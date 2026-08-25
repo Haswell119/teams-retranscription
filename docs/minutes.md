@@ -122,7 +122,7 @@ Every field of `MinutesSettings` is settable through the environment, prefix `HA
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `HANSARD_MINUTES__ENABLED` | `true` | `false` forces the extractive writer and guarantees no network call. |
-| `HANSARD_MINUTES__ENGINE` | `auto` | `llm`, `extractive` or `auto`. Read from the environment by the registry. |
+| `HANSARD_MINUTES__ENGINE` | `auto` | `llm`, `extractive` or `auto`. `auto` probes the endpoint once and falls back to extraction when it does not answer. |
 | `HANSARD_MINUTES__ENDPOINT` | `http://localhost:8080/v1` | `/v1` root of your local server. |
 | `HANSARD_MINUTES__MODEL_ID` | `qwen3-8b-instruct` | Model name as the server advertises it. |
 | `HANSARD_MINUTES__API_KEY` | unset | Sent as `Authorization: Bearer …`. Held in a `SecretStr`, never logged, never in a repr. |
