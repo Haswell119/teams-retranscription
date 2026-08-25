@@ -152,6 +152,8 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
                 "duration_seconds": round(clip.duration, 1),
                 "reference_speakers": len({turn.label for turn in reference_diarization.turns}),
                 "detected_speakers": outcome.diarization.speaker_count,
+                "reference_words": reference.word_count,
+                "hypothesis_words": hypothesis.word_count,
                 "wer_percent": _percent(scored.wer),
                 "cer_percent": _percent(scored.cer),
                 "cpwer_percent": _percent(
