@@ -63,6 +63,7 @@ class OnnxRecognizer:
     intra_op_threads: int = 0
     inter_op_threads: int = 0
     batch_size: int = 4
+    batch_seconds: float = 240.0
     language: str | None = None
     _model: Any | None = field(default=None, init=False, repr=False)
 
@@ -158,8 +159,7 @@ class OnnxRecognizer:
         language = hints.language or self.language
         spans = list(hints.segments) or [clip.span]
         utterances: list[Utterance] = []
-        for start in range(0, len(spans), max(1, self.batch_size)):
-            chunk = spans[start : start + max(1, self.batch_size)]
+        for chunk in _batches(spans, max(1, self.batch_size), self.batch_seconds):
             waveforms = [clip.extract(span).samples for span in chunk]
             usable = [(wave, span) for wave, span in zip(waveforms, chunk, strict=True) if wave.size]
             if not usable:
@@ -174,3 +174,20 @@ class OnnxRecognizer:
             language=language,
             audio_duration=clip.duration,
         )
+
+
+def _batches(spans: list[TimeSpan], size: int, seconds: float) -> list[list[TimeSpan]]:
+    batches: list[list[TimeSpan]] = []
+    current: list[TimeSpan] = []
+    budget = 0.0
+    for span in spans:
+        exceeds_count = len(current) >= size
+        exceeds_budget = current and seconds > 0 and budget + span.duration > seconds
+        if exceeds_count or exceeds_budget:
+            batches.append(current)
+            current, budget = [], 0.0
+        current.append(span)
+        budget += span.duration
+    if current:
+        batches.append(current)
+    return batches

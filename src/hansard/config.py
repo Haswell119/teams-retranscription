@@ -17,7 +17,7 @@ class AudioSettings(BaseModel):
     target_lufs: float = -23.0
     high_pass_hz: float = 60.0
     denoise: bool = False
-    max_segment_seconds: float = 30.0
+    max_segment_seconds: float = 120.0
     min_segment_seconds: float = 1.0
     segment_padding_seconds: float = 0.2
 
@@ -38,6 +38,7 @@ class AsrSettings(BaseModel):
     device: Device = "auto"
     beam_size: int = 1
     batch_size: int = 4
+    batch_seconds: float = 240.0
     language: str | None = None
     intra_op_threads: int = 0
     inter_op_threads: int = 0
