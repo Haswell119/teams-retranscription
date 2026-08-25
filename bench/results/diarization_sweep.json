@@ -365,5 +365,63 @@
       ],
       "reference_speakers": 4
     }
+  ],
+  "summ_re_similarity_rows": [
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.8,
+      "detected_speakers": 4,
+      "der_percent": 28.09,
+      "der_confusion_percent": 13.47,
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.78,
+      "detected_speakers": 4,
+      "der_percent": 28.09,
+      "der_confusion_percent": 13.47,
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.76,
+      "detected_speakers": 3,
+      "der_percent": 25.29,
+      "der_confusion_percent": 10.66,
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.75,
+      "detected_speakers": 3,
+      "der_percent": 25.29,
+      "der_confusion_percent": 10.66,
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.74,
+      "detected_speakers": 3,
+      "der_percent": 25.29,
+      "der_confusion_percent": 10.66,
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.72,
+      "detected_speakers": 3,
+      "der_percent": 25.29,
+      "der_confusion_percent": 10.66,
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.7,
+      "detected_speakers": 2,
+      "der_percent": 55.49,
+      "der_confusion_percent": 41.15,
+      "reference_speakers": 4
+    }
   ]
 }
