@@ -108,5 +108,6 @@
     },
     "word_weighted_cpwer_percent": 48.7
   },
-  "note": "Segmentation and clustering fixes applied, recognition segments still capped at 30 seconds. Recorded to separate the effect of the diarization fixes from the later segment-length change."
+  "note": "Segmentation and clustering fixes applied, recognition segments still capped at 30 seconds. Recorded to separate the effect of the diarization fixes from the later segment-length change.",
+  "profile": "historical"
 }

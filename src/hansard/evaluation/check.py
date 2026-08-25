@@ -65,6 +65,8 @@ def observations(directory: Path) -> tuple[Observation, ...]:
     collected: list[Observation] = []
     for path in sorted(directory.glob("*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("profile", "default") != "default":
+            continue
         benchmark = str(payload.get("benchmark", path.stem))
         rows = payload.get("rows")
         if not isinstance(rows, list):

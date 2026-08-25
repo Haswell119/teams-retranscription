@@ -118,6 +118,7 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
         normalizer = normalizer_for("en")
         reference = sample.reference
         hypothesis = outcome.transcript
+        scored = word_error_rate(reference.text, hypothesis.text, normalizer)
         strict = diarization_error_rate(reference_diarization, outcome.diarization, collar=0.0)
         lenient = diarization_error_rate(reference_diarization, outcome.diarization, collar=0.25)
         rows.append(
@@ -126,7 +127,8 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
                 "duration_seconds": round(clip.duration, 1),
                 "reference_speakers": len({turn.label for turn in reference_diarization.turns}),
                 "detected_speakers": outcome.diarization.speaker_count,
-                "wer_percent": _percent(word_error_rate(reference.text, hypothesis.text, normalizer).wer),
+                "wer_percent": _percent(scored.wer),
+                "cer_percent": _percent(scored.cer),
                 "cpwer_percent": _percent(
                     concatenated_minimum_permutation_wer(reference, hypothesis, normalizer).wer
                 ),
@@ -170,6 +172,7 @@ def run_ami(options: RunOptions) -> dict[str, object]:
         elapsed = time.perf_counter() - started
         reference = meeting.reference
         hypothesis = outcome.transcript
+        scored = word_error_rate(reference.text, hypothesis.text, normalizer)
         strict = diarization_error_rate(meeting.diarization, outcome.diarization, collar=0.0)
         lenient = diarization_error_rate(meeting.diarization, outcome.diarization, collar=0.25)
         rows.append(
@@ -180,7 +183,8 @@ def run_ami(options: RunOptions) -> dict[str, object]:
                 "reference_speakers": meeting.speaker_count,
                 "detected_speakers": outcome.diarization.speaker_count,
                 "reference_words": reference.word_count,
-                "wer_percent": _percent(word_error_rate(reference.text, hypothesis.text, normalizer).wer),
+                "wer_percent": _percent(scored.wer),
+                "cer_percent": _percent(scored.cer),
                 "cpwer_percent": _percent(
                     concatenated_minimum_permutation_wer(reference, hypothesis, normalizer).wer
                 ),

@@ -244,7 +244,13 @@ def test_empty_spans_are_skipped():
 
 
 def test_the_registry_builds_the_whisper_engine_from_settings(tmp_path):
-    settings = AsrSettings(engine="whisper", model_id="large-v3-turbo", beam_size=3, language="fr")
+    settings = AsrSettings(
+        engine="whisper",
+        model_id="large-v3-turbo",
+        beam_size=3,
+        language="fr",
+        quantization="int8",
+    )
     built = build_recognizer(settings, tmp_path)
     assert isinstance(built, WhisperRecognizer)
     assert built.beam_size == 3

@@ -109,5 +109,6 @@
     },
     "word_weighted_cpwer_percent": 51.37
   },
-  "note": "Recorded before two defects were fixed: segmentation discarded utterances shorter than one second and split long spans without overlap, and clustering fragmented each speaker across several clusters. Kept as the reference point the fixes are measured against."
+  "note": "Recorded before two defects were fixed: segmentation discarded utterances shorter than one second and split long spans without overlap, and clustering fragmented each speaker across several clusters. Kept as the reference point the fixes are measured against.",
+  "profile": "historical"
 }

@@ -1,6 +1,6 @@
 {
   "benchmark": "asr",
-  "model": "nemo-parakeet-tdt-0.6b-v3 int8 ONNX",
+  "model": "nemo-parakeet-tdt-0.6b-v3 float32 ONNX",
   "normalizer_version": "hansard-normalizers-1.1.0",
   "rows": [
     {
@@ -8,42 +8,41 @@
       "language": "fr",
       "utterances": 80,
       "audio_seconds": 849.3,
-      "wer_percent": 6.67,
-      "cer_percent": 2.25,
-      "substitutions": 114,
-      "deletions": 22,
-      "insertions": 11,
-      "real_time_factor": 0.3184,
-      "speedup": 3.1,
-      "peak_rss_mb": 1378.8
+      "wer_percent": 4.63,
+      "cer_percent": 1.62,
+      "substitutions": 83,
+      "deletions": 14,
+      "insertions": 5,
+      "real_time_factor": 0.3135,
+      "peak_rss_mb": 2798.5
     },
     {
       "dataset": "FLEURS en_us (read speech)",
       "language": "en",
       "utterances": 80,
       "audio_seconds": 753.1,
-      "wer_percent": 4.59,
-      "cer_percent": 2.27,
-      "substitutions": 55,
-      "deletions": 18,
-      "insertions": 5,
-      "real_time_factor": 0.3162,
-      "speedup": 3.2,
-      "peak_rss_mb": 1384.4
+      "wer_percent": 4.47,
+      "cer_percent": 1.99,
+      "substitutions": 47,
+      "deletions": 20,
+      "insertions": 9,
+      "real_time_factor": 0.4915,
+      "peak_rss_mb": 2735.9
     },
     {
       "dataset": "LibriSpeech dev-clean (read speech)",
       "language": "en",
       "utterances": 73,
       "audio_seconds": 481.0,
-      "wer_percent": 3.93,
-      "cer_percent": 1.5,
-      "substitutions": 36,
-      "deletions": 8,
-      "insertions": 2,
-      "real_time_factor": 0.355,
-      "speedup": 2.8,
-      "peak_rss_mb": 1398.1
+      "wer_percent": 3.34,
+      "cer_percent": 1.19,
+      "substitutions": 33,
+      "deletions": 5,
+      "insertions": 1,
+      "real_time_factor": 0.5657,
+      "peak_rss_mb": 2857.9
     }
-  ]
+  ],
+  "note": "Shipped default: float32 weights.",
+  "hardware": "4 vCPU, no GPU"
 }

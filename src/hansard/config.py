@@ -34,7 +34,7 @@ class VadSettings(BaseModel):
 class AsrSettings(BaseModel):
     engine: AsrEngine = "parakeet"
     model_id: str = "nemo-parakeet-tdt-0.6b-v3"
-    quantization: Literal["none", "int8"] = "int8"
+    quantization: Literal["none", "int8"] = "none"
     device: Device = "auto"
     beam_size: int = 1
     batch_size: int = 4
