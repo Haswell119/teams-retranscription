@@ -1,0 +1,51 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste meeting content into this issue.** It is public. If the
+        problem can only be shown with real audio, say so and we will find a
+        private channel. Security issues go through SECURITY.md instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `hansard doctor`
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Hansard version
+      placeholder: "0.1.0, or a commit SHA"
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Meeting language
+      options: ["French", "English", "Both in the same meeting", "Other"]
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How are you running it
+      options: ["CLI on a workstation", "Docker Compose", "Kubernetes (Helm)", "NKP", "Other"]
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact anything sensitive.
+      render: text

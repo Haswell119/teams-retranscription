@@ -1,0 +1,56 @@
+name: Transcription quality report
+description: The transcript or the speaker attribution is worse than expected
+labels: [quality]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Quality reports are the most useful issues we receive, and also the
+        easiest to get wrong. **Please do not attach meeting audio or
+        transcripts** — describe the failure instead, or reproduce it on a
+        recording you are free to share.
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What is wrong
+      options:
+        - Words are wrong or missing
+        - Everyone is labelled "Speaker 1"
+        - Too many speakers detected
+        - Two people merged into one speaker
+        - Speaker changes land in the wrong place
+        - Names or jargon are transcribed incorrectly
+        - The minutes are wrong, empty, or invented
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Meeting language
+      options: ["French", "English", "Both in the same meeting", "Other"]
+    validations:
+      required: true
+  - type: input
+    id: speakers
+    attributes:
+      label: Number of participants who actually spoke
+    validations:
+      required: true
+  - type: textarea
+    id: conditions
+    attributes:
+      label: Recording conditions
+      description: Headsets or a room microphone, dial-in participants, crosstalk, background noise, accents.
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Your configuration
+      description: Any HANSARD_ environment variables you changed from the defaults.
+      render: text
+  - type: textarea
+    id: vocabulary
+    attributes:
+      label: Did you supply a vocabulary file
+      description: Participant names and jargon fix most misrecognised proper nouns. See docs/configuration.md.

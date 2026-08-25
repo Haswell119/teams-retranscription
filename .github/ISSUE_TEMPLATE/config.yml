@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Haswell119/teams-retranscription/security/advisories/new
+    about: Report privately. Do not open a public issue.
+  - name: Documentation
+    url: https://github.com/Haswell119/teams-retranscription/tree/main/docs
+    about: Installation, configuration, deployment, benchmarks and troubleshooting.
