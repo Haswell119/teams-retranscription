@@ -226,6 +226,23 @@ Report the collar with the number: DER at 0 s and DER at 0.25 s are different me
 common convention. Hansard scores overlap by default, which is stricter and more honest for
 meetings.
 
+**Overlap puts a hard floor under the missed-speech rate.** A diarizer that names one speaker per
+instant cannot label two people talking at once, so every overlapped second is counted as missed
+no matter how good the system is. That floor equals the share of reference speech that is
+overlapped, which is why every meeting result reports it as `reference_overlap_percent`:
+
+| Corpus | Reference overlap | Floor this puts under missed speech |
+| --- | ---: | ---: |
+| AMI ES2004a | 21.3 % | 21.3 % |
+| AMI IS1009a | 18.5 % | 18.5 % |
+| AMI TS3003a | 12.9 % | 12.9 % |
+| SUMM-RE 020c_EBPZ | 5.1 % | 5.1 % |
+
+Read the missed-speech component against that column, not against zero. On AMI our missed rate
+sits close to the floor, which means the pipeline is hearing the meeting; the error that is
+actually ours is the confusion component. Getting below the floor needs overlap-aware
+diarization, which is a different architecture, not a tuning change.
+
 ### 4.5 JER — Jaccard error rate
 
 For each reference speaker, mapped to their best-matching system speaker:
