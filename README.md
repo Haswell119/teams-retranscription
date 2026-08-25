@@ -7,7 +7,7 @@ Runs entirely on your own infrastructure. Nothing leaves your network.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-953%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-979%20passing-brightgreen.svg)](tests/)
 [![Languages](https://img.shields.io/badge/languages-fran%C3%A7ais%20%7C%20english-blue.svg)](docs/benchmarks.md)
 
 </div>
@@ -106,12 +106,20 @@ They are **not** the default and not faster: INT8 costs about **2.0 WER points i
 French** for the memory it saves. The comparison is a table in
 [benchmarks](docs/benchmarks.md#5-choosing-a-quantization-profile).
 
-**Two honest caveats.** Those meeting fixtures are clean English read speech
-mixed together, which is much easier than a real meeting room — and no French
-*meeting* corpus has been run yet, so French is benchmarked at the recognition
-level only. On the AMI meeting corpus we are **worse than the published Azure
-figure**, not better. The full numbers and what they do and do not prove are in
-[benchmarks](docs/benchmarks.md) — including where we lose.
+**French is a first-class case, and here is exactly how far that goes.** One
+model covers both languages with no language tag, French read speech is measured
+and passes every quality gate it has, and French meeting fixtures are now built
+by the same generator as the English ones and scored in the same run — but no
+French *meeting* result has been recorded yet, so the meeting table above is
+English. We would rather leave that cell empty than fill it with an English
+number.
+
+**And the honest caveat.** Those meeting fixtures are clean read speech mixed
+together, which is much easier than a real meeting room. On the AMI meeting
+corpus we are **worse than the published Azure figure**, not better: 49.39 %
+macro cpWER against Azure's published 27.39 %. That is a known open problem, and
+the full numbers are in [benchmarks](docs/benchmarks.md) — including where we
+lose.
 
 ## Quick start
 

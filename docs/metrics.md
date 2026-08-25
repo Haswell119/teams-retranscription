@@ -34,7 +34,7 @@ If the comparison is done naively, a perfectly correct system is punished for pu
 
 Normalization is therefore part of the metric, not a detail. **Two error rates are only
 comparable if they were produced by the same normalizer.** For that reason every report carries a
-`normalizer_version` field (currently `hansard-normalizers-1.0.0`). If that string changes, all
+`normalizer_version` field (currently `hansard-normalizers-1.1.0`). If that string changes, all
 previously recorded baselines must be re-recorded.
 
 ### 2.1 The language-agnostic normalizer
@@ -425,6 +425,13 @@ report contains `metrics`, `metrics_by_language` and `metrics_by_dataset`. Frenc
 are evaluated against the French numbers only, and if a run contains no French data those gates
 are marked **missing**, which fails the run. It is deliberately impossible to publish an
 English-only pass.
+
+One practical qualifier. `make gates` scores the JSON files that are actually in `bench/results/`,
+so a gate whose metric appears in no result file is neither passed nor failed there — it simply
+does not appear. Read a gate that is absent from the output as a measurement you have not taken.
+Both languages are benchmarked on the same schedule: French read speech (FLEURS `fr_fr`) and, since
+the French synthetic meeting fixtures were added, French meetings scored by the same generator and
+the same metrics as the English ones. See [benchmarks](benchmarks.md#2-meeting-transcription-with-speaker-attribution).
 
 ---
 

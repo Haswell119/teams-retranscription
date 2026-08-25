@@ -290,16 +290,20 @@ speakers each:
 | 20.0 / 0.70 | 29.62 % | 5, 4, 2 |
 | 10.0 / 0.60 | 32.89 % | 4, 3, 3 |
 
-*This sweep is not yet written to `bench/results/`; the AMI baseline it was run
-against is [`ami_mix_headset.json`](../bench/results/ami_mix_headset.json).*
+*This sweep is not yet written to `bench/results/`. It was run on the same three
+meetings as [`ami_mix_headset.json`](../bench/results/ami_mix_headset.json),
+whose recorded run still uses the previous pair of defaults — six speakers
+detected against a reference of four.*
 
 Two things follow, and both matter when you reach for these knobs:
 
 **Merging harder is not better.** The instinct on seeing too many speakers is to
-lower `MERGE_SIMILARITY` so more clusters fuse. Every row of that sweep with
-`0.60` is *worse* on DER than the matching row at `0.70`, because below the
-default the consolidator starts fusing genuinely different people. Raise the
-absorption floor before you touch the similarity.
+lower `MERGE_SIMILARITY` so more clusters fuse. Holding the floor at 10 s and
+dropping the similarity from `0.70` to `0.60` costs **3.4 points of DER**
+(29.49 % against 32.89 %), because below the default the consolidator starts
+fusing genuinely different people — and two real speakers merged into one is a
+worse transcript than one spare cluster. Raise the absorption floor before you
+touch the similarity.
 
 **A 10-second floor has a deliberate cost.** Someone whose *total* speaking time
 across the entire meeting is under ten seconds is folded into a neighbouring

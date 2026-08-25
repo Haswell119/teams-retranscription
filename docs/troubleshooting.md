@@ -177,11 +177,21 @@ anything.
 syllable. This is not a threshold problem; leave the threshold alone.
 
 **Fix.** Raise the floor that absorbs marginal speakers into their nearest stable
-neighbour:
+neighbour. It defaults to `10.0` seconds of total speaking time; on a noisy room
+go higher:
 
 ```bash
-HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS=6.0
+HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS=15.0
 ```
+
+Raise this **before** you touch `MERGE_SIMILARITY`. On the AMI sweep behind the
+current defaults, going from 10 s to 20 s barely moved macro DER (29.49 % to
+29.62 %), while loosening the similarity made it clearly worse — see
+[configuration](configuration.md#minimum_speaker_seconds-and-merge_similarity-the-pair-that-was-retuned).
+
+The floor is skipped entirely when the speaker count is known — a Teams roster,
+`--speakers`, or `speaker_count` in the API. If the bot joined the meeting, this
+setting is not what you are looking for; pin the count instead.
 
 ### One person split across several speakers
 
@@ -190,15 +200,22 @@ so clustering fragments a person into several clusters. Spontaneous meetings do
 this far more than prepared speech.
 
 **Fix.** Cluster consolidation is on by default and merges clusters whose speaker
-centroids are too close to be different people. If fragments survive, lower the
-similarity a person must exceed to be considered the same person:
+centroids are too close to be different people. If fragments survive, you can
+lower the similarity a person must exceed to be considered the same person:
 
 ```bash
-HANSARD_DIARIZATION__MERGE_SIMILARITY=0.50   # default 0.60
+HANSARD_DIARIZATION__MERGE_SIMILARITY=0.65   # default 0.70
 ```
 
-Lower it too far and genuinely different speakers merge, so move in steps of
-0.05 and check the result. To turn the stage off entirely:
+**Do this last, and expect it to cost you.** The instinct — "I see too many
+speakers, so let me merge more aggressively" — measured *worse*, not better. On
+the AMI sweep behind the current defaults, dropping the similarity from 0.70 to
+0.60 while holding the floor at 10 s took macro DER from 29.49 % to 32.89 %,
+because below 0.70 the consolidator starts fusing genuinely different people —
+and a merged pair of real speakers is a far worse transcript than one spare
+cluster. Raise `MINIMUM_SPEAKER_SECONDS` first, and if you do move the
+similarity, move it in steps of 0.05 and check the result. To turn the stage off
+entirely:
 
 ```bash
 HANSARD_DIARIZATION__CLUSTER_CONSOLIDATION=false
@@ -323,15 +340,20 @@ buttons are not found, pin the Teams interface language — see
 
 ## It is too slow, or runs out of memory
 
-Expected figures on 4 vCPU with no GPU, from [benchmarks](benchmarks.md#4-efficiency):
+Expected figures on 4 vCPU with no GPU, with the shipped float32 recogniser,
+from [benchmarks](benchmarks.md#4-efficiency):
 
-| Profile | Speed | Peak RAM | 60-minute meeting |
+| Profile | RTF | Peak RAM | 60 minutes of audio |
 | --- | ---: | ---: | ---: |
-| Full pipeline | ~3× real time | 2.9 GB | ~20 min |
-| Recognition alone | ~8.8× real time | 1.4 GB | ~7 min |
+| Full pipeline | 0.61 – 0.81 | 3.6 GB | ~44 min |
+| Recognition alone | 0.31 – 0.57 | 2.9 GB | ~26 min |
 
-Time splits roughly 55 % recognition, 40 % diarization, 5 % everything else.
-Both scale with cores, so an 8-core node roughly halves those figures.
+RTF is processing seconds per second of audio; lower is better. Time splits
+roughly 55 % recognition, 40 % diarization, 5 % everything else. Both scale with
+cores, so an 8-core node roughly halves those figures.
+
+If you are comparing against older figures of "~3× real time and 2.9 GB", those
+were the INT8 recogniser, which is no longer the default.
 
 ### It is much slower than that
 
@@ -370,14 +392,28 @@ at the top of `deploy/docker/Dockerfile.worker-gpu`. Note also that
 In order of effect:
 
 ```bash
-HANSARD_ASR__QUANTIZATION=int8      # the default; `none` costs ~2.2x
+HANSARD_ASR__QUANTIZATION=int8      # the low-memory profile: 1.4 GB instead of 2.8 GB
 HANSARD_ASR__BATCH_SIZE=1           # fewer segments held at once
 HANSARD_ASR__INTRA_OP_THREADS=2     # each thread has its own arena
 ```
 
+`int8` is **not** the default and it is not free: it costs about two points of
+word error rate in French and rather less in English, for roughly 1.4 GB of
+resident memory. It is also no faster. Take it when the memory is genuinely not
+there, and record the choice wherever you report quality —
+[benchmarks §5](benchmarks.md#5-choosing-a-quantization-profile) has the full
+comparison.
+
+The other lever is the segment ceiling. `HANSARD_AUDIO__MAX_SEGMENT_SECONDS`
+defaults to 120, and on real spontaneous meeting audio that is what drives peak
+memory: the AMI benchmark reached **7.1 GB** at the default, against 3.6 GB on
+the synthetic fixtures. Lowering it to 30–60 seconds cuts memory substantially
+and costs word error rate — the exchange rate is measured in
+[benchmarks](benchmarks.md#6-engineering-findings-worth-knowing).
+
 If you are running several meetings in parallel on one node, that is the real
-cost: each worker holds its own copy of the recogniser, around 1.4 GB. Budget
-per worker process, not per node.
+cost: each worker holds its own copy of the recogniser, around 2.8 GB at the
+float32 default or 1.4 GB with `int8`. Budget per worker process, not per node.
 
 ---
 

@@ -11,10 +11,11 @@ There are three ways to run Hansard, in increasing order of effort:
 
 Whichever you choose, two things are true. **ffmpeg must be on the PATH**, and
 **the models must be on disk before you run anything**: Hansard does not
-download weights at run time.
+download weights at run time. Budget **3.2 GB** for the model bundle.
 
 French and English are handled by the same model and the same install. There is
-no per-language package, no language pack and no second worker.
+no per-language package, no language pack and no second worker. A meeting that
+switches between the two mid-sentence transcribes in one pass.
 
 ---
 
@@ -179,6 +180,9 @@ models/
 │   ├── config.json
 │   ├── vocab.txt
 │   ├── nemo128.onnx
+│   ├── encoder-model.onnx
+│   ├── encoder-model.onnx.data
+│   ├── decoder_joint-model.onnx
 │   ├── encoder-model.int8.onnx
 │   └── decoder_joint-model.int8.onnx
 ├── silero/
@@ -199,9 +203,18 @@ models/
 | `sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx` | Speaker segmentation | MIT |
 | `nemo_en_titanet_small.onnx` | Speaker embeddings for clustering | CC-BY-4.0 |
 
-Only the INT8 encoder and decoder are in the manifest. If you set
-`HANSARD_ASR__QUANTIZATION=none` you must supply the float32 weights yourself;
-the shipped bundle will not satisfy that setting.
+**Both recognition profiles are in the manifest**, which is why the bundle is
+3.2 GB: the float32 weights (`encoder-model.onnx` plus its `.data` sidecar and
+`decoder_joint-model.onnx`, 2.5 GB) are the shipped default, and the INT8 weights
+(640 MB) are the opt-in low-memory profile. `HANSARD_ASR__QUANTIZATION=int8`
+switches between them with no download and no network access. The quality and
+memory trade-off is in
+[benchmarks §5](benchmarks.md#5-choosing-a-quantization-profile); the short
+version is that INT8 saves about 1.4 GB of resident memory, is no faster, and
+costs roughly two points of word error rate in French.
+
+Diarization (46 MB) and voice activity detection (2 MB) are language independent
+and have a single profile each.
 
 ### Pointing Hansard at them
 

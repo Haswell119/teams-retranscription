@@ -282,7 +282,7 @@ path is synchronous, the I/O path is `async`.**
 | Audio load and decode | CPU + subprocess | Synchronous, ffmpeg via `subprocess.run` | The whole clip is float32 in RAM: about 3.8 MB per minute at 16 kHz |
 | Enhancement | Subprocess | Synchronous, samples piped through ffmpeg | A second copy of the clip during the pipe |
 | Voice activity | CPU, ONNX | Synchronous | ~2 MB of model |
-| Recognition | CPU or GPU, ONNX | Synchronous, batched by `asr.batch_size` | The dominant cost: about 1.4 GB resident for the INT8 model, plus activations proportional to batch size |
+| Recognition | CPU or GPU, ONNX | Synchronous, batched by `asr.batch_size` | The dominant cost: about 2.8 GB resident for the shipped float32 model, or 1.4 GB for the INT8 profile, plus activations proportional to batch size |
 | Diarization | CPU or GPU, ONNX | Synchronous | 46 MB of models, plus one embedding per segment |
 | Attribution and naming | Pure Python | Synchronous | Negligible |
 | Capture (browser, PulseAudio, roster) | I/O bound | `async`, `asyncio` throughout | The recording streams to disk, not to memory |
@@ -302,10 +302,11 @@ Running several meetings at once inside one `serve` process is governed by
 `runtime.max_concurrent_meetings`; each concurrent job holds its own recogniser,
 so that setting is a memory decision more than a throughput one.
 
-Peak resident memory for the full CPU pipeline was measured at 2.9 GB, with
-recognition alone at 1.4 GB. Time splits roughly 55 % recognition, 40 %
-diarization, 5 % everything else. Both scale with cores. See
-[benchmarks](benchmarks.md#4-efficiency).
+Peak resident memory for the full CPU pipeline was measured at 3.6 GB with the
+shipped float32 recogniser, and 2.9 GB for recognition alone. The INT8 profile
+measures 2.7 GB and 1.4 GB for the same two cases, no faster. Time splits roughly
+55 % recognition, 40 % diarization, 5 % everything else. Both scale with cores.
+See [benchmarks](benchmarks.md#4-efficiency).
 
 `PipelineOutcome` records per-stage wall-clock time, and its `real_time_factor`
 is the ratio of total processing time to audio duration — the figure the CLI
@@ -424,9 +425,10 @@ Existing channels and their address formats are in [delivery](delivery.md).
 
 **ONNX Runtime rather than PyTorch.** Parakeet is a NeMo model and the obvious
 route would be `nemo-toolkit`, which brings PyTorch and CUDA libraries with it.
-The INT8 ONNX export is about 600 MB on disk and roughly 1.4 GB resident; the
-PyTorch path is several gigabytes of wheels before any weights are loaded, and it
-puts a CUDA-shaped dependency into an image that has to run on CPU. The CPU
+The ONNX export is 2.5 GB on disk in float32 and 640 MB in INT8, roughly 2.8 GB
+and 1.4 GB resident; the PyTorch path is several gigabytes of wheels before any
+weights are loaded, and it puts a CUDA-shaped dependency into an image that has
+to run on CPU. The CPU
 worker image asserts this: the build fails if `torch` appears in the virtualenv.
 The cost of the choice is that model support is limited to what exports cleanly
 to ONNX, which is a real constraint we accept.

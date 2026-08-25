@@ -27,9 +27,13 @@ What follows from that, concretely:
   language hint at all. The model works it out. A meeting where people switch
   between French and English transcribes correctly in a single pass - something
   engines that demand a language up front cannot do.
-* **One model in memory.** This is what keeps the CPU worker at roughly **2 GB
-  RSS**. Running two monolingual models would double it, and holding both
-  loaded would double it again.
+* **One model in memory.** This is what keeps the CPU worker to a single
+  recogniser: roughly **2.8 GB RSS** with the shipped float32 weights, and up to
+  **3.6 GB** for the full pipeline at peak. Running two monolingual models would
+  double it, and holding both loaded would double it again. The INT8 profile
+  (`HANSARD_ASR__QUANTIZATION=int8`) brings the recogniser down to about 1.4 GB
+  at the cost of roughly two points of French word error rate — see
+  [benchmarks §5](benchmarks.md#5-choosing-a-quantization-profile).
 * **Diarization and VAD are language independent** by construction: pyannote
   segmentation 3.0 for speaker turns, NVIDIA TitaNet for speaker embeddings,
   Silero for voice activity. Nothing there changes with language either.
@@ -73,7 +77,8 @@ grace period, and compose cannot model that honestly.
 
 ### Requirements
 
-* Docker with BuildKit (Docker 23+), about 6 GB free disk
+* Docker with BuildKit (Docker 23+), about 6 GB free disk for the images plus
+  3.2 GB for the model bundle
 * 4 CPU cores and 8 GB RAM is comfortable; it will run on less, slower
 
 ### Steps
@@ -86,7 +91,7 @@ cp .env.example .env
 docker compose --profile build build
 
 # 2. Download and checksum-verify the model bundle. ONCE.
-#    ~0.71 GB. Nothing is ever downloaded again after this.
+#    ~3.2 GB. Nothing is ever downloaded again after this.
 docker compose run --rm models
 
 # 3. Start Redis, the API and one worker.
@@ -146,14 +151,14 @@ leaves the machine, because there is nowhere for it to go.
 |---|---|
 | `OMP_NUM_THREADS` | ONNX Runtime threads per worker. Default 4. Set to your core count minus two. |
 | `WORKER_REPLICAS` | Parallel workers. One per ~4 GB RAM. |
-| `HANSARD_ASR__QUANTIZATION` | `int8` (default, ~2 GB RSS) or `none` (better accuracy, ~4.5 GB) |
+| `HANSARD_ASR__QUANTIZATION` | `none` (default, float32, ~2.8 GB RSS) or `int8` (low-memory, ~1.4 GB, no faster, ~2 WER points worse in French) |
 | `HANSARD_ASR__BATCH_SIZE` | Segments per ONNX call. Higher = faster and hungrier. |
 
 ### Tearing down
 
 ```bash
 docker compose down                 # keeps the model volume
-docker compose down -v              # deletes it too; you will re-download 0.71 GB
+docker compose down -v              # deletes it too; you will re-download 3.2 GB
 ```
 
 ---
@@ -166,7 +171,25 @@ docker compose down -v              # deletes it too; you will re-download 0.71 
 * A default StorageClass supporting **ReadWriteOnce**. The chart never requires
   ReadWriteMany.
 * An ingress controller, if you want the API reachable from outside the cluster
-* Roughly, per worker: 2 CPU / 3 GB request, 6 GB limit
+* Roughly, per worker: 2 CPU / 3 GB request, 6 GB limit. The float32 pipeline
+  was measured at up to 3.6 GB peak on the synthetic fixtures, so it lives inside
+  the limit but above the request; give workers a node with headroom, or switch
+  them to the INT8 profile
+* **Long spontaneous meetings need more than that.** On the AMI corpus — real
+  25-minute meetings at the default 120-second segment ceiling — peak RSS reached
+  **7.1 GB**, above the chart's 6 GB limit. For that kind of recording, raise
+  `worker.cpu.resources.limits.memory`, or lower the segment ceiling through
+  `config.extraEnv` (the chart does not model audio settings directly):
+
+  ```yaml
+  config:
+    extraEnv:
+      - name: HANSARD_AUDIO__MAX_SEGMENT_SECONDS
+        value: "60"
+  ```
+
+  Shorter segments cost word error rate — the exchange rate is in
+  [benchmarks](benchmarks.md#6-engineering-findings-worth-knowing)
 
 Not required, used if present: Prometheus Operator, Grafana, KEDA, Cilium,
 External Secrets Operator, COSI. Every one of them is detected at template time
@@ -250,11 +273,17 @@ set on every workload, and there is no value that turns them off.
 
 ```yaml
 asr:
-  compute: auto   # auto | cpu | gpu | both
+  compute: auto        # auto | cpu | gpu | both
+  quantization: none   # none (float32, benchmarked default) | int8 (low-memory)
 ```
 
 `auto` resolves to **CPU**. Helm cannot see node GPU capacity at template time,
 so `auto` never silently schedules onto GPUs - ask for them explicitly.
+
+**Set `asr.quantization` explicitly.** The application default is `none`, but the
+chart's own `values.yaml` still ships `int8`, so a default `helm install` gets the
+low-memory profile - no faster, and about two points of French word error rate
+worse. Pass `none` unless you specifically want INT8.
 
 `both` runs a GPU deployment and a CPU deployment against the **same Redis
 Stream consumer group**: one logical worker pool spread over two node classes,

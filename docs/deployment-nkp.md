@@ -24,8 +24,11 @@ For an NKP operator this means:
 
 * **One worker pool, not two.** No French node pool, no English node pool, no
   language-based routing in the queue.
-* **One model artifact to mirror** into the air gap - about 0.71 GB total, once.
-* **~2 GB RSS per CPU worker.** Sizing a node pool is a single calculation.
+* **One model artifact to mirror** into the air gap - 3.2 GB total, once. It
+  carries both recognition profiles, so switching to the low-memory INT8 weights
+  later needs no second trip across the gap.
+* **~2.8 GB RSS per CPU worker** for the recogniser, up to 3.6 GB for the full
+  pipeline at peak. Sizing a node pool is a single calculation.
 * **`asr.language: auto`** is the default and sends no language tag at all.
 
 Diarization (pyannote segmentation 3.0 + NVIDIA TitaNet embeddings) and VAD
@@ -238,7 +241,7 @@ procedure, on both sides of the gap.
 
 ```bash
 make -C deploy/docker all-images REGISTRY=stage.example.com/hansard
-make -C deploy/docker models                     # 0.71 GB bundle, checksum-verified
+make -C deploy/docker models                     # 3.2 GB bundle, checksum-verified
 make -C deploy/docker push-all  REGISTRY=stage.example.com/hansard
 make -C deploy/docker sign      REGISTRY=stage.example.com/hansard COSIGN_KEY=cosign.key
 make -C deploy/docker digests   REGISTRY=stage.example.com/hansard
@@ -556,7 +559,9 @@ orchestrator:
 
 ## Sizing a node pool
 
-Per CPU worker, transcribing at roughly 0.3-0.5x realtime with int8 Parakeet:
+Per CPU worker, transcribing at a real-time factor of roughly 0.6-0.8 with the
+shipped float32 Parakeet - that is 0.6-0.8 processing seconds per second of
+audio, so a one-hour meeting takes about 44 minutes on four cores:
 
 | | Request | Limit |
 |---|---|---|
@@ -567,9 +572,44 @@ Per CPU worker, transcribing at roughly 0.3-0.5x realtime with int8 Parakeet:
 that has to keep up with realtime audio and the event loop that shepherds live
 meetings. Requests reserve capacity; limits would only add jitter.
 
-Steady-state RSS is about 2 GB per worker, because there is one multilingual
-model rather than one per language. Add roughly 1 GB of headroom for the audio
-buffer of the longest meeting you allow.
+Steady-state RSS is about 2.8 GB per worker, because there is one multilingual
+model rather than one per language, and the measured peak for the full pipeline
+is 3.6 GB on the synthetic fixtures. Add roughly 1 GB of headroom for the audio
+buffer of the longest meeting you allow, which is why the memory limit is 6 Gi
+and not 4.
+
+**Real meeting audio needs more.** On the AMI corpus - genuine spontaneous
+meetings up to 25 minutes, at the default 120-second segment ceiling - peak RSS
+reached **7.1 GB**, which the 6 Gi limit would kill. If your meetings look like
+that, raise `worker.cpu.resources.limits.memory` to 8 Gi, or lower the segment
+ceiling through `config.extraEnv` - the chart does not model audio settings
+directly:
+
+```yaml
+config:
+  extraEnv:
+    - name: HANSARD_AUDIO__MAX_SEGMENT_SECONDS
+      value: "60"
+```
+
+Shorter segments cost word error rate: see
+[benchmarks](benchmarks.md#6-engineering-findings-worth-knowing).
+
+**Check `asr.quantization` before you size anything.** The application default is
+`none` - float32, the profile every published number uses - but the Helm chart
+still ships `asr.quantization: int8` in `values.yaml`, so a default `helm install`
+runs the low-memory profile: about 1.4 GB resident for the recogniser, no faster,
+and roughly two points of word error rate worse in French. Set it explicitly to
+whichever you mean:
+
+```yaml
+asr:
+  quantization: none    # float32, the benchmarked default, ~2.8 GB resident
+```
+
+On a French-speaking cluster, buy the memory and use `none`. See
+[benchmarks](benchmarks.md#5-choosing-a-quantization-profile) for the full
+trade-off.
 
 Each capture bot is a separate Job: 1 CPU request, and `memory request == limit`
 (3 Gi with the default 1 Gi `/dev/shm`, because tmpfs pages are charged to the
