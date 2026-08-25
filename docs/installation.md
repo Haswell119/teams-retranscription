@@ -365,6 +365,31 @@ downloading its artefacts. Set `HANSARD_API__API_KEY` to require an `X-API-Key`
 header on every `/v1` route; without it the API is unauthenticated, so bind it to
 a private interface. See [configuration](configuration.md#api).
 
+### Watching a folder
+
+The simplest way to run Hansard as a service: point it at a directory and drop
+recordings in.
+
+```bash
+hansard worker --inbox /srv/recordings --outbox /srv/minutes
+```
+
+It scans every five seconds, moves each recording aside while it works, and
+writes the artefacts to a per-meeting directory under the outbox. A recording
+that fails is moved to `.failed/` next to the reason, so nothing is silently
+lost. `--once` processes what is already there and exits, which is what you want
+from a cron job.
+
+An optional JSON file next to a recording supplies what the audio cannot:
+
+```json
+{"title": "Comité de lancement", "language": "fr", "speakers": 4,
+ "vocabulary": ["Aurélie Fontaine", "SecNumCloud"]}
+```
+
+`--heartbeat` names the file touched on every scan, which is what a Kubernetes
+liveness probe watches, and `--metrics-port` serves Prometheus metrics.
+
 ---
 
 ## 7. When it does not work
