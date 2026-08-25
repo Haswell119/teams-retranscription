@@ -57,7 +57,7 @@ class DiarizationSettings(BaseModel):
     device: Device = "auto"
     speech_coverage_refinement: bool = True
     cluster_consolidation: bool = True
-    merge_similarity: float = 0.80
+    merge_similarity: float = 0.77
     maximum_turn_extension: float = 2.5
 
 

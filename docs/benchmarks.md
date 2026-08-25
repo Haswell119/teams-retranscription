@@ -186,16 +186,17 @@ distance between them is the size of the problem:
 Those fixes bought 2.58 points of macro cpWER and removed four spurious speakers
 per meeting. They do not close a twenty-two-point gap.
 
-Since that run, the diarization defaults were retuned on these same three
-meetings — `minimum_speaker_seconds` from 3 s to 10 s and `merge_similarity` from
-0.60 to 0.70 — which brings the detected speaker count to 5, 4 and 5 against a
-reference of 4, and macro DER to 29.49 %. That is better than anything in the
-table above, and it is **not** recorded in `bench/results/` yet, so it does not
-change the published figure. The sweep is written up in
+Since that run, the diarization defaults were retuned on these three meetings
+*and* on the real French meeting in [§2.4](#24-summ-re-real-french-meeting-audio)
+— `minimum_speaker_seconds` from 3 s to 10 s and `merge_similarity` from 0.60 to
+**0.77**. On AMI that brings the detected speaker count to 5, 4 and 5 against a
+reference of 4, and macro DER to 29.49 %. The full sweep is recorded in
+[`bench/results/diarization_sweep.json`](../bench/results/diarization_sweep.json)
+and written up in
 [configuration](configuration.md#minimum_speaker_seconds-and-merge_similarity-the-pair-that-was-retuned).
 
-Until AMI is re-run with those defaults, the headline number stays at 49.39 % —
-we do not publish an improvement we have not recorded.
+Until AMI is re-run end to end with those defaults, the headline number stays at
+49.39 % — we do not publish an improvement we have not recorded.
 
 ### 2.4 SUMM-RE, real French meeting audio
 

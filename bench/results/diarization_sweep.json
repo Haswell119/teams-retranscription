@@ -14,7 +14,7 @@
   },
   "shipped_default": {
     "minimum_speaker_seconds": 10.0,
-    "merge_similarity": 0.8
+    "merge_similarity": 0.77
   },
   "previous_default": {
     "minimum_speaker_seconds": 3.0,
@@ -345,6 +345,39 @@
     },
     {
       "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.79,
+      "macro_der_percent": 30.99,
+      "detected_speakers": [
+        5,
+        6,
+        5
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.78,
+      "macro_der_percent": 30.99,
+      "detected_speakers": [
+        5,
+        6,
+        5
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.77,
+      "macro_der_percent": 29.49,
+      "detected_speakers": [
+        5,
+        4,
+        5
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
       "merge_similarity": 0.75,
       "macro_der_percent": 29.49,
       "detected_speakers": [
@@ -378,6 +411,14 @@
     {
       "minimum_speaker_seconds": 10.0,
       "merge_similarity": 0.78,
+      "detected_speakers": 4,
+      "der_percent": 28.09,
+      "der_confusion_percent": 13.47,
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.77,
       "detected_speakers": 4,
       "der_percent": 28.09,
       "der_confusion_percent": 13.47,
@@ -423,5 +464,6 @@
       "der_confusion_percent": 41.15,
       "reference_speakers": 4
     }
-  ]
+  ],
+  "operating_window": "AMI degrades above 0.77; SUMM-RE degrades below 0.77"
 }

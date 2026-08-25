@@ -254,7 +254,7 @@ tuning, because it is the one that decides who is credited with what.
 | `CLUSTERING_THRESHOLD` | float | `0.99` | The cosine-distance threshold at which two segments are treated as different speakers. **The single most useful knob.** See below. |
 | `MINIMUM_SPEAKER_SECONDS` | float | `10.0` | Any speaker whose total speaking time across the whole meeting is below this is absorbed into its nearest stable neighbour. This is what removes phantom speakers created by crosstalk, laughter or a single overlapping syllable. **It does not run when the speaker count is already known** — see the note below. Lower it to 1–3 s for a file-based transcription where a genuinely brief contributor must survive as their own speaker. |
 | `CLUSTER_CONSOLIDATION` | bool | `true` | Merges clusters whose speaker centroids are too close to be different people, which is what repairs one person fragmented across several speakers. Turn it off only to measure what it is doing. |
-| `MERGE_SIMILARITY` | float | `0.70` | The cosine similarity two cluster centroids must exceed before consolidation treats them as the same person. **Raising it merges less; lowering it merges more — and lowering it below the default measured worse, not better.** See the note below. |
+| `MERGE_SIMILARITY` | float | `0.77` | The cosine similarity two cluster centroids must exceed before consolidation treats them as the same person. Raising it merges less; lowering it merges more. **Both directions measured worse.** Read the note below before you touch it. |
 | `MAX_SPEAKERS` | int | `8` | Reaches the diarization request but the sherpa engine does not read it. It does not cap anything today. |
 | `MIN_SPEAKERS` | int | `1` | Same: carried, not used. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | Only the literal value `cuda` selects the GPU provider. `auto` resolves to CPU. Diarization is a small share of total time, so this rarely matters. |
@@ -279,31 +279,56 @@ clusters. The evidence is in
 
 ### `minimum_speaker_seconds` and `merge_similarity`: the pair that was retuned
 
-These two defaults changed together — from `3.0` / `0.60` to **`10.0` / `0.70`**
-— after a parameter sweep on the three AMI meetings, whose reference is four
-speakers each:
+These two defaults were swept together on two corpora of *real* meetings: the
+three AMI meetings, four speakers each, and SUMM-RE `020c_EBPZ`, also four
+speakers but with two of them speaking for only 59 and 12 seconds in eighteen
+minutes. The recorded sweep is
+[`bench/results/diarization_sweep.json`](../bench/results/diarization_sweep.json).
 
-| `minimum_speaker_seconds` / `merge_similarity` | Macro DER | Speakers detected |
+The absorption floor moved from `3.0` to `10.0`, which on AMI takes the raw
+clusters from ten and sixteen down to six per meeting before any merging happens:
+
+| `minimum_speaker_seconds` | AMI macro DER | AMI speakers detected |
 | --- | ---: | :---: |
-| 3.0 / 0.60, the previous default | 33.03 % | 6, 6, 6 |
-| **10.0 / 0.70, the default today** | **29.49 %** | **5, 4, 5** |
-| 20.0 / 0.70 | 29.62 % | 5, 4, 2 |
-| 10.0 / 0.60 | 32.89 % | 4, 3, 3 |
+| 0.0 | 33.14 % | 10, 16, 16 |
+| 3.0 | 32.92 % | 10, 10, 10 |
+| **10.0** | **32.35 %** | **6, 6, 6** |
+| 20.0 | 32.52 % | 6, 6, 4 |
 
-*This sweep is not yet written to `bench/results/`. It was run on the same three
-meetings as [`ami_mix_headset.json`](../bench/results/ami_mix_headset.json),
-whose recorded run still uses the previous pair of defaults — six speakers
-detected against a reference of four.*
+`merge_similarity` is the more delicate of the two, and it has a **one-hundredth
+wide** window:
 
-Two things follow, and both matter when you reach for these knobs:
+| `merge_similarity` | AMI DER | AMI speakers | SUMM-RE DER | SUMM-RE speakers |
+| --- | ---: | :---: | ---: | :---: |
+| 0.85 | 31.97 % | 5, 6, 6 | — | — |
+| 0.80 | 30.99 % | 5, 6, 5 | 28.09 % | 4 |
+| 0.78 | 30.99 % | 5, 6, 5 | 28.09 % | 4 |
+| **0.77, the default** | **29.49 %** | **5, 4, 5** | **28.09 %** | **4** |
+| 0.75 | 29.49 % | 5, 4, 5 | 25.29 % | 3 |
+| 0.72 | — | — | 25.29 % | 3 |
+| 0.70, the previous default | 29.49 % | 5, 4, 5 | 55.49 % | **2** |
 
-**Merging harder is not better.** The instinct on seeing too many speakers is to
-lower `MERGE_SIMILARITY` so more clusters fuse. Holding the floor at 10 s and
-dropping the similarity from `0.70` to `0.60` costs **3.4 points of DER**
-(29.49 % against 32.89 %), because below the default the consolidator starts
-fusing genuinely different people — and two real speakers merged into one is a
-worse transcript than one spare cluster. Raise the absorption floor before you
-touch the similarity.
+The reference is four speakers in every one of those meetings.
+
+**Both directions are worse, for opposite reasons.** Above `0.77` the
+consolidator stops merging clusters that are the same person, and AMI goes from
+four detected speakers to six. Below `0.77` it starts merging people who are
+not the same person, and SUMM-RE goes from four to three, then off a cliff to
+two at `0.70` — where cpWER reached 89.82 %. Two real speakers fused into one
+is a much worse transcript than one spare cluster, so if you must be wrong, be
+wrong upwards.
+
+**Treat `0.77` as fitted, not fundamental.** It is the value where two corpora
+happen to agree, and one hundredth in either direction breaks one of them. It
+will not be exactly right for your audio. What makes the speaker count robust in
+production is not this number — it is the participant list: the bot joins with a
+roster, the roster becomes a ceiling, and the ceiling brings an over-count back
+down without ever being able to fuse two people. Tune this setting by symptom:
+
+| Symptom | Change |
+| --- | --- |
+| Two people share one speaker label | **Raise** it, `0.77 → 0.80 → 0.85` |
+| One person appears as two speakers | **Lower** it, in steps of `0.01`, and re-check that nobody got fused |
 
 **A 10-second floor has a deliberate cost.** Someone whose *total* speaking time
 across the entire meeting is under ten seconds is folded into a neighbouring

@@ -204,18 +204,19 @@ centroids are too close to be different people. If fragments survive, you can
 lower the similarity a person must exceed to be considered the same person:
 
 ```bash
-HANSARD_DIARIZATION__MERGE_SIMILARITY=0.65   # default 0.70
+HANSARD_DIARIZATION__MERGE_SIMILARITY=0.75   # default 0.77
 ```
 
-**Do this last, and expect it to cost you.** The instinct — "I see too many
-speakers, so let me merge more aggressively" — measured *worse*, not better. On
-the AMI sweep behind the current defaults, dropping the similarity from 0.70 to
-0.60 while holding the floor at 10 s took macro DER from 29.49 % to 32.89 %,
-because below 0.70 the consolidator starts fusing genuinely different people —
-and a merged pair of real speakers is a far worse transcript than one spare
-cluster. Raise `MINIMUM_SPEAKER_SECONDS` first, and if you do move the
-similarity, move it in steps of 0.05 and check the result. To turn the stage off
-entirely:
+**Do this last, in steps of 0.01, and check who got merged.** The instinct — "I
+see too many speakers, so let me merge much more aggressively" — measured
+*worse*, not better, and the margin is thin. On a real French meeting with four
+speakers, the same floor of 10 s gave four detected speakers at 0.77, three at
+0.75, and **two at 0.70**, where cpWER reached 89.82 %. A merged pair of real
+speakers is a far worse transcript than one spare cluster.
+
+Raise `MINIMUM_SPEAKER_SECONDS` first. Better still, if the bot joined the
+meeting, the participant list already caps the speaker count for you and no
+tuning is needed. To turn the stage off entirely:
 
 ```bash
 HANSARD_DIARIZATION__CLUSTER_CONSOLIDATION=false
