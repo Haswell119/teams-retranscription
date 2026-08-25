@@ -472,6 +472,43 @@ Two things about that comparison need saying plainly:
 So: treat the gap as real until proven otherwise, and treat the size of the gap
 as uncertain.
 
+**Most of the AMI error is words we never produce at all.** The reference for
+ES2004a has 2614 words and our transcript has 1517. Across the three meetings we
+produce **roughly 58 % of the reference words**; the rest are deletions, not
+mistakes. Two obvious explanations have been measured and ruled out:
+
+- *Voice activity detection is not dropping them.* Measured against the
+  reference turns, Silero covers 91.9 %, 97.9 % and 83.4 % of reference speech
+  time. IS1009a is decisive: 97.9 % coverage and still 40 % of the words
+  missing.
+- *Disfluencies in the reference are not the explanation either.* Filled pauses
+  and backchannels (uh, um, mm-hmm, yeah, okay and friends) are 8.8 %, 10.2 %
+  and 9.2 % of the reference words, and that count generously includes words the
+  recognizer does emit.
+
+On IS1009a we hand the recognizer 658 seconds of audio and get back 1187 words —
+**1.80 words per second**, against 3.16 in the reference. The words are being
+lost inside recognition, on audio the pipeline demonstrably heard. That is the
+single largest defect in this project and it is unresolved.
+
+**Some of the diarization error is structural and cannot be tuned away.** A
+system that names one speaker per instant cannot label two people talking at
+once, so overlapped speech is counted as missed however good the system is. AMI
+reference overlap is 21.3 %, 18.5 % and 12.9 %; our missed-speech component sits
+close to those figures. Read the missed column against that floor rather than
+against zero — see [metrics](metrics.md#44-der--diarization-error-rate). Getting
+under it needs overlap-aware diarization, which is a different architecture.
+
+**A real French meeting exposed a default that clean fixtures could not.** On
+SUMM-RE `020c_EBPZ`, the shipped `merge_similarity` of 0.70 fused genuinely
+different speakers and collapsed four people into two, taking cpWER to 89.82 %.
+The synthetic French fixtures, which score 4.20 %, 6.48 % and 13.36 %, gave no
+hint of it: their speakers all talk for minutes, while two of SUMM-RE's talk for
+59 and 12 seconds. The default is now 0.77 and the sweep is published, but the
+general lesson is the durable part — **a default tuned on one corpus is a
+hypothesis, not a result**, and the fixtures that pass are the ones least likely
+to catch its failure.
+
 **We also do not beat Azure on read speech.** Azure Speech reports 2.78 % on
 FLEURS `fr_fr`; we measure 4.63 %. Read-speech benchmarks are not what a meeting
 product is for, but pretending they do not exist would be dishonest. The float32
