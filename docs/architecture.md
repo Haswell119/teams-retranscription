@@ -102,14 +102,19 @@ join URL
    │                                                 ├─► RECOGNITION CHAIN
    ├── voice activity ───► Silero VAD ───────────────┘
    │                       │
-   │                       └─► plan_segments(): merge, split at 30 s, pad 0.2 s
+   │                       └─► plan_segments(): merge, split with overlap,
+   │                           pad 0.2 s, keep spans as short as 0.15 s
    │
-   ├── recognise ────────► Parakeet TDT, batched, word timestamps
+   ├── recognise ────────► Parakeet TDT, batched, word timestamps,
+   │                       duplicate words removed at segment seams
    │
    ├── enhance (again) ──► high pass only ───────────► DIARIZATION CHAIN
    │
    ├── diarise ──────────► pyannote segmentation + TitaNet embeddings,
    │                       then clustering
+   │
+   ├── consolidate ──────► clusters whose speaker centroids are too close
+   │                       to be different people are merged
    │
    ├── refine ───────────► speech the VAD found but the diarizer left
    │                       uncovered is given to the nearest turn
@@ -153,6 +158,41 @@ loudness-normalised data does better on loudness-normalised input, and the
 transcript does not care whether a speaker's timbre stayed constant.
 
 So both are served, from one recording, at the cost of one extra ffmpeg pass.
+
+### Segment boundaries, and why they are not free
+
+Splitting audio into segments is not neutral. Measured on the AMI corpus, an
+early version of `plan_segments` cost ten percent of recognised words against
+transcribing the same audio unsegmented. Two causes, both now fixed:
+
+- It discarded any span shorter than one second. A single AMI meeting contains
+  129 utterances under a second — backchannels, agreements, one-word answers —
+  so half the turns in the meeting were being thrown away before the recognizer
+  ever saw them. The floor is now 0.15 s.
+- It split long spans into adjacent, non-overlapping pieces. A word straddling
+  the cut was truncated on both sides and recognised by neither. Splits now
+  overlap by two seconds, and `hansard.adapters.asr.seams` removes the resulting
+  duplicates by giving each segment an authoritative region that ends at the
+  midpoint of its overlap with the next one.
+
+Segmentation still exists because it bounds memory on long recordings and lets
+the recognizer batch. It is a cost paid deliberately, not a free optimisation,
+and `audio.max_segment_seconds` is the knob that trades it off.
+
+### Consolidating over-split speakers
+
+Clustering can fragment one person across several clusters — a real failure on
+spontaneous meeting speech, where short turns give the embedding model little to
+work with. `EmbeddingClusterConsolidator` addresses it after the fact: for each
+cluster it takes the longest few segments, extracts speaker embeddings with the
+same TitaNet model the diarizer used, mean-pools and L2-normalises them into a
+centroid, and merges any two clusters whose centroids exceed a cosine similarity
+threshold. Merging is transitive, so a speaker split three ways collapses back to
+one.
+
+This runs on the diarization audio chain, not the recognition chain, for the
+reason given above. `diarization.merge_similarity` controls it and
+`diarization.cluster_consolidation` turns it off.
 
 ### Word-level attribution
 
