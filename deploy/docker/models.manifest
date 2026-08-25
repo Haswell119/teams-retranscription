@@ -32,6 +32,9 @@ nemo-parakeet-tdt-0.6b-v3/vocab.txt|https://huggingface.co/istupakov/parakeet-td
 nemo-parakeet-tdt-0.6b-v3/nemo128.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/nemo128.onnx|a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f|
 nemo-parakeet-tdt-0.6b-v3/decoder_joint-model.int8.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/decoder_joint-model.int8.onnx|eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70|
 nemo-parakeet-tdt-0.6b-v3/encoder-model.int8.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/encoder-model.int8.onnx|6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09|
+nemo-parakeet-tdt-0.6b-v3/encoder-model.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/encoder-model.onnx|98a74b21b4cc0017c1e7030319a4a96f4a9506e50f0708f3a516d02a77c96bb1|
+nemo-parakeet-tdt-0.6b-v3/encoder-model.onnx.data|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/encoder-model.onnx.data|9a22d372c51455c34f13405da2520baefb7125bd16981397561423ed32d24f36|
+nemo-parakeet-tdt-0.6b-v3/decoder_joint-model.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/decoder_joint-model.onnx|e978ddf6688527182c10fde2eb4b83068421648985ef23f7a86be732be8706c1|
 #
 # ---------------------------------------------------------------------------
 # VAD - Silero, language independent. MIT.

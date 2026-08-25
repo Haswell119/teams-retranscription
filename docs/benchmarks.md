@@ -109,8 +109,10 @@ everything else. Both scale with CPU cores, so an 8- or 16-core node roughly
 halves or quarters those figures, and a GPU profile is available for volume
 deployments.
 
-Model footprint on disk is **682 MB** in total: recognition 600 MB, diarization
-39 MB, voice activity detection 2 MB.
+Model footprint on disk is **3.2 GB** in total: float32 recognition 2.5 GB,
+INT8 recognition 640 MB, diarization 46 MB, voice activity detection 2 MB. The
+INT8 weights ship alongside so `HANSARD_ASR__QUANTIZATION=int8` needs no second
+download.
 
 ## 5. Engineering findings worth knowing
 
@@ -153,7 +155,7 @@ your pipeline.
 git clone https://github.com/Haswell119/teams-retranscription
 cd teams-retranscription
 make install          # virtualenv and dependencies
-make models           # fetch the model bundle, ~682 MB, SHA-256 verified
+make models           # fetch the model bundle, ~3.2 GB, SHA-256 verified
 make bench-data       # fetch the evaluation corpora
 make bench            # run everything, write bench/results/*.json
 ```

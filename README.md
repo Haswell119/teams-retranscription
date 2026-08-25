@@ -221,7 +221,8 @@ Everything ships under a licence that permits commercial use. Nothing is gated.
 | Voice activity | Silero VAD | 2 MB | MIT |
 | Minutes | any local model you choose | — | yours |
 
-**682 MB in total.** They are baked into a signed OCI artifact, verified by
+**3.2 GB in total**, of which 2.5 GB is the float32 recogniser. They are baked
+into a signed OCI artifact, verified by
 SHA-256, and never downloaded at run time. Air-gapped clusters are a supported
 configuration.
 
