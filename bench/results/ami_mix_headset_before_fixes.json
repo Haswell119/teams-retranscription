@@ -1,0 +1,113 @@
+{
+  "benchmark": "ami",
+  "condition": "Mix-Headset",
+  "normalizer_version": "hansard-normalizers-1.0.0",
+  "hardware": "4 vCPU, no GPU",
+  "rows": [
+    {
+      "meeting": "ES2004a",
+      "condition": "Mix-Headset",
+      "duration_minutes": 17.5,
+      "reference_speakers": 4,
+      "detected_speakers": 10,
+      "reference_words": 2614,
+      "hypothesis_words": 1517,
+      "wer_percent": 43.2,
+      "cpwer_percent": 48.33,
+      "tcpwer_percent": 48.81,
+      "wder_percent": 6.13,
+      "der_percent": 32.78,
+      "der_collar_percent": 22.83,
+      "jer_percent": 37.29,
+      "der_missed_percent": 20.94,
+      "der_false_alarm_percent": 2.9,
+      "der_confusion_percent": 8.94,
+      "real_time_factor": 0.9468,
+      "peak_rss_mb": 3113.1,
+      "stage_seconds": {
+        "enhance": 28.756,
+        "voice_activity": 19.554,
+        "recognise": 475.8,
+        "diarise": 469.119,
+        "refine": 0.003,
+        "attribute": 0.296,
+        "resolve_names": 0.0
+      }
+    },
+    {
+      "meeting": "IS1009a",
+      "condition": "Mix-Headset",
+      "duration_minutes": 14.0,
+      "reference_speakers": 4,
+      "detected_speakers": 10,
+      "reference_words": 1986,
+      "hypothesis_words": 1187,
+      "wer_percent": 46.39,
+      "cpwer_percent": 59.28,
+      "tcpwer_percent": 59.89,
+      "wder_percent": 13.52,
+      "der_percent": 30.83,
+      "der_collar_percent": 19.8,
+      "jer_percent": 43.08,
+      "der_missed_percent": 12.79,
+      "der_false_alarm_percent": 4.37,
+      "der_confusion_percent": 13.66,
+      "real_time_factor": 0.9072,
+      "peak_rss_mb": 3113.1,
+      "stage_seconds": {
+        "enhance": 22.073,
+        "voice_activity": 16.707,
+        "recognise": 356.115,
+        "diarise": 365.841,
+        "refine": 0.003,
+        "attribute": 0.221,
+        "resolve_names": 0.0
+      }
+    },
+    {
+      "meeting": "TS3003a",
+      "condition": "Mix-Headset",
+      "duration_minutes": 25.1,
+      "reference_speakers": 4,
+      "detected_speakers": 10,
+      "reference_words": 2518,
+      "hypothesis_words": 1633,
+      "wer_percent": 41.4,
+      "cpwer_percent": 48.29,
+      "tcpwer_percent": 49.98,
+      "wder_percent": 7.61,
+      "der_percent": 32.96,
+      "der_collar_percent": 22.15,
+      "jer_percent": 59.12,
+      "der_missed_percent": 21.91,
+      "der_false_alarm_percent": 2.41,
+      "der_confusion_percent": 8.64,
+      "real_time_factor": 0.8722,
+      "peak_rss_mb": 3128.7,
+      "stage_seconds": {
+        "enhance": 41.308,
+        "voice_activity": 45.62,
+        "recognise": 582.217,
+        "diarise": 643.769,
+        "refine": 0.006,
+        "attribute": 0.299,
+        "resolve_names": 0.0
+      }
+    }
+  ],
+  "summary": {
+    "meetings": 3,
+    "total_minutes": 56.6,
+    "macro_average": {
+      "wer_percent": 43.66,
+      "cpwer_percent": 51.97,
+      "tcpwer_percent": 52.89,
+      "wder_percent": 9.09,
+      "der_percent": 32.19,
+      "der_collar_percent": 21.59,
+      "jer_percent": 46.5
+    },
+    "word_weighted_cpwer_percent": 51.37
+  },
+  "note": "Recorded before two defects were fixed: segmentation discarded utterances shorter than one second and split long spans without overlap, and clustering fragmented each speaker across several clusters. Kept as the reference point the fixes are measured against."
+}
