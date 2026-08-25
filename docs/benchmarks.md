@@ -161,7 +161,40 @@ make bench            # run everything, write bench/results/*.json
 Raw result files live in [`bench/results/`](../bench/results/) and carry the
 normalizer version, the hardware, and the per-stage timings.
 
-## 7. What we have not measured yet
+## 7. Where we lose
+
+Publishing this matters more than publishing the wins.
+
+**On the AMI meeting corpus we are worse than the published Azure figure.** We
+ran three AMI test meetings (ES2004a, IS1009a, TS3003a — 55 minutes of real,
+spontaneous, four-person meeting audio in the Mix-Headset condition) end to end
+through the full pipeline, and scored them with our own harness.
+
+Two things about that comparison need saying plainly:
+
+- The Azure number comes from a third party (AssemblyAI, January 2026) using
+  their own reference preparation and normalizer, on conditions we cannot
+  inspect. Many published cpWER figures use reference utterance boundaries;
+  ours uses nothing but the raw audio. That difference alone can be worth a
+  great deal, in either direction.
+- The only rigorous comparison is running Teams on the same recordings and
+  scoring both outputs with one toolchain. The protocol for doing that is in
+  [metrics](metrics.md); it needs real meetings and real consent, and we have
+  not done it.
+
+So: treat the gap as real until proven otherwise, and treat the size of the gap
+as uncertain.
+
+**We also do not beat Azure on read speech.** Azure Speech reports 2.78 % on
+FLEURS `fr_fr`; we measure 6.95 %. Read-speech benchmarks are not what a meeting
+product is for, but pretending they do not exist would be dishonest.
+
+**Where we are genuinely ahead** is not on the leaderboard: audio that never
+leaves your infrastructure, a custom vocabulary that Teams does not offer at all,
+no four-hour ceiling, no forced profanity masking, evidence timecodes on every
+generated claim, and open export formats.
+
+## 8. What we have not measured yet
 
 Being explicit about this is part of the point.
 
@@ -176,13 +209,7 @@ Being explicit about this is part of the point.
   written up in [metrics.md](metrics.md); it needs real meetings and real consent.
 - **Minutes quality against Copilot's recap**, blind and rated by humans.
 
-## Related reading
-
-- [Metrics](metrics.md) — every formula and how it is computed
-- [Architecture](architecture.md) — what runs where
-- [Sovereignty](sovereignty.md) — the other reason to run this
-
-## 8. Checking the gates
+## 9. Checking the gates
 
 The project defines quality gates in `src/hansard/evaluation/gates.py`: a
 must-pass threshold and a stretch target for every headline metric, separately
@@ -219,3 +246,9 @@ DER and speaker counting, in both languages — currently passes.
 We are not going to lower a threshold to turn a failure into a success. If a
 threshold turns out to be wrong, it changes only with published evidence and a
 note in this page saying what changed and why.
+
+## Related reading
+
+- [Metrics](metrics.md) — every formula and how it is computed
+- [Architecture](architecture.md) — what runs where
+- [Sovereignty](sovereignty.md) — the other reason to run this

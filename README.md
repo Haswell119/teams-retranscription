@@ -62,7 +62,7 @@ Hansard is built to be measured on the second kind of number. See
 | Where audio is processed | Your infrastructure | Microsoft's |
 | Where minutes are generated | Your infrastructure | Microsoft's, possibly outside the EU by default |
 | Custom vocabulary (names, jargon, product codes) | **Yes** | Not available |
-| Speakers supported | Unbounded — 9 detected exactly in testing | Attribution degrades past ~3; guests appear as "Speaker 1" |
+| Speakers supported | No architectural limit. Nine detected exactly on clean audio; on spontaneous meeting audio the count is over-estimated and a Teams roster fixes it | Attribution degrades past ~3; guests appear as "Speaker 1" |
 | Maximum meeting length | Unbounded | 4 hours or 1.5 GB, no automatic restart |
 | Languages in one meeting | Automatic, no language tag needed | One language per meeting; multilingual mode needs Teams Premium and discards the transcript afterwards |
 | Verbatim transcript | Yes | Obscenities are always masked |
@@ -96,10 +96,11 @@ speaker confusion:
 A 60-minute meeting is transcribed, diarized and summarised in about 20 minutes
 on that 4-core machine, using 2.9 GB of RAM at peak.
 
-**An honest caveat:** our meeting fixtures are built from clean recordings mixed
-together, which is easier than AMI or NOTSOFAR. We have not yet run those corpora,
-and until we do these numbers show the pipeline is sound rather than that it beats
-Azure. [Full methodology, and what we have not measured](docs/benchmarks.md).
+**An honest caveat.** Those fixtures are clean recordings mixed together, which is
+much easier than a real meeting room. We have since run the AMI meeting corpus,
+and there we are **worse than the published Azure figure**, not better. The full
+numbers and what they do and do not prove are in
+[benchmarks](docs/benchmarks.md) — including where we lose.
 
 ## Quick start
 
