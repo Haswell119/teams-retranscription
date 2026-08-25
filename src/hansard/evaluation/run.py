@@ -66,6 +66,19 @@ def _percent(value: float) -> float:
     return round(value * 100, 2)
 
 
+def _recognition_profile(settings: Settings) -> dict[str, object]:
+    quantization = settings.asr.quantization
+    return {
+        "model_id": settings.asr.model_id,
+        "precision": "float32" if quantization == "none" else quantization,
+        "batch_size": settings.asr.batch_size,
+        "batch_seconds": settings.asr.batch_seconds,
+        "max_segment_seconds": settings.audio.max_segment_seconds,
+        "merge_similarity": settings.diarization.merge_similarity,
+        "minimum_speaker_seconds": settings.diarization.minimum_speaker_seconds,
+    }
+
+
 def run_asr(options: RunOptions) -> dict[str, object]:
     settings = Settings()
     engine = OnnxRecognizer(
@@ -113,10 +126,11 @@ def run_asr(options: RunOptions) -> dict[str, object]:
                 "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
             }
         )
-    precision = "float32" if settings.asr.quantization == "none" else settings.asr.quantization
+    profile = _recognition_profile(settings)
     return {
         "benchmark": "asr",
-        "model": f"{settings.asr.model_id} {precision} ONNX",
+        "model": f"{settings.asr.model_id} {profile['precision']} ONNX",
+        "recognition": profile,
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
     }
@@ -180,6 +194,7 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
         )
     return {
         "benchmark": "meetings",
+        "recognition": _recognition_profile(settings),
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
     }
@@ -263,6 +278,7 @@ def run_ami(options: RunOptions) -> dict[str, object]:
         "benchmark": "ami",
         "profile": "roster" if options.roster else "default",
         "condition": AMI_CONDITION,
+        "recognition": _recognition_profile(settings),
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
         "summary": _aggregate(rows),
@@ -295,6 +311,7 @@ def run_summ_re(options: RunOptions) -> dict[str, object]:
         "benchmark": "summ-re",
         "profile": "roster" if options.roster else "default",
         "condition": "mixed headsets",
+        "recognition": _recognition_profile(settings),
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
         "summary": _aggregate(rows),
