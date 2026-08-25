@@ -60,6 +60,7 @@ def _build_onnx(settings: AsrSettings, models_dir: Path) -> SpeechRecognizer:
         inter_op_threads=settings.inter_op_threads,
         batch_size=settings.batch_size,
         batch_seconds=settings.batch_seconds,
+        memory_profile=settings.memory_profile,
         language=settings.language,
     )
 

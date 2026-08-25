@@ -60,6 +60,7 @@ class OnnxRecognizer:
     quantization: str | None = "int8"
     model_path: Path | None = None
     providers: tuple[str, ...] = ("CPUExecutionProvider",)
+    memory_profile: str = "default"
     intra_op_threads: int = 0
     inter_op_threads: int = 0
     batch_size: int = 4
@@ -92,6 +93,9 @@ class OnnxRecognizer:
         if self.inter_op_threads > 0:
             options.inter_op_num_threads = self.inter_op_threads
         options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        if self.memory_profile == "compact":
+            options.enable_cpu_mem_arena = False
+            options.enable_mem_pattern = False
         return options
 
     def _load(self) -> Any:

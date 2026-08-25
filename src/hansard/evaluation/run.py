@@ -68,8 +68,9 @@ def _percent(value: float) -> float:
 def run_asr(options: RunOptions) -> dict[str, object]:
     settings = Settings()
     engine = OnnxRecognizer(
-        quantization=settings.asr.quantization,
+        quantization=None if settings.asr.quantization == "none" else settings.asr.quantization,
         batch_size=settings.asr.batch_size,
+        memory_profile=settings.asr.memory_profile,
         intra_op_threads=options.threads,
     )
     engine.warm_up()

@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 AsrEngine = Literal["parakeet", "whisper", "qwen3", "null"]
 DiarizationEngine = Literal["sherpa", "spectral", "sortformer", "pyannote", "null"]
 Device = Literal["auto", "cpu", "cuda"]
+MemoryProfile = Literal["default", "compact"]
 
 
 class AudioSettings(BaseModel):
@@ -42,6 +43,7 @@ class AsrSettings(BaseModel):
     language: str | None = None
     intra_op_threads: int = 0
     inter_op_threads: int = 0
+    memory_profile: MemoryProfile = "default"
 
 
 class DiarizationSettings(BaseModel):
