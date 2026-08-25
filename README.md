@@ -7,7 +7,7 @@ Runs entirely on your own infrastructure. Nothing leaves your network.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-946%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-953%20passing-brightgreen.svg)](tests/)
 [![Languages](https://img.shields.io/badge/languages-fran%C3%A7ais%20%7C%20english-blue.svg)](docs/benchmarks.md)
 
 </div>
@@ -74,32 +74,43 @@ Hansard is built to be measured on the second kind of number. See
 
 ## Measured quality
 
-On **4 vCPU with no GPU** — deliberately modest hardware.
+On **4 vCPU with no GPU** — deliberately modest hardware, with the shipped
+default: Parakeet TDT 0.6B v3 in **float32**.
+
+**Speech recognition — French and English, one model, no language tag.** French
+is measured on every release, not assumed to follow from English:
+
+| Corpus | Language | WER | CER | RTF |
+| --- | --- | ---: | ---: | ---: |
+| FLEURS `fr_fr` | **French** | **4.63 %** | 1.62 % | 0.31 |
+| FLEURS `en_us` | English | **4.47 %** | 1.99 % | 0.49 |
+| LibriSpeech dev-clean | English | **3.34 %** | 1.19 % | 0.57 |
 
 **Meetings**, scored with cpWER, which penalises both transcription errors and
 speaker confusion:
 
-| Meeting | Speakers detected | cpWER | WDER | Speed |
-| --- | :---: | ---: | ---: | ---: |
-| 3 speakers | 3 / 3 ✓ | **3.02 %** | 0.26 % | 2.9× real-time |
-| 6 speakers | 6 / 6 ✓ | **9.51 %** | 1.71 % | 3.0× real-time |
-| 9 speakers | 9 / 9 ✓ | **13.75 %** | 1.77 % | 3.1× real-time |
+| Meeting | Speakers detected | cpWER | WDER | DER | RTF | Peak RAM |
+| --- | :---: | ---: | ---: | ---: | ---: | ---: |
+| 3 speakers | 3 / 3 ✓ | **2.52 %** | 0.00 % | 8.64 % | 0.78 | 3209 MB |
+| 6 speakers | 6 / 6 ✓ | **5.56 %** | 1.91 % | 9.40 % | 0.81 | 3551 MB |
+| 9 speakers | 9 / 9 ✓ | **6.51 %** | 1.52 % | 9.94 % | 0.61 | 3594 MB |
 
-**Speech recognition**, both languages, one model:
+RTF is the real-time factor — processing seconds per second of audio, lower is
+better. A 60-minute recording is transcribed and diarized in about 44 minutes on
+that 4-core machine, peaking at 3.6 GB of RAM. Minutes generation is extra and
+depends on the model you point it at.
 
-| Corpus | Language | WER | CER |
-| --- | --- | ---: | ---: |
-| FLEURS `fr_fr` | French | 6.95 % | 2.50 % |
-| FLEURS `en_us` | English | 4.59 % | 2.27 % |
-| LibriSpeech dev-clean | English | 3.93 % | 1.50 % |
+INT8 weights ship alongside as an opt-in low-memory profile
+(`HANSARD_ASR__QUANTIZATION=int8`, roughly 1.4 GB resident instead of 2.8 GB).
+They are **not** the default and not faster: INT8 costs about **2.0 WER points in
+French** for the memory it saves. The comparison is a table in
+[benchmarks](docs/benchmarks.md#5-choosing-a-quantization-profile).
 
-A 60-minute meeting is transcribed, diarized and summarised in about 20 minutes
-on that 4-core machine, using 2.9 GB of RAM at peak.
-
-**An honest caveat.** Those fixtures are clean recordings mixed together, which is
-much easier than a real meeting room. We have since run the AMI meeting corpus,
-and there we are **worse than the published Azure figure**, not better. The full
-numbers and what they do and do not prove are in
+**Two honest caveats.** Those meeting fixtures are clean English read speech
+mixed together, which is much easier than a real meeting room — and no French
+*meeting* corpus has been run yet, so French is benchmarked at the recognition
+level only. On the AMI meeting corpus we are **worse than the published Azure
+figure**, not better. The full numbers and what they do and do not prove are in
 [benchmarks](docs/benchmarks.md) — including where we lose.
 
 ## Quick start
@@ -164,11 +175,11 @@ Teams meeting
 │               recognition, dynamics preserved for diarization,  │
 │               Silero voice-activity detection                   │
 ├─────────────────────────────────────────────────────────────────┤
-│  Recognise    Parakeet TDT 0.6B v3, INT8 ONNX, 25 languages,    │
+│  Recognise    Parakeet TDT 0.6B v3, float32 ONNX, 25 languages, │
 │               word-level timestamps, punctuation, no PyTorch    │
 ├─────────────────────────────────────────────────────────────────┤
 │  Diarize      pyannote segmentation + TitaNet embeddings,       │
-│               unbounded speakers, 39 MB of models               │
+│               unbounded speakers, 46 MB of models               │
 ├─────────────────────────────────────────────────────────────────┤
 │  Attribute    word-level fusion with boundary dilation and      │
 │               Viterbi smoothing; clusters matched to real       │
@@ -215,15 +226,17 @@ Everything ships under a licence that permits commercial use. Nothing is gated.
 
 | Purpose | Model | Size | Licence |
 | --- | --- | ---: | --- |
-| Speech recognition | NVIDIA Parakeet TDT 0.6B v3 (INT8 ONNX) | 600 MB | CC-BY-4.0 |
+| Speech recognition, **default** | NVIDIA Parakeet TDT 0.6B v3 (float32 ONNX) | 2.5 GB | CC-BY-4.0 |
+| Speech recognition, low-memory option | NVIDIA Parakeet TDT 0.6B v3 (INT8 ONNX) | 640 MB | CC-BY-4.0 |
 | Speaker segmentation | pyannote segmentation 3.0 (INT8 ONNX) | 7 MB | MIT |
 | Speaker embeddings | NVIDIA TitaNet Small | 39 MB | CC-BY-4.0 |
 | Voice activity | Silero VAD | 2 MB | MIT |
 | Minutes | any local model you choose | — | yours |
 
-**3.2 GB in total**, of which 2.5 GB is the float32 recogniser. They are baked
-into a signed OCI artifact, verified by
-SHA-256, and never downloaded at run time. Air-gapped clusters are a supported
+**3.2 GB in total** — both recognition profiles ship in the same bundle, so
+switching to `HANSARD_ASR__QUANTIZATION=int8` needs no second download and no
+network access. They are baked into a signed OCI artifact, verified by SHA-256,
+and never downloaded at run time. Air-gapped clusters are a supported
 configuration.
 
 ## Documentation

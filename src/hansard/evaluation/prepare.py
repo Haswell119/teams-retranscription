@@ -24,6 +24,21 @@ AMI_AUDIO = (
 )
 AMI_ANNOTATIONS = "https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip"
 AMI_TEST_MEETINGS: tuple[str, ...] = ("ES2004a", "IS1009a", "TS3003a")
+MLS_FRENCH_BASE = (
+    "https://huggingface.co/datasets/facebook/multilingual_librispeech/"
+    "resolve/main/data/mls_french/dev"
+)
+MLS_FRENCH_SPEAKERS: tuple[str, ...] = (
+    "10087_11650_000",
+    "10177_10625_000",
+    "12205_11650_000",
+    "1591_1028_000",
+    "1770_1028_000",
+    "3267_1902_000",
+    "4193_3103_000",
+    "4724_3731_000",
+    "4937_2928_000",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,12 +57,19 @@ class MeetingRecipe:
     overlap_probability: float
     seed: int
     utterances_per_speaker: int = 8
+    language: str = "en"
 
 
 MEETING_RECIPES: tuple[MeetingRecipe, ...] = (
     MeetingRecipe("meeting_3spk", 3, 0.10, 11),
     MeetingRecipe("meeting_6spk", 6, 0.18, 22),
     MeetingRecipe("meeting_9spk", 9, 0.20, 33, utterances_per_speaker=6),
+)
+
+FRENCH_MEETING_RECIPES: tuple[MeetingRecipe, ...] = (
+    MeetingRecipe("meeting_fr_3spk", 3, 0.10, 11, language="fr"),
+    MeetingRecipe("meeting_fr_6spk", 6, 0.18, 22, language="fr"),
+    MeetingRecipe("meeting_fr_9spk", 9, 0.20, 33, utterances_per_speaker=6, language="fr"),
 )
 
 
@@ -158,6 +180,34 @@ def _collect_speakers(root: Path) -> dict[str, list[tuple[Path, str]]]:
     return speakers
 
 
+def prepare_mls_french_corpus(output: Path) -> Path:
+    root = output / "mls_french"
+    root.mkdir(parents=True, exist_ok=True)
+    _download(f"{MLS_FRENCH_BASE}/transcripts.txt", root / "transcripts.txt")
+    for bundle in MLS_FRENCH_SPEAKERS:
+        marker = root / f"{bundle}.done"
+        if marker.exists():
+            continue
+        archive = _download(f"{MLS_FRENCH_BASE}/audio/{bundle}.tar.gz", root / f"{bundle}.tar.gz")
+        with tarfile.open(archive) as handle:
+            handle.extractall(root, filter="data")
+        archive.unlink(missing_ok=True)
+        marker.touch()
+    return root
+
+
+def _collect_mls_speakers(root: Path) -> dict[str, list[tuple[Path, str]]]:
+    audio = {path.stem: path for path in root.rglob("*.flac")}
+    speakers: dict[str, list[tuple[Path, str]]] = {}
+    for line in (root / "transcripts.txt").read_text(encoding="utf-8").splitlines():
+        identifier, _, text = line.partition("\t")
+        path = audio.get(identifier)
+        if path is None or not text:
+            continue
+        speakers.setdefault(identifier.split("_")[0], []).append((path, text))
+    return speakers
+
+
 def synthesise_meeting(
     recipe: MeetingRecipe, speakers: dict[str, list[tuple[Path, str]]], output: Path
 ) -> Path:
@@ -214,6 +264,7 @@ def synthesise_meeting(
             )
     reference = {
         "audio": str(audio_path),
+        "language": recipe.language,
         "duration": len(mixture) / TARGET_SAMPLE_RATE,
         "speakers": sorted({item.speaker for item in ordered}),
         "segments": [
@@ -254,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=Path("bench/data"))
     parser.add_argument("--skip-fleurs", action="store_true")
     parser.add_argument("--skip-meetings", action="store_true")
+    parser.add_argument("--skip-french-meetings", action="store_true")
     parser.add_argument("--ami", action="store_true", help="also fetch the AMI test meetings")
     arguments = parser.parse_args(argv)
     output = arguments.output
@@ -284,6 +336,17 @@ def main(argv: list[str] | None = None) -> int:
         for recipe in MEETING_RECIPES:
             path = synthesise_meeting(recipe, speakers, output)
             print(f"{recipe.name} -> {path}")
+
+    if not arguments.skip_french_meetings:
+        try:
+            root = prepare_mls_french_corpus(output)
+            speakers = _collect_mls_speakers(root)
+            print(f"mls french dev: {len(speakers)} speakers")
+            for recipe in FRENCH_MEETING_RECIPES:
+                path = synthesise_meeting(recipe, speakers, output)
+                print(f"{recipe.name} -> {path}")
+        except Exception as error:
+            print(f"french meetings failed: {type(error).__name__}: {error}")
     return 0
 
 

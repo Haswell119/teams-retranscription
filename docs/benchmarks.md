@@ -8,20 +8,36 @@ given underneath it.
 That is deliberately modest hardware. If your numbers are better than ours, that
 is the expected outcome.
 
-**Normalizer version:** `hansard-normalizers-1.0.0`. Word error rates are not
+**Normalizer version:** `hansard-normalizers-1.1.0`. Word error rates are not
 comparable across normalizers, so this identifier appears in every report we
-publish. Changing it forces us to re-record the baseline.
+publish. Changing it forces us to re-record the baseline. Where a table below
+carries a different normalizer version, it says so.
+
+**Shipped profile:** `nemo-parakeet-tdt-0.6b-v3`, **float32 ONNX**. Every
+headline number on this page is that profile. The INT8 profile is still
+available and still measured; its numbers are in
+[§5](#5-choosing-a-quantization-profile), never mixed into the tables above it.
+
+**Both languages, every release.** French and English are benchmarked on the
+same schedule with the same harness, and the French numbers gate a release just
+as the English ones do. Nothing here is an English measurement with a French
+claim attached to it.
 
 ## 1. Speech recognition, French and English
 
-Model: `nemo-parakeet-tdt-0.6b-v3`, INT8 ONNX, CC-BY-4.0.
+Model: `nemo-parakeet-tdt-0.6b-v3`, float32 ONNX, CC-BY-4.0.
 One model serves both languages; no language tag is required.
 
-| Dataset | Language | Utterances | Audio | WER | CER | Speed | Peak RAM |
+Source: [`bench/results/asr_bilingual.json`](../bench/results/asr_bilingual.json).
+
+| Dataset | Language | Utterances | Audio | WER | CER | RTF | Peak RAM |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| FLEURS `fr_fr` test | French | 80 | 14.2 min | **6.95 %** | 2.50 % | 8.7× real-time | 1.38 GB |
-| FLEURS `en_us` test | English | 80 | 12.6 min | **4.59 %** | 2.27 % | 8.9× real-time | 1.38 GB |
-| LibriSpeech dev-clean | English | 73 | 8.0 min | **3.93 %** | 1.50 % | 8.1× real-time | 1.40 GB |
+| FLEURS `fr_fr` test | **French** | 80 | 14.2 min | **4.63 %** | 1.62 % | 0.31 | 2.80 GB |
+| FLEURS `en_us` test | English | 80 | 12.6 min | **4.47 %** | 1.99 % | 0.49 | 2.74 GB |
+| LibriSpeech dev-clean | English | 73 | 8.0 min | **3.34 %** | 1.19 % | 0.57 | 2.86 GB |
+
+RTF is the real-time factor: processing seconds per second of audio. Lower is
+better; 0.31 means 14.2 minutes of French audio were transcribed in 4.5 minutes.
 
 ```bash
 make bench-asr
@@ -32,6 +48,11 @@ whether the engine is healthy; they do not tell you how the system behaves on a
 real meeting. Microsoft's Azure Speech reports 2.78 % on FLEURS `fr_fr`, and we
 do not beat that. Read-speech benchmarks are not where a meeting product is
 won or lost — see the next section for the reason.
+
+French is the corpus we watch hardest, because it is the language most likely to
+be silently mishandled: a system that drops diacritics or mangles elisions can
+still post a respectable WER. That is why CER is published beside WER, and why
+the French normalizer deliberately keeps accents.
 
 ## 2. Meeting transcription with speaker attribution
 

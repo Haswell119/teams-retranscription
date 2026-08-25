@@ -33,7 +33,14 @@ ASR_CORPORA: tuple[tuple[str, str, str], ...] = (
     ("librispeech_dummy.jsonl", "en", "LibriSpeech dev-clean (read speech)"),
 )
 
-MEETING_FIXTURES: tuple[str, ...] = ("meeting_3spk", "meeting_6spk", "meeting_9spk")
+MEETING_FIXTURES: tuple[tuple[str, str], ...] = (
+    ("meeting_3spk", "en"),
+    ("meeting_6spk", "en"),
+    ("meeting_9spk", "en"),
+    ("meeting_fr_3spk", "fr"),
+    ("meeting_fr_6spk", "fr"),
+    ("meeting_fr_9spk", "fr"),
+)
 AMI_CONDITION = "Mix-Headset"
 
 
@@ -102,20 +109,24 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
     settings = Settings()
     settings.asr.intra_op_threads = options.threads
     rows: list[dict[str, object]] = []
-    for name in MEETING_FIXTURES:
+    for name, language in MEETING_FIXTURES:
+        if options.language and options.language != language:
+            continue
         reference_path = options.data_dir / "synthetic" / f"{name}.ref.json"
         if not reference_path.exists():
             continue
-        sample = load_reference_json(reference_path, "en", "synthetic")
+        sample = load_reference_json(reference_path, language, "synthetic")
         reference_diarization = sample.reference_diarization
         if reference_diarization is None:
             continue
         clip = load_clip(Path(str(sample.audio_path)))
         pipeline = Composition(settings).pipeline()
-        request = MeetingRequest(audio_path=Path(str(sample.audio_path)), title=name, language="en")
+        request = MeetingRequest(
+            audio_path=Path(str(sample.audio_path)), title=name, language=language
+        )
         with ResourceProbe() as probe:
             outcome = pipeline.run(clip, request)
-        normalizer = normalizer_for("en")
+        normalizer = normalizer_for(language)
         reference = sample.reference
         hypothesis = outcome.transcript
         scored = word_error_rate(reference.text, hypothesis.text, normalizer)
@@ -124,6 +135,7 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
         rows.append(
             {
                 "meeting": name,
+                "language": language,
                 "duration_seconds": round(clip.duration, 1),
                 "reference_speakers": len({turn.label for turn in reference_diarization.turns}),
                 "detected_speakers": outcome.diarization.speaker_count,
