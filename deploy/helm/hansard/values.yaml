@@ -194,7 +194,9 @@ diarization:
   clusteringThreshold: 0.99
   # Clusters with less total speech than this are absorbed into their nearest
   # neighbour. Suppresses phantom speakers from crosstalk and backchannel.
-  minimumSpeakerSeconds: 3.0
+  minimumSpeakerSeconds: 3
+  clusterConsolidation: true
+  mergeSimilarity: 0.60
   maxSpeakers: 8
   minSpeakers: 1
 
@@ -220,6 +222,7 @@ capture:
   displayName: Hansard Notetaker
   # Disabling this is a legal decision, not a technical one. NOTES.txt shouts.
   announceRecording: true
+  uiLocale: en-US
   announcementText: >-
     This meeting is being transcribed locally by Hansard.
     No audio or text leaves this organisation.

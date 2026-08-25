@@ -46,6 +46,8 @@ data:
   HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS: {{ .Values.diarization.minimumSpeakerSeconds | quote }}
   HANSARD_DIARIZATION__MAX_SPEAKERS: {{ .Values.diarization.maxSpeakers | quote }}
   HANSARD_DIARIZATION__MIN_SPEAKERS: {{ .Values.diarization.minSpeakers | quote }}
+  HANSARD_DIARIZATION__CLUSTER_CONSOLIDATION: {{ .Values.diarization.clusterConsolidation | quote }}
+  HANSARD_DIARIZATION__MERGE_SIMILARITY: {{ .Values.diarization.mergeSimilarity | quote }}
 
   HANSARD_VAD__ENGINE: {{ .Values.vad.engine | quote }}
   HANSARD_VAD__THRESHOLD: {{ .Values.vad.threshold | quote }}
@@ -72,6 +74,7 @@ data:
   HANSARD_CAPTURE__ALONE_TIMEOUT_SECONDS: {{ .Values.capture.aloneTimeoutSeconds | quote }}
   HANSARD_CAPTURE__MAX_DURATION_SECONDS: {{ .Values.capture.maxDurationSeconds | quote }}
   HANSARD_CAPTURE__HEADLESS: "true"
+  HANSARD_CAPTURE__UI_LOCALE: {{ .Values.capture.uiLocale | quote }}
 
   HANSARD_DELIVERY__DEFAULT_CHANNELS: {{ join "," .Values.delivery.channels | quote }}
   HANSARD_DELIVERY__FORMATS: {{ join "," .Values.delivery.formats | quote }}
