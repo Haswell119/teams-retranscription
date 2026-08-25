@@ -1,0 +1,167 @@
+# Hansard evaluation stack for a laptop.
+#
+#   cd deploy/compose
+#   cp .env.example .env
+#   docker compose --profile build build          # build the images locally
+#   docker compose run --rm models                # download weights ONCE
+#   docker compose up -d
+#   docker compose run --rm cli doctor
+#   cp ~/meeting.wav ./inbox/
+#   docker compose run --rm cli transcribe /inbox/meeting.wav --output /artifacts
+#
+# This is the FILE-BASED path: you feed it a recording and get a transcript and
+# minutes. There is no browser bot here - a Teams bot needs a real Kubernetes
+# Job with its own /dev/shm budget and egress policy, which compose cannot
+# model honestly. See docs/deployment.md.
+#
+# One multilingual ASR model handles FRENCH AND ENGLISH. There is nothing to
+# switch, and a meeting that mixes the two transcribes in a single pass.
+
+name: hansard
+
+x-common-env: &common-env
+  HANSARD_RUNTIME__WORKSPACE: /var/lib/hansard
+  HANSARD_RUNTIME__MODELS_DIR: /models
+  HANSARD_RUNTIME__ALLOW_MODEL_DOWNLOADS: "false"
+  HANSARD_RUNTIME__TELEMETRY_ENABLED: "false"
+  HANSARD_RUNTIME__LOG_FORMAT: console
+  HANSARD_RUNTIME__LOG_LEVEL: ${HANSARD_LOG_LEVEL:-INFO}
+  HF_HOME: /models/.cache
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+  HANSARD_CAPTURE__ENGINE: file
+  HANSARD_ASR__ENGINE: parakeet
+  HANSARD_ASR__MODEL_ID: nemo-parakeet-tdt-0.6b-v3
+  HANSARD_ASR__QUANTIZATION: int8
+  HANSARD_DIARIZATION__ENGINE: spectral
+  HANSARD_STORAGE__BACKEND: filesystem
+  HANSARD_STORAGE__ROOT: /artifacts
+  HANSARD_DELIVERY__OUTPUT_DIR: /artifacts
+  HANSARD_DELIVERY__DEFAULT_CHANNELS: filesystem
+  HANSARD_QUEUE_URL: redis://redis:6379/0
+
+x-security: &security
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  user: "10001:10001"
+  tmpfs:
+    - /tmp:size=1g
+
+services:
+  # Runs once. Downloads and checksum-verifies the model bundle into the
+  # `models` volume, then exits. Re-run it only to change models.
+  models:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.models
+      target: copier
+    image: hansard-models-init:${HANSARD_VERSION:-0.1.0}
+    profiles: ["build", "setup"]
+    environment:
+      HANSARD_MODELS_TARGET: /models
+    user: "10001:10001"
+    volumes:
+      - models:/models
+    restart: "no"
+
+  redis:
+    image: docker.io/library/redis:7.4-alpine
+    command:
+      - --dir
+      - /data
+      - --appendonly
+      - "yes"
+      - --save
+      - "60 1"
+    user: "999:999"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.api
+      args:
+        EXTRA_PIP_PACKAGES: sherpa-onnx>=1.13
+    image: hansard-api:${HANSARD_VERSION:-0.1.0}
+    command: ["serve"]
+    <<: *security
+    environment:
+      <<: *common-env
+      HANSARD_API__HOST: 0.0.0.0
+      HANSARD_API__PORT: "8000"
+      HANSARD_API__METRICS_ENABLED: "true"
+    ports:
+      - "${HANSARD_API_PORT:-8000}:8000"
+    volumes:
+      - models:/models:ro
+      - workspace:/var/lib/hansard
+      - ./artifacts:/artifacts
+      - ./inbox:/inbox:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.worker
+      args:
+        EXTRA_PIP_PACKAGES: sherpa-onnx>=1.13
+    image: hansard-worker:${HANSARD_VERSION:-0.1.0}
+    command: ["worker"]
+    <<: *security
+    environment:
+      <<: *common-env
+      HANSARD_ASR__DEVICE: cpu
+      HANSARD_DIARIZATION__DEVICE: cpu
+      HANSARD_METRICS_PORT: "9095"
+      # Keep one worker honest on a laptop: ONNX Runtime will otherwise take
+      # every core and starve the rest of the machine.
+      OMP_NUM_THREADS: ${HANSARD_WORKER_THREADS:-4}
+    deploy:
+      replicas: ${HANSARD_WORKER_REPLICAS:-1}
+    volumes:
+      - models:/models:ro
+      - workspace:/var/lib/hansard
+      - ./artifacts:/artifacts
+      - ./inbox:/inbox:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # One-shot CLI against the same images, models and volumes.
+  #   docker compose run --rm cli doctor
+  #   docker compose run --rm cli transcribe /inbox/meeting.wav --output /artifacts
+  cli:
+    image: hansard-api:${HANSARD_VERSION:-0.1.0}
+    profiles: ["cli"]
+    <<: *security
+    environment:
+      <<: *common-env
+    volumes:
+      - models:/models:ro
+      - workspace:/var/lib/hansard
+      - ./artifacts:/artifacts
+      - ./inbox:/inbox:ro
+    depends_on:
+      - redis
+
+volumes:
+  models:
+  workspace:
+  redis:

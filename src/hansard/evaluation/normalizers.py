@@ -10,6 +10,8 @@ from typing import Protocol, cast, runtime_checkable
 from hansard.evaluation.english_numbers import normalize_digit_groups, words_to_digits
 from hansard.evaluation.french_numbers import expand_numbers
 
+NORMALIZER_VERSION = "hansard-normalizers-1.0.0"
+
 _BRACKETED = re.compile(r"[<\[][^>\]]*[>\]]")
 _PARENTHESISED = re.compile(r"\(([^)]+?)\)")
 _WHITESPACE = re.compile(r"\s+")

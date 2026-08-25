@@ -1,0 +1,30 @@
+# Reference posture: portable Kubernetes, no optional platform integrations
+# assumed. Every `auto` gate resolves from the target cluster.
+orchestrator:
+  replicaCount: 2
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: hansard.example.internal
+        paths:
+          - path: /
+            pathType: Prefix
+  persistence:
+    enabled: true
+    size: 20Gi
+asr:
+  compute: cpu
+  language: auto
+worker:
+  cpu:
+    replicaCount: 2
+networkPolicy:
+  enabled: true
+  egress:
+    mode: cidr
+    extraCIDRs:
+      - 10.10.0.0/16
+    extraPorts:
+      - protocol: TCP
+        port: 25

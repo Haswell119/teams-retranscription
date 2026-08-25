@@ -1,0 +1,51 @@
+# GPU + CPU worker pools sharing one Redis consumer group.
+#
+# Everything here is vanilla Kubernetes: an nvidia.com/gpu resource request, an
+# nvidia.com/gpu.present nodeSelector and the standard NoSchedule toleration.
+# On NKP the NVIDIA GPU Operator that provides them is a Pro entitlement.
+asr:
+  compute: both
+  language: auto
+  quantization: int8
+  batchSize: 8
+
+worker:
+  gpu:
+    replicaCount: 2
+    # With GPU Operator time-slicing and renameByDefault: true the schedulable
+    # resource becomes nvidia.com/gpu.shared. Change the VALUE, not the chart.
+    resourceName: nvidia.com/gpu
+    count: 1
+    resources:
+      requests:
+        cpu: "4"
+        memory: 8Gi
+      limits:
+        memory: 16Gi
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+  cpu:
+    replicaCount: 2
+  autoscaling:
+    keda:
+      enabled: auto
+      target: gpu
+      minReplicaCount: 1
+      maxReplicaCount: 6
+      pendingEntriesCount: "3"
+
+models:
+  source: initImage
+  emptyDir:
+    sizeLimit: 6Gi
+
+orchestrator:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6

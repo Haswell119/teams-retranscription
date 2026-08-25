@@ -1,0 +1,61 @@
+Hansard model artifact - third-party model attribution
+======================================================
+
+This artifact contains no Hansard code. It is a bundle of third-party machine
+learning models, redistributed under their own licences and reproduced here
+byte-for-byte from the sources recorded in deploy/docker/models.manifest.
+Every file is verified against a pinned SHA-256 at build time and again at pod
+start (models.verifyChecksums).
+
+One ASR model serves BOTH French and English. There is no per-language model,
+no per-language deployment, and no language tag required at inference time.
+
+--------------------------------------------------------------------------
+1. Automatic speech recognition
+--------------------------------------------------------------------------
+   Model      NVIDIA Parakeet TDT 0.6b v3 (multilingual, 25 European
+              languages including French and English)
+   Files      nemo-parakeet-tdt-0.6b-v3/
+   Origin     NVIDIA Corporation, https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+   ONNX build https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx
+   Licence    Creative Commons Attribution 4.0 International (CC-BY-4.0)
+              https://creativecommons.org/licenses/by/4.0/
+
+   ATTRIBUTION, as required by CC-BY-4.0 section 3(a):
+       "Parakeet TDT 0.6b v3" (c) NVIDIA Corporation, licensed under
+       CC-BY-4.0. Converted to ONNX and quantized to int8 by istupakov.
+       Redistributed unmodified as part of the Hansard model artifact.
+
+--------------------------------------------------------------------------
+2. Voice activity detection
+--------------------------------------------------------------------------
+   Model      Silero VAD
+   Files      silero/silero_vad.onnx
+   Origin     Silero Team, https://github.com/snakers4/silero-vad
+   ONNX build https://huggingface.co/onnx-community/silero-vad
+   Licence    MIT (full text in silero/LICENSE)
+
+--------------------------------------------------------------------------
+3. Speaker segmentation (diarization)
+--------------------------------------------------------------------------
+   Model      pyannote segmentation 3.0, int8 ONNX export
+   Files      sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx
+   Origin     pyannote.audio, exported by the k2-fsa/sherpa-onnx project
+   Licence    MIT (full text in sherpa-onnx-pyannote-segmentation-3-0/LICENSE)
+
+--------------------------------------------------------------------------
+4. Speaker embedding (diarization)
+--------------------------------------------------------------------------
+   Model      3D-Speaker CAM++ speaker verification, VoxCeleb 16 kHz
+   Files      3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+   Origin     Alibaba DAMO Academy 3D-Speaker, redistributed by k2-fsa/sherpa-onnx
+   Licence    Apache License 2.0
+
+--------------------------------------------------------------------------
+Bundle
+--------------------------------------------------------------------------
+   Total size  ~0.71 GB uncompressed
+   Integrity   SHA256SUMS in the artifact root covers every file above.
+   Runtime     Nothing in this artifact is fetched at pod start. The workers
+               run with HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1 and
+               HANSARD_RUNTIME__ALLOW_MODEL_DOWNLOADS=false.

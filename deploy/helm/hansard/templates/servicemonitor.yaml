@@ -51,10 +51,10 @@ spec:
   namespaceSelector:
     matchNames:
       - {{ include "hansard.namespace" . }}
+  # Selects the headless worker-metrics Service, and only that Service.
   selector:
     matchLabels:
-      {{- include "hansard.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/part-of: hansard
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "worker") | nindent 6 }}
   endpoints:
     - port: metrics
       path: /metrics

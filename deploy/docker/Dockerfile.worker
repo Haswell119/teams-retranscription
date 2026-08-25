@@ -13,6 +13,11 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_EXTRA_INDEX_URL=
 ARG PIP_TRUSTED_HOST=
 ARG EXTRAS=asr-onnx,diarization,observability
+# Diarization runs on sherpa-onnx (pyannote segmentation 3.0 int8 + CAM++
+# embeddings, both language independent). If the project's `diarization` extra
+# does not yet pull it in, add it here rather than editing pyproject.toml:
+#   --build-arg EXTRA_PIP_PACKAGES="sherpa-onnx>=1.10"
+ARG EXTRA_PIP_PACKAGES=
 
 ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
     PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL} \
@@ -26,6 +31,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install --no-install-recommends -y build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+
+# Corporate TLS-inspecting proxies re-sign every certificate. Feed their CA in
+# without ever weakening verification:
+#   docker build --secret id=ca_bundle,src=/etc/ssl/certs/corporate-ca.crt ...
+RUN --mount=type=secret,id=ca_bundle,required=false \
+    if [ -s /run/secrets/ca_bundle ]; then \
+        cp /run/secrets/ca_bundle /usr/local/share/ca-certificates/hansard-build-ca.crt \
+        && update-ca-certificates \
+        && { echo '[global]'; echo 'cert=/etc/ssl/certs/ca-certificates.crt'; } >> /etc/pip.conf; \
+    fi
+
 RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 
@@ -34,12 +50,8 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 
 RUN python -m pip install --upgrade pip setuptools wheel \
-    && python -m pip install ".[${EXTRAS}]" \
-    && python - <<'PY'
-import importlib.util, sys
-if importlib.util.find_spec("torch") is not None:
-    sys.exit("torch leaked into the CPU worker image; check the extras")
-PY
+    && python -m pip install ".[${EXTRAS}]" ${EXTRA_PIP_PACKAGES} \
+    && python -c "import importlib.util,sys; sys.exit('torch leaked into the CPU worker image; check the extras') if importlib.util.find_spec('torch') else None"
 
 RUN find /opt/venv -name '__pycache__' -type d -prune -exec rm -rf {} + \
     && find /opt/venv -name '*.pyc' -delete \

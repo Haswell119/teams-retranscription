@@ -1,0 +1,51 @@
+# NKP Starter. There is NO ServiceMonitor CRD, no Grafana, no Alertmanager, no
+# Velero, no Gatekeeper and no External Secrets Operator on this tier.
+#
+# Nothing below disables those integrations by hand: every one of them is
+# `auto` in values.yaml, so they simply do not render when the CRD is missing.
+# The only Starter-specific settings are the ones that are genuinely different.
+global:
+  # nutanix-volume (iSCSI, RWO) is the cluster default. nutanix-file (RWX)
+  # requires licensed Nutanix Files and is NOT present, so nothing may ask
+  # for ReadWriteMany.
+  storageClass: nutanix-volume
+
+orchestrator:
+  replicaCount: 2
+  ingress:
+    enabled: true
+    className: kommander-traefik
+    hosts:
+      - host: hansard.apps.nkp.internal
+        paths:
+          - path: /
+            pathType: Prefix
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+
+redis:
+  persistence:
+    accessMode: ReadWriteOnce
+
+asr:
+  compute: cpu
+  language: auto
+
+worker:
+  autoscaling:
+    # No KEDA on Starter either; fall back to a plain CPU HPA.
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 4
+
+secrets:
+  create: false
+  existingSecret: hansard-credentials
+
+networkPolicy:
+  enabled: true
+  ingress:
+    fromNamespaceSelector:
+      kubernetes.io/metadata.name: kommander-traefik

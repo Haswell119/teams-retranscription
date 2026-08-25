@@ -41,6 +41,11 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_EXTRA_INDEX_URL=
 ARG PIP_TRUSTED_HOST=
 ARG EXTRAS=asr-onnx-gpu,diarization,observability
+# Diarization runs on sherpa-onnx (pyannote segmentation 3.0 int8 + CAM++
+# embeddings, both language independent). If the project's `diarization` extra
+# does not yet pull it in, add it here rather than editing pyproject.toml:
+#   --build-arg EXTRA_PIP_PACKAGES="sherpa-onnx>=1.10"
+ARG EXTRA_PIP_PACKAGES=
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_INDEX_URL=${PIP_INDEX_URL} \
@@ -55,6 +60,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         ${PYTHON_BIN} ${PYTHON_BIN}-venv ${PYTHON_BIN}-dev build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+
+# Corporate TLS-inspecting proxies re-sign every certificate. Feed their CA in
+# without ever weakening verification:
+#   docker build --secret id=ca_bundle,src=/etc/ssl/certs/corporate-ca.crt ...
+RUN --mount=type=secret,id=ca_bundle,required=false \
+    if [ -s /run/secrets/ca_bundle ]; then \
+        cp /run/secrets/ca_bundle /usr/local/share/ca-certificates/hansard-build-ca.crt \
+        && update-ca-certificates \
+        && { echo '[global]'; echo 'cert=/etc/ssl/certs/ca-certificates.crt'; } >> /etc/pip.conf; \
+    fi
+
 RUN ${PYTHON_BIN} -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 
@@ -66,7 +82,7 @@ COPY src ./src
 # single place to bump when moving to a new CUDA base image.
 RUN printf '%s\n' "${ONNXRUNTIME_GPU_SPEC}" > /tmp/gpu-constraints.txt \
     && python -m pip install --upgrade pip setuptools wheel \
-    && python -m pip install ".[${EXTRAS}]" "${ONNXRUNTIME_GPU_SPEC}" \
+    && python -m pip install ".[${EXTRAS}]" "${ONNXRUNTIME_GPU_SPEC}" ${EXTRA_PIP_PACKAGES} \
     && python -m pip uninstall -y onnxruntime 2>/dev/null || true
 
 RUN find /opt/venv -name '__pycache__' -type d -prune -exec rm -rf {} + \

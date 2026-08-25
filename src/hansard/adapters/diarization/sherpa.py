@@ -11,7 +11,7 @@ from hansard.domain.timespan import TimeSpan
 from hansard.ports.diarization import DiarizationRequest
 
 SEGMENTATION_FILENAME = "sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx"
-EMBEDDING_FILENAME = "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
+EMBEDDING_FILENAME = "nemo_en_titanet_small.onnx"
 
 
 @dataclass(slots=True)
@@ -21,10 +21,11 @@ class SherpaDiarizer:
     embedding_model: str = EMBEDDING_FILENAME
     num_threads: int = 4
     provider: str = "cpu"
-    clustering_threshold: float = 0.55
+    clustering_threshold: float = 0.95
     min_duration_on: float = 0.25
     min_duration_off: float = 0.40
     window_shift_ratio: float = 0.1
+    minimum_speaker_seconds: float = 3.0
     _engine: Any | None = field(default=None, init=False, repr=False)
 
     @property
@@ -89,5 +90,40 @@ class SherpaDiarizer:
             for segment in outcome
             if segment.end > segment.start
         )
+        turns = _absorb_marginal_speakers(turns, self.minimum_speaker_seconds)
         labels = tuple(dict.fromkeys(turn.label for turn in turns))
         return Diarization(turns=turns, labels=labels)
+
+
+def _absorb_marginal_speakers(
+    turns: tuple[SpeakerTurn, ...], minimum_seconds: float
+) -> tuple[SpeakerTurn, ...]:
+    if len(turns) < 2 or minimum_seconds <= 0.0:
+        return turns
+    totals: dict[str, float] = {}
+    for turn in turns:
+        totals[turn.label] = totals.get(turn.label, 0.0) + turn.span.duration
+    marginal = {label for label, total in totals.items() if total < minimum_seconds}
+    if not marginal or len(marginal) == len(totals):
+        return turns
+    ordered = sorted(turns, key=lambda turn: turn.span.start)
+    absorbed: list[SpeakerTurn] = []
+    for position, turn in enumerate(ordered):
+        if turn.label not in marginal:
+            absorbed.append(turn)
+            continue
+        neighbour = _nearest_stable_label(ordered, position, marginal)
+        absorbed.append(SpeakerTurn(turn.span, neighbour or turn.label, turn.confidence * 0.5))
+    return tuple(absorbed)
+
+
+def _nearest_stable_label(
+    ordered: list[SpeakerTurn], position: int, marginal: set[str]
+) -> str | None:
+    offset = 1
+    while position - offset >= 0 or position + offset < len(ordered):
+        for index in (position - offset, position + offset):
+            if 0 <= index < len(ordered) and ordered[index].label not in marginal:
+                return ordered[index].label
+        offset += 1
+    return None

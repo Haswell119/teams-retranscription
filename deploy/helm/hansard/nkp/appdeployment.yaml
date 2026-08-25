@@ -1,0 +1,99 @@
+# NKP Kommander catalog wrapper.
+#
+# Kommander distributes an application to one or more managed clusters through
+# an AppDeployment that references a ClusterApp (a catalog entry) rather than a
+# chart directly. Apply BOTH objects in the workspace namespace of the
+# management cluster; Kommander reconciles them onto the target clusters.
+#
+#   kubectl -n <workspace-namespace> apply -f appdeployment.yaml
+#
+# TIER NOTE: custom catalogs and multi-cluster AppDeployments are Kommander
+# features. If your licence does not include them, skip this file entirely and
+# install with `helm upgrade --install` or the Flux HelmRelease in
+# ocirepository.yaml - the chart is identical either way.
+---
+apiVersion: apps.kommander.d2iq.io/v1alpha3
+kind: ClusterApp
+metadata:
+  name: hansard-0.1.0
+  namespace: hansard-catalog
+spec:
+  appRef:
+    name: hansard-0.1.0
+    kind: HelmRelease
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: hansard-catalog
+  namespace: hansard-catalog
+spec:
+  interval: 10m
+  type: oci
+  url: oci://harbor.nkp.internal/hansard/charts
+  certSecretRef:
+    name: hansard-registry-ca
+  secretRef:
+    name: harbor-pull
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta2
+kind: HelmRelease
+metadata:
+  name: hansard-0.1.0
+  namespace: hansard-catalog
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: hansard
+      version: 0.1.0
+      sourceRef:
+        kind: HelmRepository
+        name: hansard-catalog
+        namespace: hansard-catalog
+---
+apiVersion: apps.kommander.d2iq.io/v1alpha3
+kind: AppDeployment
+metadata:
+  name: hansard
+  # Replace with your Kommander workspace namespace.
+  namespace: workspace-example
+spec:
+  appRef:
+    name: hansard-0.1.0
+    kind: ClusterApp
+  # Per-deployment overrides. Keep credentials OUT of here: point
+  # secrets.existingSecret at a Secret the platform team manages, or use
+  # External Secrets on Pro+.
+  configOverrides:
+    name: hansard-overrides
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hansard-overrides
+  namespace: workspace-example
+data:
+  values.yaml: |
+    global:
+      imageRegistry: harbor.nkp.internal/hansard
+      storageClass: nutanix-volume
+      customCA:
+        enabled: true
+        existingSecret: hansard-internal-ca
+    orchestrator:
+      ingress:
+        enabled: true
+        className: kommander-traefik
+        hosts:
+          - host: hansard.apps.nkp.internal
+            paths:
+              - path: /
+                pathType: Prefix
+    # One multilingual model serves French and English. No per-language split.
+    asr:
+      compute: cpu
+      language: auto
+    secrets:
+      create: false
+      existingSecret: hansard-credentials

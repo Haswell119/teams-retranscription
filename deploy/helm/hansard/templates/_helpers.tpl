@@ -594,6 +594,7 @@ metadata:
   namespace: {{ include "hansard.namespace" $ctx }}
   labels:
     {{- include "hansard.componentLabels" (dict "ctx" $ctx "component" $component) | nindent 4 }}
+    hansard.io/role: worker
     hansard.io/compute: {{ $variant }}
   {{- with $ctx.Values.commonAnnotations }}
   annotations:
@@ -609,6 +610,7 @@ spec:
     metadata:
       labels:
         {{- include "hansard.componentLabels" (dict "ctx" $ctx "component" $component) | nindent 8 }}
+        hansard.io/role: worker
         hansard.io/compute: {{ $variant }}
         {{- with $ctx.Values.worker.podLabels }}
         {{- toYaml . | nindent 8 }}

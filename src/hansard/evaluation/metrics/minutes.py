@@ -289,9 +289,11 @@ def _parse_rubric_scores(response: str) -> RubricScores:
 
 
 def _clamped_score(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise SummarizationError(f"judge score is not numeric: {value!r}")
     try:
-        numeric = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError) as error:
+        numeric = float(value)
+    except ValueError as error:
         raise SummarizationError(f"judge score is not numeric: {value!r}") from error
     return min(5.0, max(1.0, numeric))
 

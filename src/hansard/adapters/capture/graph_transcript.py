@@ -175,7 +175,7 @@ class MsalApplicationTokenProvider:
             import msal
         except ImportError as error:
             raise CaptureError(
-                "msal is not installed; install the 'delivery' extra to use the Graph fallback"
+                "msal is not installed; install the 'capture-graph-fallback' extra to use the Graph fallback"
             ) from error
         secret = self.settings.client_secret
         application = msal.ConfidentialClientApplication(

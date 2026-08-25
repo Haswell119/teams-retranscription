@@ -9,6 +9,7 @@ from hansard.evaluation.metrics.speaker import (
     diarization_error_rate,
     jaccard_error_rate,
     speaker_count_error,
+    time_constrained_cpwer,
     word_diarization_error_rate,
 )
 
@@ -172,3 +173,35 @@ def test_cpwer_agrees_with_meeteval(reference_stream, hypothesis_stream):
     if expected is None:
         pytest.skip("meeteval is not installed")
     assert concatenated_minimum_permutation_wer(reference, hypothesis).wer == pytest.approx(expected)
+
+
+def test_tcpwer_matches_cpwer_when_words_are_on_time():
+    reference = transcript(("A", 0.0, 5.0, "hello world how are you"), ("B", 5.0, 10.0, "i am fine thanks"))
+    hypothesis = transcript(
+        ("spk2", 0.0, 5.0, "hello world how are you"),
+        ("spk1", 5.0, 10.0, "i am fine thanks"),
+    )
+    assert time_constrained_cpwer(reference, hypothesis, collar=5.0).wer == pytest.approx(0.0)
+    assert concatenated_minimum_permutation_wer(reference, hypothesis).wer == pytest.approx(0.0)
+
+
+def test_tcpwer_rejects_words_outside_the_collar():
+    reference = transcript(("A", 0.0, 5.0, "hello world how are you"), ("B", 5.0, 10.0, "i am fine thanks"))
+    displaced = transcript(
+        ("spk2", 120.0, 125.0, "hello world how are you"),
+        ("spk1", 100.0, 105.0, "i am fine thanks"),
+    )
+    assert concatenated_minimum_permutation_wer(reference, displaced).wer == pytest.approx(0.0)
+    result = time_constrained_cpwer(reference, displaced, collar=5.0)
+    assert (result.deletions, result.insertions, result.hits) == (9, 9, 0)
+    assert result.wer == pytest.approx(2.0)
+
+
+def test_tcpwer_tolerates_drift_inside_the_collar():
+    reference = transcript(("A", 0.0, 5.0, "hello world how are you"), ("B", 5.0, 10.0, "i am fine thanks"))
+    drifted = transcript(
+        ("spk2", 2.0, 7.0, "hello world how are you"),
+        ("spk1", 7.0, 12.0, "i am fine thanks"),
+    )
+    assert time_constrained_cpwer(reference, drifted, collar=5.0).wer == pytest.approx(0.0)
+    assert time_constrained_cpwer(reference, drifted, collar=0.5).wer > 0.0

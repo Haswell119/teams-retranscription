@@ -140,6 +140,10 @@ config:
 asr:
   # parakeet | whisper | qwen3 | ensemble | null
   engine: parakeet
+  # ONE model serves BOTH French and English. Parakeet TDT 0.6b v3 is natively
+  # multilingual across 25 European languages, so there is no per-language
+  # model, no per-language worker pool and no per-language deployment. This is
+  # what keeps the CPU profile at roughly 2 GB RSS.
   modelId: nemo-parakeet-tdt-0.6b-v3
   # none | int8
   quantization: int8
@@ -150,18 +154,33 @@ asr:
   compute: auto
   batchSize: 4
   beamSize: 1
-  language: ""
+  # auto | fr | en (or any other code the model supports: de, es, it, nl, pt...)
+  #   auto -> send no language tag at all. Parakeet v3 detects the language
+  #           itself, and a mixed French/English meeting transcribes correctly
+  #           in one pass. Competing engines that demand a language up front
+  #           cannot do this; leave it on auto unless you have a reason.
+  #   fr/en -> pin the decode language. Slightly more robust on very short or
+  #            very noisy audio, wrong if the meeting switches language.
+  language: auto
   intraOpThreads: 0
   interOpThreads: 0
   fallbackEngine: whisper
   fallbackModelId: large-v3-turbo
 
+# Diarization is language independent: the same two models handle French and
+# English meetings. They live in the model artifact at the fixed paths that
+# hansard.adapters.diarization.sherpa expects:
+#   sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx   (~7 MB, MIT)
+#   3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx       (~29 MB, Apache-2.0)
 diarization:
-  engine: sortformer
-  modelId: nvidia/diar_streaming_sortformer_4spk-v2.1
+  # spectral | sherpa -> the sherpa-onnx pipeline shipped in the model artifact.
+  # sortformer / pyannote need models this chart's artifact does not contain.
+  engine: spectral
+  modelId: sherpa-onnx-pyannote-segmentation-3-0
   maxSpeakers: 8
   minSpeakers: 1
 
+# Voice activity detection, also language independent. Silero VAD, MIT.
 vad:
   engine: silero
   threshold: 0.5

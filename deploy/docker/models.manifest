@@ -1,12 +1,61 @@
 # Hansard model manifest - the ONLY place model provenance is declared.
 #
-# Format:  <target-dir>|<huggingface-repo-id>|<revision>|<comma-separated allow patterns>
+# Format:  <target-path>|<url>|<sha256>|<archive-member>
 #
-# <target-dir> MUST match how hansard.adapters.asr.registry resolves a local
-# model: models_dir / model_id.replace("/", "__").  Keep them in sync.
+#   <target-path>     path inside /models. It MUST match how the adapters
+#                     resolve a local model:
+#                       ASR   models_dir / model_id.replace("/", "__")
+#                             (hansard.adapters.asr.registry)
+#                       VAD   models_dir / "silero" / "silero_vad.onnx"
+#                             (onnx_asr.models.silero._get_model_files)
+#                       DIAR  the two constants in
+#                             hansard.adapters.diarization.sherpa
+#   <url>             direct download. https://huggingface.co is rewritten to
+#                     $HF_ENDPOINT and https://github.com to $GITHUB_MIRROR so
+#                     air-gapped builds pull from an internal mirror.
+#   <sha256>          verified after download. A mismatch fails the build.
+#   <archive-member>  optional. When set, the URL is an archive and only this
+#                     member is extracted to <target-path>.
 #
-# Revisions are pinned so a rebuild is reproducible and an air-gapped mirror is
-# auditable.  Replace `main` with a commit SHA before any production build.
-nemo-parakeet-tdt-0.6b-v3|istupakov/parakeet-tdt-0.6b-v3-onnx|main|*.onnx,*.json,*.txt,*.md,*.model
-silero|istupakov/silero-vad-onnx|main|*.onnx,*.json,*.md
-onnx-community__pyannote-segmentation-3.0|onnx-community/pyannote-segmentation-3.0|main|onnx/*.onnx,*.json,*.md
+# Hugging Face URLs are pinned to a COMMIT, never to `main`, so a rebuild in
+# six months produces the same bytes.
+#
+# ---------------------------------------------------------------------------
+# ASR - ONE model serves BOTH French and English.
+# ---------------------------------------------------------------------------
+# NVIDIA Parakeet TDT 0.6b v3 is natively multilingual (25 European languages,
+# fr and en among them) and needs no language tag at inference time. That is
+# why it was chosen: one 0.67 GB int8 artifact, one deployment, no per-language
+# worker pool, ~2 GB RSS on CPU. Licence CC-BY-4.0 - see models.NOTICE.
+nemo-parakeet-tdt-0.6b-v3/config.json|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/config.json|666903c76b9798caf2c210afd4f6cd60b08a8dbf9800ec8d7a3bc0d2148ac466|
+nemo-parakeet-tdt-0.6b-v3/vocab.txt|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/vocab.txt|d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d|
+nemo-parakeet-tdt-0.6b-v3/nemo128.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/nemo128.onnx|a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f|
+nemo-parakeet-tdt-0.6b-v3/decoder_joint-model.int8.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/decoder_joint-model.int8.onnx|eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70|
+nemo-parakeet-tdt-0.6b-v3/encoder-model.int8.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/encoder-model.int8.onnx|6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09|
+#
+# ---------------------------------------------------------------------------
+# VAD - Silero, language independent. MIT.
+# ---------------------------------------------------------------------------
+silero/silero_vad.onnx|https://huggingface.co/onnx-community/silero-vad/resolve/e71cae966052b992a7eca6b17738916ce0eca4ec/onnx/model.onnx|a4a068cd6cf1ea8355b84327595838ca748ec29a25bc91fc82e6c299ccdc5808|
+silero/LICENSE|https://huggingface.co/onnx-community/silero-vad/resolve/e71cae966052b992a7eca6b17738916ce0eca4ec/LICENSE|2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b|
+#
+# ---------------------------------------------------------------------------
+# Diarization - language independent, ~46 MB total.
+# ---------------------------------------------------------------------------
+# Plain GitHub release assets: no Hugging Face token, no gated repo, no
+# click-through licence. That is exactly what an air gap needs.
+#
+# The EMBEDDING model was chosen on measurement, not on reputation. Benchmarked
+# on synthetic multi-speaker meetings with exact ground truth:
+#
+#   nemo_en_titanet_small.onnx     0.01 % speaker confusion   DER 14.96 %
+#   3dspeaker_campplus_voxceleb    47 %   speaker confusion   DER 62.77 %
+#
+# CAM++ failed even when handed the correct number of clusters, so this is not
+# a clustering-hyperparameter problem. Do not swap TitaNet out without
+# re-running that benchmark. `embedding_model` is a setting and a Helm value
+# (diarization.embeddingModel), so you can test a candidate without a rebuild -
+# but the bundle ships the one that measured well.
+sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx|https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2|24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488|sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx
+sherpa-onnx-pyannote-segmentation-3-0/LICENSE|https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2|24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488|sherpa-onnx-pyannote-segmentation-3-0/LICENSE
+nemo_en_titanet_small.onnx|https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_small.onnx|ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e|

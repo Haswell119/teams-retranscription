@@ -30,8 +30,11 @@ data:
   HANSARD_ASR__INTER_OP_THREADS: {{ .Values.asr.interOpThreads | quote }}
   HANSARD_ASR__FALLBACK_ENGINE: {{ .Values.asr.fallbackEngine | quote }}
   HANSARD_ASR__FALLBACK_MODEL_ID: {{ .Values.asr.fallbackModelId | quote }}
-  {{- with .Values.asr.language }}
-  HANSARD_ASR__LANGUAGE: {{ . | quote }}
+  {{- if and .Values.asr.language (ne .Values.asr.language "auto") }}
+  # Omitted entirely when asr.language=auto: Parakeet TDT 0.6b v3 is
+  # multilingual and detects French vs English itself. Setting a language here
+  # pins the decoder and will mis-transcribe a meeting that switches language.
+  HANSARD_ASR__LANGUAGE: {{ .Values.asr.language | quote }}
   {{- end }}
 
   HANSARD_DIARIZATION__ENGINE: {{ .Values.diarization.engine | quote }}

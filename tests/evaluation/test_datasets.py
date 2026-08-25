@@ -5,7 +5,13 @@ import pytest
 
 from hansard.domain.speakers import UNKNOWN_SPEAKER, Diarization, SpeakerTurn
 from hansard.domain.timespan import TimeSpan
-from hansard.evaluation.datasets import load_manifest, sample_from_subtitles
+from hansard.evaluation.corpora import SUMM_RE_DATASET, SUMM_RE_LANGUAGE, meeting_diarization
+from hansard.evaluation.datasets import (
+    load_manifest,
+    prepare_summ_re,
+    sample_from_subtitles,
+    summ_re_samples,
+)
 from hansard.evaluation.formats.rttm import load_rttm, parse_rttm, render_rttm, write_rttm
 from hansard.evaluation.formats.subtitles import load_subtitles, parse_srt, parse_webvtt
 
@@ -135,3 +141,66 @@ def test_sample_from_subtitles_builds_reference_diarization(tmp_path):
     assert sample.source == "teams"
     assert sample.reference_diarization is not None
     assert sample.reference_diarization.labels == ("Marie Dupont", "Paul Martin")
+
+
+FLEURS_MANIFEST = Path("/home/user/eval_data/fleurs_fr.jsonl")
+
+
+@pytest.mark.skipif(not FLEURS_MANIFEST.exists(), reason="local evaluation corpus is absent")
+def test_load_manifest_reads_the_french_fixture():
+    samples = load_manifest(FLEURS_MANIFEST)
+    assert len(samples) == 80
+    assert {sample.language for sample in samples} == {"fr"}
+    assert samples[0].reference.text.startswith("l'accident")
+    assert all(sample.audio_seconds > 0.0 for sample in samples)
+
+
+def summ_re_tree(root):
+    meeting = root / "meeting-01"
+    meeting.mkdir(parents=True)
+    (meeting / "alice.json").write_text(
+        json.dumps(
+            [
+                {"start": 0.0, "end": 2.0, "text": "bonjour à toutes et à tous"},
+                {"start": 6.0, "end": 8.5, "text": "on commence par le budget"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (meeting / "bob.json").write_text(
+        json.dumps([{"start": 2.5, "end": 5.5, "text": "merci alice"}]),
+        encoding="utf-8",
+    )
+    (meeting / "mixed.wav").write_bytes(b"")
+    return root
+
+
+def test_summ_re_preparation_builds_reference_diarization(tmp_path):
+    root = summ_re_tree(tmp_path / "summ-re")
+    meetings = prepare_summ_re(root, tmp_path / "rttm")
+    assert [meeting.identifier for meeting in meetings] == ["meeting-01"]
+    assert meetings[0].speakers == ("alice", "bob")
+    assert meetings[0].duration == pytest.approx(8.5)
+    diarization = meeting_diarization(meetings[0])
+    assert diarization.speaker_count == 2
+    assert diarization.turns[0].label == "alice"
+    assert diarization.turns[1].label == "bob"
+    written = load_rttm(tmp_path / "rttm" / "meeting-01.rttm")
+    assert written["meeting-01"].turns == diarization.turns
+
+
+def test_summ_re_samples_are_french_and_carry_the_mixed_audio(tmp_path):
+    root = summ_re_tree(tmp_path / "summ-re")
+    samples = summ_re_samples(root)
+    assert len(samples) == 1
+    assert samples[0].language == "fr"
+    assert samples[0].source == "summ-re"
+    assert samples[0].audio_path == root / "meeting-01" / "mixed.wav"
+    assert samples[0].reference.speakers == ("alice", "bob")
+    assert len(samples[0].reference.utterances) == 3
+    assert samples[0].reference_diarization is not None
+
+
+def test_summ_re_download_is_documented_not_automatic():
+    assert SUMM_RE_DATASET == "linagora/SUMM-RE"
+    assert SUMM_RE_LANGUAGE == "fr"

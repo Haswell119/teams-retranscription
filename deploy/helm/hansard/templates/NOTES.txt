@@ -18,25 +18,32 @@ Hansard {{ .Chart.AppVersion }} is installed as {{ .Release.Name }} in namespace
 ################################################################################
 {{ end }}
 WHAT IS RUNNING
-{{ if .Values.orchestrator.enabled -}}
+{{- if .Values.orchestrator.enabled }}
   orchestrator   {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }} ({{ if .Values.orchestrator.autoscaling.enabled }}HPA {{ .Values.orchestrator.autoscaling.minReplicas }}-{{ .Values.orchestrator.autoscaling.maxReplicas }}{{ else }}{{ .Values.orchestrator.replicaCount }} replicas{{ end }})
 {{- end }}
-{{ if include "hansard.cpuEnabled" . -}}
+{{- if include "hansard.cpuEnabled" . }}
   worker (cpu)   {{ include "hansard.componentName" (dict "ctx" . "component" "worker-cpu") }}
 {{- end }}
-{{ if include "hansard.gpuEnabled" . -}}
-  worker (gpu)   {{ include "hansard.componentName" (dict "ctx" . "component" "worker-gpu") }}  [{{ .Values.worker.gpu.count }} x {{ .Values.worker.gpu.resourceName }}]
+{{- if include "hansard.gpuEnabled" . }}
+  worker (gpu)   {{ include "hansard.componentName" (dict "ctx" . "component" "worker-gpu") }} [{{ .Values.worker.gpu.count }} x {{ .Values.worker.gpu.resourceName }}]
 {{- end }}
-{{ if .Values.redis.enabled -}}
+{{- if .Values.redis.enabled }}
   queue          {{ include "hansard.redis.serviceName" . }}:{{ .Values.redis.port }} (in-chart)
-{{- else -}}
+{{- else }}
   queue          external
 {{- end }}
-{{ if .Values.bot.enabled -}}
+{{- if .Values.bot.enabled }}
   capture bot    Job template in ConfigMap {{ include "hansard.componentName" (dict "ctx" . "component" "bot") }}
 {{- end }}
   models         source={{ .Values.models.source }} mounted at {{ .Values.models.mountPath }}
   storage        backend={{ .Values.storage.backend }}
+  language       asr.language={{ .Values.asr.language }}
+                 {{ .Values.asr.modelId }} is multilingual: ONE model and ONE
+                 worker pool serve French AND English.
+{{- if ne .Values.asr.language "auto" }}
+                 You have PINNED the decode language. A meeting that switches
+                 language will be mis-transcribed; asr.language=auto avoids it.
+{{- end }}
 
 NEXT STEPS
 

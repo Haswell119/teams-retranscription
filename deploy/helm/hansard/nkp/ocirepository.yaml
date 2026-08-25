@@ -1,0 +1,71 @@
+# Flux OCIRepository - how NKP consumes the Hansard chart in GitOps mode.
+#
+# NKP ships Flux as its GitOps engine on every tier. Push the chart as an OCI
+# artifact into the same internal registry that holds the images:
+#
+#   helm package deploy/helm/hansard
+#   helm push hansard-0.1.0.tgz oci://harbor.nkp.internal/hansard/charts
+#
+# Then apply this object (and appdeployment.yaml) into the workspace namespace.
+# Nothing here is templated by Helm: it is the wrapper AROUND the release.
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: hansard
+  namespace: kommander-flux
+spec:
+  interval: 10m
+  url: oci://harbor.nkp.internal/hansard/charts/hansard
+  ref:
+    # Pin by digest in production; a tag can be moved underneath you.
+    tag: 0.1.0
+    # digest: sha256:...
+  # Required whenever the registry uses a private CA. Create the secret with:
+  #   kubectl -n kommander-flux create secret generic hansard-registry-ca \
+  #     --from-file=ca.crt=/etc/ssl/certs/nkp-internal-ca.crt
+  certSecretRef:
+    name: hansard-registry-ca
+  secretRef:
+    name: harbor-pull
+  # Cosign verification. Drop this block only if you do not sign your charts.
+  verify:
+    provider: cosign
+    secretRef:
+      name: hansard-cosign-pub
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta2
+kind: HelmRelease
+metadata:
+  name: hansard
+  namespace: hansard
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: hansard
+    namespace: kommander-flux
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  # Values live in a ConfigMap so the platform team can review them as a plain
+  # Kubernetes object, and secrets never appear in this manifest.
+  valuesFrom:
+    - kind: ConfigMap
+      name: hansard-values
+    - kind: Secret
+      name: hansard-values-secret
+      optional: true
+  values:
+    global:
+      imageRegistry: harbor.nkp.internal/hansard
+      storageClass: nutanix-volume
+    orchestrator:
+      ingress:
+        enabled: true
+        className: kommander-traefik

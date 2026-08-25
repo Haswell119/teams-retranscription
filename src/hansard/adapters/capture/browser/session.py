@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Final, Protocol
+from typing import Any, Final, Protocol, cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from hansard.adapters.capture.browser import selectors
@@ -77,7 +77,7 @@ class MeetingState(StrEnum):
     UNKNOWN = "unknown"
 
 
-TEXT_STATES: Final[tuple[tuple[tuple[str, ...], "MeetingState"], ...]] = (
+TEXT_STATES: Final[tuple[tuple[tuple[str, ...], MeetingState], ...]] = (
     (selectors.DENIED_TEXTS, MeetingState.DENIED),
     (selectors.REMOVED_TEXTS, MeetingState.REMOVED),
     (selectors.BLOCKED_TEXTS, MeetingState.BLOCKED),
@@ -590,18 +590,18 @@ class PlaywrightRuntime:
 
     @property
     def context(self) -> ContextLike:
-        return self._context
+        return cast(ContextLike, self._context)
 
     @property
     def page(self) -> PageLike:
-        return self._page
+        return cast(PageLike, self._page)
 
     async def cdp(self) -> CdpSessionLike | None:
         try:
-            session: Any = await self._context.new_cdp_session(self._page)
+            session = await self._context.new_cdp_session(self._page)
         except Exception:
             return None
-        return session
+        return cast(CdpSessionLike, session)
 
     async def aclose(self) -> None:
         for closer in (self._context, self._browser, self._driver):

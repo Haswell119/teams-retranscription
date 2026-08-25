@@ -1,0 +1,101 @@
+# Fully disconnected site. Nothing may resolve or dial a public endpoint.
+#
+#   * every image comes from the internal registry (global.imageRegistry)
+#   * every image is pinned by digest and the chart refuses to render otherwise
+#   * models are staged from a mirrored OCI artifact, checksum-verified
+#   * Graph webhooks are impossible here (they need a public inbound endpoint),
+#     so calendar discovery is outbound polling
+#   * artifacts go to Nutanix Objects over path-style S3 with a private CA
+global:
+  imageRegistry: harbor.nkp.internal/hansard
+  requireImageDigests: true
+  storageClass: nutanix-volume
+  customCA:
+    enabled: true
+    existingSecret: hansard-internal-ca
+    key: ca-bundle.crt
+  imagePullSecrets:
+    - name: harbor-pull
+
+images:
+  api:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000001
+  worker:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000002
+  workerGpu:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000003
+  bot:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000004
+  modelsInit:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000005
+  modelsArtifact:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000006
+  oras:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000007
+  s3cli:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000008
+  redis:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000009
+
+models:
+  source: oras
+  oras:
+    reference: harbor.nkp.internal/hansard/hansard-models-artifact:0.1.0
+  verifyChecksums: true
+
+# One multilingual model, French and English, no language tag needed.
+asr:
+  compute: cpu
+  language: auto
+
+secrets:
+  create: false
+  existingSecret: hansard-credentials
+
+storage:
+  backend: s3
+  s3:
+    endpoint: https://objects.nkp.internal
+    bucket: hansard-artifacts
+    region: us-east-1
+    forcePathStyle: true
+    credentials:
+      existingSecret: hansard-objects
+
+minutes:
+  enabled: true
+  endpoint: http://vllm.llm.svc.cluster.local:8000/v1
+
+# Polling only. A Graph change-notification endpoint cannot exist behind an
+# air gap: it needs a public inbound HTTPS URL answering a 10 s handshake.
+webhook:
+  enabled: false
+polling:
+  enabled: true
+  intervalSeconds: 120
+
+networkPolicy:
+  enabled: true
+  ingress:
+    fromNamespaceSelector:
+      kubernetes.io/metadata.name: kommander-traefik
+  egress:
+    mode: cidr
+    teamsMedia:
+      enabled: false
+    entra:
+      enabled: false
+    extraCIDRs:
+      - 10.42.0.0/16
+    extraPorts:
+      - protocol: TCP
+        port: 443
+      - protocol: TCP
+        port: 25
+
+capture:
+  # No Teams reachability in a true air gap: transcribe uploaded recordings.
+  engine: file
+
+bot:
+  enabled: false

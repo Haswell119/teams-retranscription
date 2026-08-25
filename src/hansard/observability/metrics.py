@@ -80,9 +80,48 @@ _RTF_BUCKETS: Final[tuple[float, ...]] = (
 
 _SPEAKER_BUCKETS: Final[tuple[float, ...]] = (1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 16.0, 24.0)
 
+KNOWN_LANGUAGES: Final[frozenset[str]] = frozenset(
+    {
+        "bg",
+        "cs",
+        "da",
+        "de",
+        "el",
+        "en",
+        "es",
+        "et",
+        "fi",
+        "fr",
+        "hr",
+        "hu",
+        "it",
+        "lt",
+        "lv",
+        "mt",
+        "nl",
+        "pl",
+        "pt",
+        "ro",
+        "ru",
+        "sk",
+        "sl",
+        "sv",
+        "uk",
+    }
+)
+
+UNKNOWN_LANGUAGE: Final[str] = "unknown"
+
 
 class UnsafeLabelError(ValueError):
     pass
+
+
+def normalise_language(language: str | None) -> str:
+    if not language:
+        return UNKNOWN_LANGUAGE
+    candidate = language.strip().lower().replace("_", "-").split("-")[0]
+    return candidate if candidate in KNOWN_LANGUAGES else UNKNOWN_LANGUAGE
 
 
 def _reject_unsafe_labels(name: str, labelnames: Sequence[str]) -> None:
@@ -284,14 +323,14 @@ ASR_TRANSCRIBE_DURATION: Final[Histogram] = _histogram(
     "asr_transcribe_duration_seconds",
     "Wall clock seconds spent transcribing one unit of audio",
     _DURATION_BUCKETS,
-    ("model", "compute"),
+    ("model", "compute", "language"),
 )
 
 ASR_REALTIME_FACTOR: Final[Histogram] = _histogram(
     "asr_realtime_factor",
     "Processing seconds divided by audio seconds; lower is faster than realtime",
     _RTF_BUCKETS,
-    ("model", "compute"),
+    ("model", "compute", "language"),
 )
 
 ASR_FAILURES: Final[Counter] = _counter(
@@ -321,6 +360,7 @@ def set_build_info(
     asr_engine: str = "unknown",
     asr_model: str = "unknown",
     compute: str = "unknown",
+    language: str | None = None,
 ) -> None:
     BUILD_INFO.set(
         {
@@ -329,6 +369,7 @@ def set_build_info(
             "asr_engine": asr_engine,
             "asr_model": asr_model,
             "compute": compute,
+            "language": language or "auto",
         }
     )
 
@@ -356,10 +397,21 @@ def record_queue_depth(stream: str, group: str, pending: int) -> None:
     QUEUE_PENDING.labels(stream=stream, group=group).set(float(pending))
 
 
-def record_transcription(model: str, compute: str, processing_seconds: float, audio_seconds: float) -> None:
-    ASR_TRANSCRIBE_DURATION.labels(model=model, compute=compute).observe(processing_seconds)
+def record_transcription(
+    model: str,
+    compute: str,
+    processing_seconds: float,
+    audio_seconds: float,
+    language: str | None = None,
+) -> None:
+    resolved = normalise_language(language)
+    ASR_TRANSCRIBE_DURATION.labels(model=model, compute=compute, language=resolved).observe(
+        processing_seconds
+    )
     if audio_seconds > 0:
-        ASR_REALTIME_FACTOR.labels(model=model, compute=compute).observe(processing_seconds / audio_seconds)
+        ASR_REALTIME_FACTOR.labels(model=model, compute=compute, language=resolved).observe(
+            processing_seconds / audio_seconds
+        )
 
 
 def record_asr_failure(reason: str) -> None:

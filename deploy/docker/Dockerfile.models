@@ -18,36 +18,50 @@
 #
 # See deploy/docker/README.md and deploy/docker/Makefile.
 #
-# Weights are downloaded HERE, at build time, and never at pod start.
+# Weights are downloaded HERE, at build time, and never at pod start. Every
+# file is pinned by SHA-256 in deploy/docker/models.manifest, so the build is
+# reproducible and the bundle is auditable. Attribution lives in
+# deploy/docker/models.NOTICE and is copied into the artifact as /models/NOTICE.
+#
+# One ASR model covers BOTH French and English (Parakeet TDT 0.6b v3 is
+# multilingual): no per-language bundle, no per-language worker pool.
 
-ARG PYTHON_VERSION=3.11
-ARG FETCH_IMAGE=python:${PYTHON_VERSION}-slim-bookworm
+ARG FETCH_IMAGE=debian:bookworm-slim
 ARG BUSYBOX_IMAGE=busybox:1.36-glibc
 
 FROM ${FETCH_IMAGE} AS fetch
 
-ARG PIP_INDEX_URL=https://pypi.org/simple
-ARG PIP_EXTRA_INDEX_URL=
-# Point at an internal Hugging Face mirror for air-gapped builds.
+# Point these at internal mirrors for air-gapped builds. Every URL in
+# models.manifest starts with one of the two public prefixes they replace.
 ARG HF_ENDPOINT=https://huggingface.co
-ARG HUGGINGFACE_HUB_SPEC=huggingface_hub>=0.25
+ARG GITHUB_MIRROR=https://github.com
 
-ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
-    PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL} \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1 \
-    HF_ENDPOINT=${HF_ENDPOINT} \
-    HF_HUB_DISABLE_TELEMETRY=1 \
-    HF_HUB_ENABLE_HF_TRANSFER=0
+ENV HF_ENDPOINT=${HF_ENDPOINT} \
+    GITHUB_MIRROR=${GITHUB_MIRROR} \
+    DEBIAN_FRONTEND=noninteractive
 
-RUN python -m pip install "${HUGGINGFACE_HUB_SPEC}"
+# curl + bzip2 + coreutils only. No Python, no Hugging Face client, no token:
+# every artifact is a plain HTTPS GET verified against a pinned SHA-256.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install --no-install-recommends -y \
+        curl ca-certificates bzip2 tar \
+    && rm -rf /var/lib/apt/lists/*
+
+# Corporate TLS-inspecting proxies re-sign every certificate. Feed their CA in
+# without ever weakening verification:
+#   docker build --secret id=ca_bundle,src=/etc/ssl/certs/corporate-ca.crt ...
+RUN --mount=type=secret,id=ca_bundle,required=false \
+    if [ -s /run/secrets/ca_bundle ]; then \
+        cp /run/secrets/ca_bundle /usr/local/share/ca-certificates/hansard-build-ca.crt \
+        && update-ca-certificates; \
+    fi
 
 COPY deploy/docker/models.manifest /build/models.manifest
+COPY deploy/docker/models.NOTICE   /build/models.NOTICE
 COPY deploy/docker/fetch-models.sh /build/fetch-models.sh
 
-RUN --mount=type=secret,id=hf_token,required=false \
-    HF_TOKEN="$(cat /run/secrets/hf_token 2>/dev/null || true)" \
-    sh /build/fetch-models.sh /build/models.manifest /out/models
+RUN sh /build/fetch-models.sh /build/models.manifest /build/models.NOTICE /out/models
 
 # --- 1. host directory ------------------------------------------------------
 FROM scratch AS export
@@ -61,7 +75,7 @@ ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 
 LABEL org.opencontainers.image.title="hansard-models" \
-      org.opencontainers.image.description="Hansard ASR/VAD/diarization ONNX weights, build-time resolved" \
+      org.opencontainers.image.description="Hansard ASR/VAD/diarization ONNX weights (French + English from one model), build-time resolved" \
       org.opencontainers.image.licenses="CC-BY-4.0 AND MIT" \
       org.opencontainers.image.source="https://github.com/Haswell119/teams-retranscription" \
       org.opencontainers.image.version="${VERSION}" \
@@ -91,4 +105,4 @@ COPY --from=fetch /out/models /opt/hansard-models
 
 USER 10001:10001
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["set -eu; cp -a /opt/hansard-models/. \"${HANSARD_MODELS_TARGET:-/models}/\"; cd \"${HANSARD_MODELS_TARGET:-/models}\"; sha256sum -c SHA256SUMS >/dev/null; echo 'model artifact verified'"]
+CMD ["set -eu; cp -R /opt/hansard-models/. \"${HANSARD_MODELS_TARGET:-/models}/\"; cd \"${HANSARD_MODELS_TARGET:-/models}\"; sha256sum -c SHA256SUMS >/dev/null; echo 'model artifact verified'"]

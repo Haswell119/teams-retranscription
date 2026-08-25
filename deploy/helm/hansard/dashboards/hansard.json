@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Hansard sovereign Teams transcription. No panel uses a meeting, user or URL label: those are structurally forbidden by src/hansard/observability/metrics.py.",
+  "description": "Hansard sovereign Teams transcription. One multilingual ASR model serves both French and English. No panel uses a meeting, user or URL label: those are structurally forbidden by src/hansard/observability/metrics.py.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -724,8 +724,8 @@
     {
       "id": 21,
       "type": "timeseries",
-      "title": "Realtime factor by compute",
-      "description": "Processing seconds per audio second. Above 1.0 the fleet cannot keep up with live meetings.",
+      "title": "Realtime factor by compute and language",
+      "description": "Processing seconds per audio second. Above 1.0 the fleet cannot keep up with live meetings. One multilingual model serves French and English, so a gap between the fr and en series is a data problem, not a model problem.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -743,8 +743,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, compute) (rate(hansard_asr_realtime_factor_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
-          "legendFormat": "p95 {{compute}}",
+          "expr": "histogram_quantile(0.95, sum by (le, compute, language) (rate(hansard_asr_realtime_factor_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "legendFormat": "p95 {{compute}} / {{language}}",
           "range": true,
           "instant": false,
           "refId": "A"
@@ -755,8 +755,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le, compute) (rate(hansard_asr_realtime_factor_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
-          "legendFormat": "p50 {{compute}}",
+          "expr": "histogram_quantile(0.50, sum by (le, compute, language) (rate(hansard_asr_realtime_factor_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "legendFormat": "p50 {{compute}} / {{language}}",
           "range": true,
           "instant": false,
           "refId": "B"
@@ -811,7 +811,7 @@
     {
       "id": 22,
       "type": "timeseries",
-      "title": "Transcription duration p95 by model",
+      "title": "Transcription duration p95 by model and language",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -830,8 +830,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, model, compute) (rate(hansard_asr_transcribe_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
-          "legendFormat": "{{model}} / {{compute}}",
+          "expr": "histogram_quantile(0.95, sum by (le, model, compute, language) (rate(hansard_asr_transcribe_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "legendFormat": "{{model}} / {{compute}} / {{language}}",
           "range": true,
           "instant": false,
           "refId": "A"
@@ -962,6 +962,84 @@
       }
     },
     {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Audio transcribed by language",
+      "description": "Language mix. `unknown` means the engine reported no language, which is normal and harmless when asr.language=auto.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (language) (rate(hansard_asr_transcribe_duration_seconds_count{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "{{language}}",
+          "range": true,
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": null,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisPlacement": "auto",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "id": 103,
       "type": "row",
       "title": "Output",
@@ -970,7 +1048,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 34
       },
       "panels": []
     },
@@ -987,7 +1065,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 29
+        "y": 35
       },
       "targets": [
         {
@@ -1074,7 +1152,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 29
+        "y": 35
       },
       "targets": [
         {
@@ -1161,7 +1239,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 29
+        "y": 35
       },
       "targets": [
         {
@@ -1234,7 +1312,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 42
       },
       "panels": []
     },
@@ -1250,7 +1328,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 43
       },
       "targets": [
         {

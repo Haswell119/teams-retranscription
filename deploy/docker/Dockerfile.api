@@ -21,6 +21,9 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_EXTRA_INDEX_URL=
 ARG PIP_TRUSTED_HOST=
 ARG EXTRAS=api,asr-onnx,diarization,delivery,observability
+# Packages the project's extras do not (yet) declare, e.g. sherpa-onnx for the
+# diarization pipeline. Verify with `hansard doctor` inside the built image.
+ARG EXTRA_PIP_PACKAGES=
 
 ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
     PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL} \
@@ -35,6 +38,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+
+# Corporate TLS-inspecting proxies re-sign every certificate. Feed their CA in
+# without ever weakening verification:
+#   docker build --secret id=ca_bundle,src=/etc/ssl/certs/corporate-ca.crt ...
+RUN --mount=type=secret,id=ca_bundle,required=false \
+    if [ -s /run/secrets/ca_bundle ]; then \
+        cp /run/secrets/ca_bundle /usr/local/share/ca-certificates/hansard-build-ca.crt \
+        && update-ca-certificates \
+        && { echo '[global]'; echo 'cert=/etc/ssl/certs/ca-certificates.crt'; } >> /etc/pip.conf; \
+    fi
+
 RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 
@@ -43,7 +57,7 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 
 RUN python -m pip install --upgrade pip setuptools wheel \
-    && python -m pip install ".[${EXTRAS}]" \
+    && python -m pip install ".[${EXTRAS}]" ${EXTRA_PIP_PACKAGES} \
     && find /opt/venv -name '__pycache__' -type d -prune -exec rm -rf {} + \
     && find /opt/venv -name '*.pyc' -delete
 

@@ -2,31 +2,48 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from hansard.domain.speakers import UNKNOWN_SPEAKER, Diarization, SpeakerTurn
 from hansard.domain.timespan import TimeSpan
 from hansard.domain.transcript import Transcript, Utterance
+from hansard.evaluation.corpora import (
+    SUMM_RE_LANGUAGE,
+    SUMM_RE_SOURCE,
+    SummReMeeting,
+    download_summ_re,
+    meeting_diarization,
+    meeting_transcript,
+    prepare_summ_re,
+    read_meeting,
+)
 from hansard.evaluation.formats.rttm import load_rttm, parse_rttm, render_rttm, write_rttm
 from hansard.evaluation.formats.subtitles import load_subtitles, parse_srt, parse_webvtt
 
 __all__ = [
     "EvaluationSample",
+    "download_summ_re",
     "load_manifest",
+    "load_meetings",
+    "load_reference_json",
     "load_rttm",
     "load_subtitles",
     "parse_rttm",
     "parse_srt",
     "parse_webvtt",
+    "prepare_summ_re",
     "render_rttm",
     "sample_from_record",
     "sample_from_subtitles",
+    "summ_re_sample",
     "write_rttm",
 ]
 
 DEFAULT_LANGUAGE = "en"
+REFERENCE_JSON_SUFFIX = ".ref.json"
 _UTTERANCE_KEYS = ("utterances", "segments")
+_DURATION_KEYS = ("seconds", "duration")
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +84,7 @@ def sample_from_record(record: Mapping[str, object], source: str, index: int) ->
         utterances = tuple(_utterance(segment, language) for segment in segments)
         diarization = _diarization(utterances)
     else:
-        duration = _as_float(record.get("seconds"))
+        duration = _duration(record)
         utterances = (
             Utterance(
                 span=TimeSpan(0.0, duration),
@@ -77,7 +94,7 @@ def sample_from_record(record: Mapping[str, object], source: str, index: int) ->
             ),
         )
         diarization = None
-    duration = _as_float(record.get("seconds")) or max((item.span.end for item in utterances), default=0.0)
+    duration = _duration(record) or max((item.span.end for item in utterances), default=0.0)
     return EvaluationSample(
         identifier=identifier,
         reference=Transcript(utterances=utterances, language=language, audio_duration=duration),
@@ -86,6 +103,55 @@ def sample_from_record(record: Mapping[str, object], source: str, index: int) ->
         audio_path=audio_path,
         reference_diarization=diarization,
         audio_seconds=duration,
+    )
+
+
+def load_reference_json(
+    path: Path,
+    language: str = DEFAULT_LANGUAGE,
+    source: str = "synthetic",
+) -> EvaluationSample:
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(record, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    identifier = path.name.removesuffix(REFERENCE_JSON_SUFFIX).removesuffix(".json")
+    enriched = {"id": identifier, "language": record.get("language") or language, **record}
+    sample = sample_from_record(enriched, source=source, index=0)
+    companion = path.with_name(f"{identifier}.rttm")
+    if not companion.exists():
+        return sample
+    return replace(sample, reference_diarization=load_rttm(companion).get(identifier))
+
+
+def load_meetings(
+    directory: Path,
+    language: str = DEFAULT_LANGUAGE,
+    source: str = "synthetic",
+) -> tuple[EvaluationSample, ...]:
+    return tuple(
+        load_reference_json(path, language, source)
+        for path in sorted(directory.glob(f"*{REFERENCE_JSON_SUFFIX}"))
+    )
+
+
+def summ_re_sample(meeting: SummReMeeting) -> EvaluationSample:
+    transcript = meeting_transcript(meeting)
+    return EvaluationSample(
+        identifier=meeting.identifier,
+        reference=transcript,
+        language=SUMM_RE_LANGUAGE,
+        source=SUMM_RE_SOURCE,
+        audio_path=meeting.mixed_audio,
+        reference_diarization=meeting_diarization(meeting),
+        audio_seconds=meeting.duration,
+    )
+
+
+def summ_re_samples(root: Path) -> tuple[EvaluationSample, ...]:
+    return tuple(
+        summ_re_sample(read_meeting(directory))
+        for directory in sorted(root.iterdir())
+        if directory.is_dir()
     )
 
 
@@ -124,6 +190,14 @@ def _utterance(segment: Mapping[str, object], language: str) -> Utterance:
         speaker=str(segment.get("speaker") or UNKNOWN_SPEAKER),
         language=language,
     )
+
+
+def _duration(record: Mapping[str, object]) -> float:
+    for key in _DURATION_KEYS:
+        value = _as_float(record.get(key))
+        if value:
+            return value
+    return 0.0
 
 
 def _as_float(value: object) -> float:

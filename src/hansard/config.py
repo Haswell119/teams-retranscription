@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AsrEngine = Literal["parakeet", "whisper", "qwen3", "ensemble", "null"]
-DiarizationEngine = Literal["sortformer", "pyannote", "spectral", "null"]
+DiarizationEngine = Literal["sherpa", "sortformer", "pyannote", "null"]
 Device = Literal["auto", "cpu", "cuda"]
 
 
@@ -24,6 +24,7 @@ class AudioSettings(BaseModel):
 
 class VadSettings(BaseModel):
     engine: Literal["silero", "energy", "null"] = "silero"
+    model_subdirectory: str = "silero"
     threshold: float = 0.5
     min_speech_seconds: float = 0.25
     min_silence_seconds: float = 0.35
@@ -47,13 +48,16 @@ class AsrSettings(BaseModel):
 
 
 class DiarizationSettings(BaseModel):
-    engine: DiarizationEngine = "sortformer"
-    model_id: str = "nvidia/diar_streaming_sortformer_4spk-v2.1"
+    engine: DiarizationEngine = "sherpa"
+    segmentation_model: str = "sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx"
+    embedding_model: str = "nemo_en_titanet_small.onnx"
+    clustering_threshold: float = 0.95
+    minimum_speaker_seconds: float = 3.0
     max_speakers: int = 8
     min_speakers: int = 1
     device: Device = "auto"
     collar_seconds: float = 0.25
-    overflow_engine: DiarizationEngine = "spectral"
+    overflow_engine: DiarizationEngine = "sherpa"
 
 
 class AttributionSettings(BaseModel):

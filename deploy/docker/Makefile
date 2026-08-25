@@ -26,6 +26,19 @@ PLATFORMS ?= linux/amd64
 PIP_INDEX_URL       ?= https://pypi.org/simple
 PIP_EXTRA_INDEX_URL ?=
 HF_ENDPOINT         ?= https://huggingface.co
+GITHUB_MIRROR       ?= https://github.com
+
+# Corporate TLS-inspecting proxy: point this at its CA and every build stage
+# that talks HTTPS trusts it, without ever disabling verification.
+comma               := ,
+BUILD_CA_BUNDLE     ?=
+CA_SECRET           := $(if $(BUILD_CA_BUNDLE),--secret id=ca_bundle$(comma)src=$(BUILD_CA_BUNDLE),)
+
+# Diarization runs on sherpa-onnx (pyannote segmentation 3.0 int8 + CAM++
+# embeddings). `pyproject.toml` does not declare it in the `diarization` extra
+# yet, so it is added here. Once the extra declares it this becomes a no-op and
+# can be emptied. `hansard doctor` inside the built image tells you which it is.
+EXTRA_PIP_PACKAGES ?= sherpa-onnx>=1.13
 
 # Browser capture bot. Owned by src/hansard/adapters/capture/docker/ - built
 # here only so that one command produces a complete, mirrorable image set.
@@ -39,12 +52,13 @@ MODELS_IMAGE     := $(REGISTRY)/hansard-models:$(VERSION)
 MODELS_INIT_IMAGE:= $(REGISTRY)/hansard-models-init:$(VERSION)
 MODELS_ARTIFACT  := $(REGISTRY)/hansard-models-artifact:$(VERSION)
 
-BUILD_ARGS := \
+BUILD_ARGS := $(CA_SECRET) \
   --build-arg VERSION=$(VERSION) \
   --build-arg VCS_REF=$(VCS_REF) \
   --build-arg BUILD_DATE=$(BUILD_DATE) \
   --build-arg PIP_INDEX_URL=$(PIP_INDEX_URL) \
-  --build-arg PIP_EXTRA_INDEX_URL=$(PIP_EXTRA_INDEX_URL)
+  --build-arg PIP_EXTRA_INDEX_URL=$(PIP_EXTRA_INDEX_URL) \
+  --build-arg EXTRA_PIP_PACKAGES="$(EXTRA_PIP_PACKAGES)"
 
 .PHONY: help
 help:
@@ -79,32 +93,38 @@ all-images: api worker worker-gpu bot models ## Build absolutely everything
 
 ## --------------------------------------------------------------- model images
 #
-# ONE download feeds all three model outputs. The BuildKit cache makes repeat
-# targets free; nothing here ever runs inside a Hansard runtime container.
+# ONE download feeds all three model outputs, and every file is pinned by
+# SHA-256 in models.manifest, so `make models` is reproducible and auditable.
+# The BuildKit cache makes repeat targets free; nothing here ever runs inside a
+# Hansard runtime container.
+#
+# The bundle serves FRENCH AND ENGLISH from a single multilingual ASR model
+# (Parakeet TDT 0.6b v3). There is no per-language bundle to build.
 
-MODELS_BUILD_ARGS := \
+MODELS_BUILD_ARGS := $(CA_SECRET) \
   --build-arg VERSION=$(VERSION) \
   --build-arg VCS_REF=$(VCS_REF) \
   --build-arg BUILD_DATE=$(BUILD_DATE) \
-  --build-arg PIP_INDEX_URL=$(PIP_INDEX_URL) \
-  --build-arg HF_ENDPOINT=$(HF_ENDPOINT)
+  --build-arg HF_ENDPOINT=$(HF_ENDPOINT) \
+  --build-arg GITHUB_MIRROR=$(GITHUB_MIRROR)
 
 .PHONY: models-export
-models-export: ## Download weights at build time into dist/models (host dir)
+models-export: ## Download+verify weights at build time into dist/models (host dir)
 	mkdir -p $(DIST)
-	docker buildx build $(MODELS_BUILD_ARGS) \
+	docker buildx build $(MODELS_BUILD_ARGS) $(CA_SECRET) \
 	  -f $(DOCKERDIR)/Dockerfile.models --target export \
 	  --output type=local,dest=$(DIST)/models $(ROOT)
-	@echo "checksums:" && head -3 $(DIST)/models/SHA256SUMS && du -sh $(DIST)/models
+	@cd $(DIST)/models && sha256sum -c SHA256SUMS
+	@du -sh $(DIST)/models
 
 .PHONY: models-init-image
 models-init-image: ## Build the busybox copier image (chart default)
-	docker build $(MODELS_BUILD_ARGS) \
+	docker build $(MODELS_BUILD_ARGS) $(CA_SECRET) \
 	  -f $(DOCKERDIR)/Dockerfile.models --target copier -t $(MODELS_INIT_IMAGE) $(ROOT)
 
 .PHONY: models-scratch-image
 models-scratch-image: ## Build the FROM scratch image (Kubernetes image: volume)
-	docker build $(MODELS_BUILD_ARGS) \
+	docker build $(MODELS_BUILD_ARGS) $(CA_SECRET) \
 	  -f $(DOCKERDIR)/Dockerfile.models --target artifact -t $(MODELS_IMAGE) $(ROOT)
 
 .PHONY: models

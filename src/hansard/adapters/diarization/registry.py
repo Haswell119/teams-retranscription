@@ -34,6 +34,10 @@ def _build_sherpa(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
 
     return SherpaDiarizer(
         models_dir=models_dir,
+        segmentation_model=settings.segmentation_model,
+        embedding_model=settings.embedding_model,
+        clustering_threshold=settings.clustering_threshold,
+        minimum_speaker_seconds=settings.minimum_speaker_seconds,
         provider="cuda" if settings.device == "cuda" else "cpu",
     )
 
@@ -44,6 +48,8 @@ def _build_null(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
     return NullDiarizer()
 
 
-register_diarizer("spectral", _build_sherpa)
 register_diarizer("sherpa", _build_sherpa)
+register_diarizer("spectral", _build_sherpa)
+register_diarizer("sortformer", _build_sherpa)
+register_diarizer("pyannote", _build_sherpa)
 register_diarizer("null", _build_null)

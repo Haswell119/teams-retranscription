@@ -169,3 +169,61 @@ def test_runner_rejects_samples_without_audio():
     runner = BenchmarkRunner(recognizer=StubRecognizer([]), audio_source=StubAudioSource(1.0))
     with pytest.raises(ValueError, match="no audio path"):
         runner.run([reference])
+
+
+def french_sample(identifier, text, duration=10.0):
+    reference = Transcript(
+        utterances=(Utterance(TimeSpan(0.0, duration), text, "unknown"),),
+        language="fr",
+        audio_duration=duration,
+    )
+    return EvaluationSample(
+        identifier=identifier,
+        reference=reference,
+        language="fr",
+        source="fleurs_fr",
+        audio_path=Path(f"/data/{identifier}.wav"),
+        audio_seconds=duration,
+    )
+
+
+def test_runner_reports_both_languages_side_by_side():
+    samples = [
+        sample("en-1", "the cat sat on the mat"),
+        french_sample("fr-1", "le chat est assis sur le tapis"),
+    ]
+    hypotheses = [
+        Transcript(utterances=(Utterance(TimeSpan(0.0, 10.0), "the cat sat on a mat", "unknown"),)),
+        Transcript(utterances=(Utterance(TimeSpan(0.0, 10.0), "le chat est assis sur le tapis", "unknown"),)),
+    ]
+    runner = BenchmarkRunner(recognizer=StubRecognizer(hypotheses), audio_source=StubAudioSource(10.0))
+    report = runner.run(samples, label="bilingual")
+    assert report.languages == ("en", "fr")
+    assert [(item.dataset, item.language) for item in report.dataset_slices] == [
+        ("fleurs_fr", "fr"),
+        ("unit-test", "en"),
+    ]
+    assert report.metric_values_for("en")["wer"] == pytest.approx(1 / 6)
+    assert report.metric_values_for("fr")["wer"] == pytest.approx(0.0)
+    assert report.metric_values_for("de") is None
+    assert report.normalizer_version.startswith("hansard-normalizers-")
+    assert [outcome.language for outcome in report.samples] == ["en", "fr"]
+
+
+def test_runner_reports_time_constrained_cpwer_for_meetings():
+    reference = sample("meeting", "", speakers=(("Marie", "bonjour tout le monde"), ("Paul", "salut marie")))
+    hypothesis = Transcript(
+        utterances=(
+            Utterance(TimeSpan(0.0, 5.0), "bonjour tout le monde", "S1"),
+            Utterance(TimeSpan(200.0, 205.0), "salut marie", "S2"),
+        )
+    )
+    runner = BenchmarkRunner(
+        recognizer=StubRecognizer([hypothesis]),
+        audio_source=StubAudioSource(10.0),
+        time_collar=5.0,
+    )
+    report = runner.run([reference])
+    assert report.samples[0].cpwer == pytest.approx(0.0)
+    assert report.samples[0].tcpwer > 0.0
+    assert report.corpus.tcpwer == report.samples[0].tcpwer

@@ -15,7 +15,9 @@ spec:
       port: {{ .Values.worker.metricsPort }}
       targetPort: metrics
       protocol: TCP
+  # hansard.io/role spans both compute variants; app.kubernetes.io/component
+  # does not, because it is worker-cpu on one and worker-gpu on the other.
   selector:
     {{- include "hansard.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/part-of: hansard
+    hansard.io/role: worker
 {{- end }}

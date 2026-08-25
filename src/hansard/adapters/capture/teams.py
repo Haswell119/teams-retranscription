@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
+from typing import Final
 
 from hansard.adapters.capture.audio.pulse import PulseAudioSink, PulseSinkPlan
 from hansard.adapters.capture.audio.recorder import FfmpegRecorder, RecorderSettings, SilenceReport
@@ -23,6 +24,7 @@ from hansard.adapters.capture.browser.events import (
     TimelineSettings,
 )
 from hansard.adapters.capture.browser.session import (
+    DEFAULT_UI_LOCALE,
     BrowserOptions,
     MeetingState,
     PlaywrightRuntimeFactory,
@@ -34,6 +36,31 @@ from hansard.domain.meeting import Capture, MeetingRequest
 
 SessionBuilder = Callable[[Callable[[CaptureEvent], None]], TeamsBrowserSession]
 RecorderBuilder = Callable[[str], FfmpegRecorder]
+
+DEFAULT_ANNOUNCEMENTS: Final[dict[str, str]] = {
+    "en": (
+        "This meeting is being transcribed locally by Hansard. "
+        "No audio or text leaves this organisation."
+    ),
+    "fr": (
+        "Cette réunion est transcrite localement par Hansard. "
+        "Aucun enregistrement audio ni aucun texte ne quitte cette organisation."
+    ),
+}
+
+
+def language_key(language: str | None) -> str:
+    if not language:
+        return "en"
+    return language.replace("_", "-").split("-")[0].strip().lower()
+
+
+def announcement_for(settings: CaptureSettings, language: str | None) -> str:
+    configured = settings.announcement_text.strip()
+    shipped_default = str(CaptureSettings.model_fields["announcement_text"].default).strip()
+    if configured and configured != shipped_default:
+        return configured
+    return DEFAULT_ANNOUNCEMENTS.get(language_key(language), DEFAULT_ANNOUNCEMENTS["en"])
 
 
 class StopReason(StrEnum):
@@ -60,8 +87,12 @@ class CaptureDiagnostics:
         return self.health.silent_signals
 
 
-def _default_session_builder(settings: CaptureSettings) -> SessionBuilder:
-    options = BrowserOptions(headless=settings.headless, executable_path=settings.browser_binary)
+def _default_session_builder(settings: CaptureSettings, locale: str) -> SessionBuilder:
+    options = BrowserOptions(
+        headless=settings.headless,
+        executable_path=settings.browser_binary,
+        locale=locale,
+    )
 
     def build(sink: Callable[[CaptureEvent], None]) -> TeamsBrowserSession:
         return TeamsBrowserSession(
@@ -89,6 +120,7 @@ class TeamsBrowserCapture:
     recorder_builder: RecorderBuilder | None = None
     pulse: PulseAudioSink | None = None
     timeline_settings: TimelineSettings | None = None
+    ui_locale: str = DEFAULT_UI_LOCALE
     now: Callable[[], datetime] = lambda: datetime.now(UTC)
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
     last_diagnostics: CaptureDiagnostics | None = field(default=None, init=False)
@@ -141,7 +173,7 @@ class TeamsBrowserCapture:
         reducer = self._reducer()
         pulse = self.pulse or PulseAudioSink(plan=PulseSinkPlan(sink_name=self.settings.pulse_sink_name))
         build_recorder = self.recorder_builder or _default_recorder_builder(self.sample_rate)
-        build_session = self.session_builder or _default_session_builder(self.settings)
+        build_session = self.session_builder or _default_session_builder(self.settings, self.ui_locale)
         recorder = build_recorder(pulse.monitor_source)
         output = workspace / f"{request.identifier}.wav"
 
@@ -160,7 +192,7 @@ class TeamsBrowserCapture:
         try:
             await recorder.start(output)
             outcome = await session.join(request.join_url)
-            announced = await self._announce(session)
+            announced = await self._announce(session, request)
             reason = await self._monitor(session, recorder, reducer, request, origin_epoch_ms)
             await session.leave()
         except BaseException:
@@ -190,10 +222,10 @@ class TeamsBrowserCapture:
             sample_rate=self.sample_rate,
         )
 
-    async def _announce(self, session: TeamsBrowserSession) -> bool:
+    async def _announce(self, session: TeamsBrowserSession, request: MeetingRequest) -> bool:
         if not self.settings.announce_recording:
             return False
-        return await session.announce(self.settings.announcement_text)
+        return await session.announce(announcement_for(self.settings, request.language or self.ui_locale))
 
     async def _finalise(self, recorder: FfmpegRecorder, pulse: PulseAudioSink) -> Path:
         try:

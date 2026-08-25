@@ -282,3 +282,20 @@ def test_the_bot_never_appears_in_its_own_roster():
     capture, _, _, _ = build_capture()
     reducer = capture._reducer()
     assert capture.settings.display_name in reducer.settings.ignore_display_names
+
+
+async def test_announcement_follows_the_meeting_language(tmp_path):
+    from hansard.adapters.capture.teams import DEFAULT_ANNOUNCEMENTS
+
+    capture, sessions, _, _ = build_capture(settings=capture_settings(max_duration_seconds=3))
+    await capture.capture(MeetingRequest(join_url=JOIN_URL, language="fr-FR"), tmp_path)
+    assert sessions[0].announced == [DEFAULT_ANNOUNCEMENTS["fr"]]
+
+
+async def test_announcement_falls_back_to_the_forced_ui_locale(tmp_path):
+    from hansard.adapters.capture.teams import DEFAULT_ANNOUNCEMENTS
+
+    capture, sessions, _, _ = build_capture(settings=capture_settings(max_duration_seconds=3))
+    capture.ui_locale = "fr-FR"
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert sessions[0].announced == [DEFAULT_ANNOUNCEMENTS["fr"]]

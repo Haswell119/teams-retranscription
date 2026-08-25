@@ -1,0 +1,71 @@
+# Hardest posture that still runs a browser bot.
+#
+# Namespace is expected to carry:
+#   pod-security.kubernetes.io/enforce: restricted
+#   pod-security.kubernetes.io/enforce-version: latest
+global:
+  requireImageDigests: false
+  storageClass: nutanix-volume
+
+podSecurity:
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  enforceStandard: restricted
+
+serviceAccounts:
+  orchestrator:
+    automountServiceAccountToken: true
+  worker:
+    automountServiceAccountToken: false
+  bot:
+    automountServiceAccountToken: false
+
+bot:
+  enabled: true
+  # Own user namespace on top of the restricted profile.
+  hostUsers: false
+  chromium:
+    noSandbox: true
+    disableDevShmUsage: true
+  # Small shm because --disable-dev-shm-usage moves Chromium's cache to /tmp.
+  shm:
+    sizeLimit: 256Mi
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2560Mi
+    limits:
+      memory: 2560Mi
+  backoffLimit: 1
+  terminationGracePeriodSeconds: 120
+
+capture:
+  announceRecording: true
+
+secrets:
+  create: false
+  existingSecret: hansard-credentials
+
+networkPolicy:
+  enabled: true
+  egress:
+    mode: proxy
+    proxy:
+      host: egress-proxy.netpol.svc.cluster.local
+      port: 3128
+      cidr: 10.96.44.11/32
+
+cilium:
+  networkPolicy:
+    enabled: auto
+    enableDnsProxy: true
+
+storage:
+  backend: s3
+  s3:
+    endpoint: https://objects.nkp.internal
+    bucket: hansard-artifacts
+    forcePathStyle: true
+    credentials:
+      existingSecret: hansard-objects

@@ -69,7 +69,7 @@ spec:
           expr: |
             histogram_quantile(
               0.95,
-              sum by (le, compute, model) (
+              sum by (le, compute, model, language) (
                 rate(hansard_asr_realtime_factor_bucket{namespace="{{ $ns }}"}[30m])
               )
             ) > {{ $t.realtimeFactor }}
@@ -81,10 +81,12 @@ spec:
             summary: Hansard transcription is slower than realtime
             description: >-
               p95 realtime factor for model {{`{{ $labels.model }}`}} on
-              {{`{{ $labels.compute }}`}} is above {{ $t.realtimeFactor }}: it takes more
-              wall-clock time to transcribe audio than the audio lasts. On GPU workers the
-              usual cause is a CUDA/cuDNN mismatch making ONNX Runtime fall back to the CPU
-              provider - check that CUDAExecutionProvider is registered.
+              {{`{{ $labels.compute }}`}} (language {{`{{ $labels.language }}`}}) is above
+              {{ $t.realtimeFactor }}: it takes more wall-clock time to transcribe audio
+              than the audio lasts. One multilingual model serves French and English, so a
+              degradation on one language only points at the audio, not the model. On GPU
+              workers the usual cause is a CUDA/cuDNN mismatch making ONNX Runtime fall
+              back to the CPU provider - check that CUDAExecutionProvider is registered.
         - alert: AsrFailuresSustained
           expr: |
             sum(rate(hansard_asr_failures_total{namespace="{{ $ns }}"}[15m])) > 0

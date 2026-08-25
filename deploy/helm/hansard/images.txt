@@ -1,0 +1,29 @@
+# Hansard container image manifest.
+#
+# GENERATED - do not edit by hand.
+#   deploy/helm/hansard/hack/gen-images-txt.sh > deploy/helm/hansard/images.txt
+#
+# Mirror every line into your internal registry before an air-gapped install:
+#   make -C deploy/docker mirror TARGET_REGISTRY=harbor.nkp.internal/hansard
+# or, with NKP's own tooling:
+#   nkp push bundle --bundle hansard-images.tar --to-registry harbor.nkp.internal/hansard
+#
+# Then set global.imageRegistry to that registry. Tags below are the chart
+# defaults; pin by digest in production (make -C deploy/docker digests).
+#
+# Not every line is needed by every posture:
+#   hansard-api, hansard-worker, redis, hansard-models-init  always
+#   hansard-worker-gpu        asr.compute=gpu|both
+#   hansard-bot               capture.engine=browser
+#   hansard-models            models.source=image (ImageVolume)
+#   oras                      models.source=oras
+#   minio/mc                  models.source=s3
+docker.io/library/redis:7.4-alpine
+docker.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
+ghcr.io/haswell119/hansard-api:0.1.0
+ghcr.io/haswell119/hansard-bot:0.1.0
+ghcr.io/haswell119/hansard-models-init:0.1.0
+ghcr.io/haswell119/hansard-models:0.1.0
+ghcr.io/haswell119/hansard-worker-gpu:0.1.0
+ghcr.io/haswell119/hansard-worker:0.1.0
+ghcr.io/oras-project/oras:v1.2.0
