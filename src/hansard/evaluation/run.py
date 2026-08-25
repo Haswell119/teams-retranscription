@@ -59,6 +59,7 @@ class RunOptions:
     output: Path
     threads: int
     language: str | None = None
+    roster: bool = False
 
 
 def _percent(value: float) -> float:
@@ -191,11 +192,18 @@ def _score_corpus_meeting(
     reference: Transcript,
     reference_diarization: Diarization,
     language: str,
+    roster: bool = False,
 ) -> dict[str, object]:
     normalizer = normalizer_for(language)
     clip = load_clip(audio_path)
+    speakers = sorted({turn.label for turn in reference_diarization.turns})
     pipeline = Composition(settings).pipeline()
-    request = MeetingRequest(audio_path=audio_path, title=identifier, language=language)
+    request = MeetingRequest(
+        audio_path=audio_path,
+        title=identifier,
+        language=language,
+        expected_participants=tuple(speakers) if roster else (),
+    )
     started = time.perf_counter()
     with ResourceProbe() as probe:
         outcome = pipeline.run(clip, request)
@@ -207,8 +215,9 @@ def _score_corpus_meeting(
     return {
         "meeting": identifier,
         "language": language,
+        "roster": roster,
         "duration_minutes": round(clip.duration / 60, 1),
-        "reference_speakers": len({turn.label for turn in reference_diarization.turns}),
+        "reference_speakers": len(speakers),
         "detected_speakers": outcome.diarization.speaker_count,
         "reference_words": reference.word_count,
         "hypothesis_words": hypothesis.word_count,
@@ -246,11 +255,13 @@ def run_ami(options: RunOptions) -> dict[str, object]:
             meeting.reference,
             meeting.diarization,
             "en",
+            options.roster,
         )
         row["condition"] = AMI_CONDITION
         rows.append(row)
     return {
         "benchmark": "ami",
+        "profile": "roster" if options.roster else "default",
         "condition": AMI_CONDITION,
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
@@ -277,10 +288,12 @@ def run_summ_re(options: RunOptions) -> dict[str, object]:
                 meeting_transcript(meeting),
                 meeting_diarization(meeting),
                 SUMM_RE_LANGUAGE,
+                options.roster,
             )
         )
     return {
         "benchmark": "summ-re",
+        "profile": "roster" if options.roster else "default",
         "condition": "mixed headsets",
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
@@ -326,6 +339,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--threads", type=int, default=0)
     parser.add_argument("--language", default=None)
+    parser.add_argument(
+        "--roster",
+        action="store_true",
+        help="supply the speakers as a participant list, as a Teams meeting would",
+    )
     return parser
 
 
@@ -336,6 +354,7 @@ def main(argv: list[str] | None = None) -> int:
         output=arguments.output or Path(f"bench/results/{arguments.benchmark}.json"),
         threads=arguments.threads,
         language=arguments.language,
+        roster=arguments.roster,
     )
     runners = {
         "asr": run_asr,
