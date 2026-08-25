@@ -120,13 +120,24 @@ French *meeting* result has been recorded yet, so the meeting table above is
 English. We would rather leave that cell empty than fill it with an English
 number.
 
-**And the honest caveat.** Those meeting fixtures are clean read speech mixed
-together, which is much easier than a real meeting room. We also measure on two
-corpora of genuine spontaneous meetings — AMI in English and SUMM-RE in French —
-and there we are **worse than the published Azure figure**, not better: 49.39 %
-macro cpWER on AMI against Azure's published 27.39 %. That is a known open
-problem, not a footnote, and the full numbers are in
-[benchmarks](docs/benchmarks.md) — including where we lose and why.
+**Real meetings, not just fixtures.** Those fixtures are clean recordings mixed
+together, which is much easier than a real room, so we also measure on two
+corpora of genuine spontaneous meetings — AMI in English, SUMM-RE in French:
+
+| Corpus | Speakers | cpWER | WER |
+| --- | :---: | ---: | ---: |
+| AMI, 3 meetings, told nothing | 4 → 5, 4, 5 | 28.75 % | 20.44 % |
+| AMI, 3 meetings, with a participant list | 4 → **4, 4, 4** | **27.34 %** | 20.44 % |
+| SUMM-RE, real French meeting | 4 → **4** | 53.16 % | 37.52 % |
+
+Azure Speech, the engine behind Teams transcription, is independently measured
+at **27.39 %** cpWER on AMI. We are level with it there — from 49.39 % earlier in
+this project's life, closed by fixing our own defects rather than by changing how
+we score. Read [benchmarks](docs/benchmarks.md) before quoting that: three
+meetings is a small sample, the Azure figure comes from a third party using its
+own reference preparation, and **on French meetings we are clearly behind** —
+though nobody publishes a French meeting number to be behind. Where we lose, and
+why, is written down.
 
 ## Quick start
 

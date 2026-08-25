@@ -147,56 +147,67 @@ Source:
 [`bench/results/ami_mix_headset.json`](../bench/results/ami_mix_headset.json).
 Three AMI test meetings, Mix-Headset condition, 56.6 minutes of spontaneous
 four-person meeting audio, run end to end through the full pipeline and scored
-with our own harness.
+with our own harness. No participant list is supplied — the system is told
+nothing about how many people are in the room.
 
-| Meeting | Duration | Speakers (reference → detected) | WER | **cpWER** | tcpWER@5s | WDER | DER (collar 0) | RTF | Peak RAM |
-| --- | ---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ES2004a | 17.5 min | 4 → 6 | 41.14 % | **43.18 %** | 43.55 % | 2.95 % | 29.93 % | 0.93 | 4256 MB |
-| IS1009a | 14.0 min | 4 → 6 | 37.83 % | **57.54 %** | 60.86 % | 20.72 % | 37.63 % | 0.81 | 6894 MB |
-| TS3003a | 25.1 min | 4 → 6 | 45.16 % | **47.46 %** | 48.84 % | 4.47 % | 29.00 % | 0.80 | 7101 MB |
-| **Macro average** | — | — | **41.38 %** | **49.39 %** | **51.08 %** | **9.38 %** | **32.19 %** | — | — |
+| Meeting | Duration | Speakers (reference → detected) | Words (reference → produced) | WER | **cpWER** | tcpWER@5s | WDER | DER (collar 0) | Reference overlap | RTF | Peak RAM |
+| --- | ---: | :---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ES2004a | 17.5 min | 4 → 5 | 2614 → 2239 | 18.87 % | **28.30 %** | 29.93 % | 7.47 % | 31.06 % | 21.3 % | 0.57 | 4770 MB |
+| IS1009a | 14.0 min | 4 → **4** | 1986 → 1729 | 22.66 % | **31.70 %** | 33.38 % | 8.25 % | 25.87 % | 18.6 % | 0.61 | 4805 MB |
+| TS3003a | 25.1 min | 4 → 5 | 2518 → 2233 | 19.79 % | **26.25 %** | 27.75 % | 4.63 % | 28.74 % | 12.9 % | 0.40 | 4805 MB |
+| **Macro average** | — | — | — | **20.44 %** | **28.75 %** | **30.35 %** | **6.78 %** | **28.56 %** | 17.6 % | — | — |
 
 ```bash
 make bench-data-ami
 make bench-ami
 ```
 
-Word-weighted cpWER is 48.70 %. JER is 51.71 %, DER at the 0.25-second collar is
-22.75 %. Note the peak memory as well: real meeting audio reaches 7.1 GB, against
-the 3.6 GB the synthetic fixtures need. Size a node for AMI-like audio, not for
-the fixtures.
+Word-weighted cpWER is 28.52 %; DER at the 0.25-second collar is 18.34 %.
 
-**This is where we lose, and it is an open problem, not a footnote.** Azure's
-published AMI figure is 27.39 % cpWER. Ours is **49.39 %** — nearly twice the
-error. The speaker count is still wrong in the same direction: six clusters
-detected where there are four speakers, in every one of the three meetings. On
-IS1009a, 20.72 % of the words that were recognised correctly are attributed to
-the wrong speaker. See [§8](#8-where-we-lose) for what that comparison is and is
-not worth.
+**With a participant list, which is what the bot has.** When Hansard joins a
+meeting it knows who is present, and the roster becomes a ceiling on the speaker
+count. Source:
+[`ami_mix_headset_roster.json`](../bench/results/ami_mix_headset_roster.json).
 
-The other AMI files in `bench/results/` are labelled history, kept because the
-distance between them is the size of the problem:
+| Meeting | Speakers (reference → detected) | **cpWER** | WDER | DER (collar 0) | RTF |
+| --- | :---: | ---: | ---: | ---: | ---: |
+| ES2004a | 4 → **4** | **25.89 %** | 6.71 % | 29.87 % | 0.28 |
+| IS1009a | 4 → **4** | **31.70 %** | 8.25 % | 25.87 % | 0.28 |
+| TS3003a | 4 → **4** | **24.44 %** | 3.47 % | 27.46 % | 0.24 |
+| **Macro average** | — | **27.34 %** | **6.14 %** | **27.73 %** | — |
 
-| Run | File | Macro cpWER | Speakers detected | Notes |
-| --- | --- | ---: | :---: | --- |
-| **Published AMI figure** | `ami_mix_headset.json` | **49.39 %** | 6, 6, 6 | Normalizer 1.1.0 |
-| Before the segmentation and clustering fixes | `ami_mix_headset_before_fixes.json` | 51.97 % | 10, 10, 10 | Normalizer 1.0.0. Kept as the explicit reference point the fixes are measured against |
-| Fixes applied, 30-second segment cap | `ami_mix_headset_short_segments.json` | 49.39 % | 6, 6, 6 | Normalizer 1.1.0. Isolates the diarization fixes from the later segment-length change |
+Every meeting finds the right number of speakers, and macro cpWER lands at
+**27.34 %**. Recognition is untouched — WER is 20.44 % in both configurations —
+so the whole gain is attribution.
 
-Those fixes bought 2.58 points of macro cpWER and removed four spurious speakers
-per meeting. They do not close a twenty-two-point gap.
+**How this run differs from the one it replaces.** The previously published
+figure on this page was 49.39 % macro cpWER. That run used **INT8 weights**,
+which delete words wholesale on real meeting audio (see
+[§5](#5-choosing-a-quantization-profile)); the shipped default is float32. The
+diarization retune and a batch-padding fix account for the rest:
 
-Since that run, the diarization defaults were retuned on these three meetings
-*and* on the real French meeting in [§2.4](#24-summ-re-real-french-meeting-audio)
-— `minimum_speaker_seconds` from 3 s to 10 s and `merge_similarity` from 0.60 to
-**0.77**. On AMI that brings the detected speaker count to 5, 4 and 5 against a
-reference of 4, and macro DER to 29.49 %. The full sweep is recorded in
-[`bench/results/diarization_sweep.json`](../bench/results/diarization_sweep.json)
-and written up in
-[configuration](configuration.md#minimum_speaker_seconds-and-merge_similarity-the-pair-that-was-retuned).
+| | Superseded (INT8) | Current (float32) | With a roster |
+| --- | ---: | ---: | ---: |
+| Macro WER | 41.38 % | **20.44 %** | 20.44 % |
+| Macro cpWER | 49.39 % | **28.75 %** | **27.34 %** |
+| Macro WDER | 9.38 % | 6.78 % | 6.14 % |
+| Macro DER | 32.19 % | 28.56 % | 27.73 % |
+| Speakers detected | 6, 6, 6 | 5, 4, 5 | **4, 4, 4** |
+| Peak RSS | 7101 MB | **4805 MB** | 4805 MB |
+| RTF | 0.80 – 0.93 | 0.40 – 0.61 | **0.24 – 0.28** |
 
-Until AMI is re-run end to end with those defaults, the headline number stays at
-49.39 % — we do not publish an improvement we have not recorded.
+The superseded run is kept as
+[`ami_mix_headset_short_segments.json`](../bench/results/ami_mix_headset_short_segments.json),
+labelled historical, because the distance between the two columns is the size of
+the mistake.
+
+**The DER gate cannot be met on this corpus, and that is arithmetic.** A diarizer
+naming one speaker per instant cannot label overlapped speech, so its missed rate
+has a floor equal to the reference overlap: 21.3 %, 18.6 % and 12.9 %. Our
+must-pass gate asks for DER ≤ 15 %. On AMI that is unreachable by construction
+for any single-stream system, ours included. The gate stays where it is because
+it is right for the audio a Teams meeting produces; on AMI, read the confusion
+and false-alarm components instead.
 
 ### 2.4 SUMM-RE, real French meeting audio
 
@@ -241,24 +252,46 @@ organisation, and it is exactly the case the synthetic fixtures do not test.
 | Azure Speech (the engine behind Teams transcription) | AMI | 27.39 % |
 | Azure Speech | NOTSOFAR-1 test (Microsoft's own office-meeting corpus) | 35.68 % |
 | Azure Speech | NOTSOFAR-1 dev | 45.38 % |
-| **Hansard** | **AMI Mix-Headset, 3 meetings** | **49.39 %** |
-| Hansard | our synthetic meetings, 3–9 speakers | 2.52 – 6.51 % |
+| **Hansard, with a participant list** | **AMI Mix-Headset, 3 meetings** | **27.34 %** |
+| **Hansard, told nothing** | **AMI Mix-Headset, 3 meetings** | **28.75 %** |
+| Hansard | SUMM-RE, real French meeting | 53.16 % |
+| Hansard | our synthetic meetings, 3–9 speakers, French and English | 2.52 – 13.36 % |
 
 *Azure figures: AssemblyAI's January 2026 competitive benchmark, which is the
 only public source that scores Azure with cpWER on meeting corpora.*
 
-**Read the two Hansard rows together or not at all.** On the corpus where a
-direct comparison exists, we are behind. On our own fixtures we score well, and
-those fixtures are built from clean close-talk recordings mixed together, while
-AMI and NOTSOFAR include far-field microphones, room reverberation and heavy
-crosstalk. What the synthetic numbers establish is that the pipeline is sound and
-that speaker attribution works at nine speakers. What the AMI number establishes
-is that spontaneous overlapping speech is not solved here yet.
+**On AMI we are now level with Azure, and that claim needs three caveats before
+you believe it.**
+
+- The Azure number comes from a third party using their own reference
+  preparation and normalizer, on conditions we cannot inspect. Many published
+  cpWER figures score against reference utterance boundaries; ours starts from
+  nothing but the raw audio, which is harder. That difference alone can be worth
+  several points in either direction.
+- Three meetings is a small sample. Per-meeting cpWER ranges from 24.44 % to
+  31.70 %, so the macro average carries real variance.
+- The only rigorous comparison is running Teams on the same recordings and
+  scoring both outputs with one toolchain. The protocol is in
+  [metrics](metrics.md); it needs real meetings and real consent, and we have
+  not done it.
+
+So: treat parity on AMI as *measured but not established*. What is not in doubt
+is the direction — this page previously published 49.39 % against the same Azure
+figure, and the change came from fixing our own defects rather than from
+changing how we score.
+
+**On French meetings we are behind, and nobody has a number to be behind.** Our
+real French meeting scores 53.16 % cpWER. Neither Microsoft nor anyone else
+publishes a French meeting figure, so there is nothing to compare it against —
+which cuts both ways. It is not evidence that we are better than Teams in
+French, and it is the reason [§2.4](#24-summ-re-real-french-meeting-audio) exists
+at all.
 
 Note also the gap in Microsoft's own numbers: Azure markets **2.4 % WER** on
 curated short clips and scores **27.4 % cpWER** on AMI. That is not dishonesty —
 it is the difference between read speech and a real meeting, and it is exactly
-why this page separates the two.
+why this page separates the two. We are subject to the same gap: 4.63 % on
+French read speech, 53.16 % on a French meeting.
 
 ## 3. What the metrics mean
 
