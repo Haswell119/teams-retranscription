@@ -1,0 +1,112 @@
+{
+  "benchmark": "ami",
+  "condition": "Mix-Headset",
+  "normalizer_version": "hansard-normalizers-1.1.0",
+  "rows": [
+    {
+      "meeting": "ES2004a",
+      "condition": "Mix-Headset",
+      "duration_minutes": 17.5,
+      "reference_speakers": 4,
+      "detected_speakers": 6,
+      "reference_words": 2614,
+      "wer_percent": 41.14,
+      "cpwer_percent": 43.18,
+      "tcpwer_percent": 43.55,
+      "wder_percent": 2.95,
+      "der_percent": 29.93,
+      "der_collar_percent": 20.82,
+      "jer_percent": 35.4,
+      "der_missed_percent": 22.67,
+      "der_false_alarm_percent": 2.4,
+      "der_confusion_percent": 4.86,
+      "real_time_factor": 0.6743,
+      "peak_rss_mb": 4288.8,
+      "stage_seconds": {
+        "enhance": 28.591,
+        "voice_activity": 18.616,
+        "recognise": 340.797,
+        "diarise": 303.677,
+        "consolidate": 15.544,
+        "refine": 0.007,
+        "attribute": 0.32,
+        "resolve_names": 0.0
+      }
+    },
+    {
+      "meeting": "IS1009a",
+      "condition": "Mix-Headset",
+      "duration_minutes": 14.0,
+      "reference_speakers": 4,
+      "detected_speakers": 6,
+      "reference_words": 1986,
+      "wer_percent": 37.83,
+      "cpwer_percent": 57.54,
+      "tcpwer_percent": 60.86,
+      "wder_percent": 20.72,
+      "der_percent": 37.63,
+      "der_collar_percent": 28.69,
+      "jer_percent": 59.17,
+      "der_missed_percent": 17.12,
+      "der_false_alarm_percent": 3.21,
+      "der_confusion_percent": 17.3,
+      "real_time_factor": 0.7443,
+      "peak_rss_mb": 6921.9,
+      "stage_seconds": {
+        "enhance": 23.522,
+        "voice_activity": 16.189,
+        "recognise": 317.847,
+        "diarise": 255.422,
+        "consolidate": 11.208,
+        "refine": 0.007,
+        "attribute": 0.166,
+        "resolve_names": 0.0
+      }
+    },
+    {
+      "meeting": "TS3003a",
+      "condition": "Mix-Headset",
+      "duration_minutes": 25.1,
+      "reference_speakers": 4,
+      "detected_speakers": 6,
+      "reference_words": 2518,
+      "wer_percent": 45.16,
+      "cpwer_percent": 47.46,
+      "tcpwer_percent": 48.84,
+      "wder_percent": 4.47,
+      "der_percent": 29.0,
+      "der_collar_percent": 18.73,
+      "jer_percent": 60.55,
+      "der_missed_percent": 22.17,
+      "der_false_alarm_percent": 2.27,
+      "der_confusion_percent": 4.55,
+      "real_time_factor": 0.6086,
+      "peak_rss_mb": 7137.7,
+      "stage_seconds": {
+        "enhance": 40.919,
+        "voice_activity": 16.276,
+        "recognise": 419.516,
+        "diarise": 426.809,
+        "consolidate": 12.602,
+        "refine": 0.007,
+        "attribute": 0.256,
+        "resolve_names": 0.0
+      }
+    }
+  ],
+  "summary": {
+    "meetings": 3,
+    "total_minutes": 56.6,
+    "macro_average": {
+      "wer_percent": 41.38,
+      "cpwer_percent": 49.39,
+      "tcpwer_percent": 51.08,
+      "wder_percent": 9.38,
+      "der_percent": 32.19,
+      "der_collar_percent": 22.75,
+      "jer_percent": 51.71
+    },
+    "word_weighted_cpwer_percent": 48.7
+  },
+  "note": "Segmentation and clustering fixes applied, recognition segments still capped at 30 seconds. Recorded to separate the effect of the diarization fixes from the later segment-length change."
+}

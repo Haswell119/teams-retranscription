@@ -122,7 +122,7 @@ Prefix `HANSARD_ASR__`.
 | --- | --- | --- | --- |
 | `ENGINE` | `parakeet` \| `whisper` \| `qwen3` \| `null` | `parakeet` | `parakeet` and `qwen3` both build the ONNX recogniser. `whisper` builds the faster-whisper recogniser and needs the `asr-whisper` extra — see below. `null` produces an empty transcript, for testing the rest of the pipeline. |
 | `MODEL_ID` | str | `nemo-parakeet-tdt-0.6b-v3` | Directory name under `runtime.models_dir`, and the id passed to `onnx-asr`. |
-| `QUANTIZATION` | `int8` \| `none` | `int8` | `int8` is what the model bundle contains: about 600 MB on disk, roughly 1.4 GB resident, and the quality in [benchmarks](benchmarks.md) was measured on it. `none` loads float32 weights, costs roughly 2.2× the memory, and the shipped bundle does not include those files — you would have to fetch them yourself. |
+| `QUANTIZATION` | `int8` \| `none` | `int8` | `int8` is what the model bundle contains: about 600 MB on disk and roughly 1.4 GB resident. `none` loads float32 weights, needs roughly 2× the memory, and is **substantially more accurate on French** — see the quality profile below. The shipped bundle does not include the float32 files, so `none` only works once you have fetched them yourself. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | `auto` selects the CUDA execution provider if ONNX Runtime reports one, and falls back to CPU. Pin to `cpu` when a GPU is present but you want it left for something else. |
 | `BEAM_SIZE` | int | `1` | Only reaches the Whisper adapter. It has no effect on Parakeet. |
 | `BATCH_SECONDS` | float | `240.0` | Ceiling on the total audio held in flight for one decoding call. This is what actually bounds memory, because it holds regardless of how long individual segments are. `0` disables it and leaves only `BATCH_SIZE`. |
@@ -130,6 +130,64 @@ Prefix `HANSARD_ASR__`.
 | `LANGUAGE` | str \| null | unset | `fr`, `en`, … Leave it unset. Parakeet TDT 0.6b v3 is natively multilingual across 25 European languages and detects the language itself, which is what lets a French/English meeting transcribe in one pass. Pin it only for very short or very noisy audio, and accept that a language switch will then be mis-transcribed. |
 | `INTRA_OP_THREADS` | int | `0` | ONNX Runtime threads **within** one operator. `0` means "let ONNX Runtime decide", which usually means every core. **Set it to your core count** on a dedicated box, or to a smaller number on a shared one — otherwise one transcription starves everything else on the machine. |
 | `INTER_OP_THREADS` | int | `0` | Threads **across** independent operators. `0` leaves it to ONNX Runtime. Raising it rarely helps for this graph; prefer `INTRA_OP_THREADS` and `BATCH_SIZE`. |
+
+### Choosing a quantization: the accuracy profile
+
+`QUANTIZATION` is the single setting with the largest effect on transcription
+quality, and the trade-off is **not** the one the name suggests. Measured on this
+repository's own corpora with `INTRA_OP_THREADS=4` and `BATCH_SIZE=4`:
+
+| Corpus | `int8` WER / CER | `none` (float32) WER / CER |
+| --- | --- | --- |
+| FLEURS `fr_fr`, 80 utterances | 6.67 % / 2.25 % | **4.63 % / 1.62 %** |
+| FLEURS `en_us`, 80 utterances | 4.59 % / 2.27 % | **4.47 % / 1.99 %** |
+| LibriSpeech dev-clean, 73 utterances | 3.93 % / 1.50 % | **3.34 % / 1.19 %** |
+| Synthetic 9-speaker meeting | 8.29 % / 7.65 % | **3.67 % / 2.56 %** |
+
+Cost, same runs:
+
+| | `int8` | `none` (float32) |
+| --- | --- | --- |
+| Peak resident memory, read speech | 1.38 GB | 2.80 GB |
+| Peak resident memory, meeting pipeline | 2.65 GB | 3.59 GB |
+| CPU-seconds per second of audio | 0.650 | 0.645 |
+
+**Float32 is not slower.** On an AVX-512/VNNI Xeon the two configurations cost the
+same CPU time to within one percent, because the dynamic quantize/dequantize work
+around each INT8 matmul cancels out the arithmetic saving. INT8 buys memory, and
+it pays for that memory in accuracy — most visibly on French read speech
+(+2.0 WER points) and on multi-speaker meetings, where INT8 drops whole segments
+rather than mis-transcribing them: the 9-speaker fixture loses 66 reference words
+to deletions at `int8` against 23 at `none`.
+
+Use `int8` when the container has less than about 4 GB for the recogniser.
+Use `none` everywhere else, and always for French-language meetings:
+
+```dotenv
+HANSARD_ASR__ENGINE=parakeet
+HANSARD_ASR__QUANTIZATION=none
+HANSARD_ASR__BATCH_SIZE=4
+HANSARD_ASR__INTRA_OP_THREADS=4
+```
+
+This requires `encoder-model.onnx`, `encoder-model.onnx.data` and
+`decoder_joint-model.onnx` from
+[`istupakov/parakeet-tdt-0.6b-v3-onnx`](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx)
+next to the INT8 files in `runtime.models_dir`, or a cache warm enough for
+`onnx-asr` to find them. The bundle shipped today carries only the INT8 files.
+
+### Alternative models
+
+`MODEL_ID=nemo-canary-1b-v2` also loads through `onnx-asr`. It is a 1B-parameter
+attention encoder-decoder rather than a transducer, so it emits **no word
+timestamps** — which means speaker attribution degrades to utterance-level and
+`wder`/`tcpwer` get worse even where the text improves. Measure before adopting
+it; it is not a drop-in replacement for the default.
+
+`onnx-asr` exposes no beam search, temperature or language-model fusion for the
+Parakeet transducer: `recognize()` accepts only `language`, `target_language` and
+`pnc`, and the first two are read by the Canary and Whisper decoders only. TDT
+decoding is greedy and there is no decode-side knob to turn.
 
 ### The Whisper engine
 
@@ -540,9 +598,9 @@ The changes that matter here are the lower VAD threshold and longer padding,
 which stop quiet speech being discarded before it reaches the recogniser, and
 the lower `MINIMUM_SPEAKER_SECONDS`, which keeps genuinely short contributions
 as their own speaker. `BATCH_SIZE=1` does not improve accuracy on its own; it
-lowers peak memory so you can afford everything else. Do not reach for
-`QUANTIZATION=none` — the shipped bundle has no float32 weights, and the
-published quality numbers were measured on INT8.
+lowers peak memory so you can afford everything else. `QUANTIZATION=none` is the
+one change here that reliably improves accuracy, but it needs float32 weights the
+shipped bundle does not carry — see [the accuracy profile](#choosing-a-quantization-the-accuracy-profile).
 
 Whatever you change, re-measure. `make bench-meetings` scores speaker
 attribution and transcription together, which is the only number that reflects

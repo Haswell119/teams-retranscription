@@ -1,21 +1,21 @@
 {
   "benchmark": "asr",
   "model": "nemo-parakeet-tdt-0.6b-v3 int8 ONNX",
-  "normalizer_version": "hansard-normalizers-1.0.0",
+  "normalizer_version": "hansard-normalizers-1.1.0",
   "rows": [
     {
       "dataset": "FLEURS fr_fr (read speech)",
       "language": "fr",
       "utterances": 80,
       "audio_seconds": 849.3,
-      "wer_percent": 6.95,
-      "cer_percent": 2.5,
-      "substitutions": 119,
-      "deletions": 23,
+      "wer_percent": 6.67,
+      "cer_percent": 2.25,
+      "substitutions": 114,
+      "deletions": 22,
       "insertions": 11,
-      "real_time_factor": 0.1145,
-      "speedup": 8.7,
-      "peak_rss_mb": 1362.5
+      "real_time_factor": 0.3184,
+      "speedup": 3.1,
+      "peak_rss_mb": 1378.8
     },
     {
       "dataset": "FLEURS en_us (read speech)",
@@ -27,9 +27,9 @@
       "substitutions": 55,
       "deletions": 18,
       "insertions": 5,
-      "real_time_factor": 0.1124,
-      "speedup": 8.9,
-      "peak_rss_mb": 1368.2
+      "real_time_factor": 0.3162,
+      "speedup": 3.2,
+      "peak_rss_mb": 1384.4
     },
     {
       "dataset": "LibriSpeech dev-clean (read speech)",
@@ -41,9 +41,9 @@
       "substitutions": 36,
       "deletions": 8,
       "insertions": 2,
-      "real_time_factor": 0.1214,
-      "speedup": 8.2,
-      "peak_rss_mb": 1382.1
+      "real_time_factor": 0.355,
+      "speedup": 2.8,
+      "peak_rss_mb": 1398.1
     }
   ]
 }
