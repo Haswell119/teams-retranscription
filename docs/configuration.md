@@ -252,7 +252,9 @@ tuning, because it is the one that decides who is credited with what.
 | `SEGMENTATION_MODEL` | str | `sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx` | Path under `runtime.models_dir` to the speaker-segmentation model. |
 | `EMBEDDING_MODEL` | str | `nemo_en_titanet_small.onnx` | Path under `runtime.models_dir` to the speaker-embedding model. Read the note below before changing it. |
 | `CLUSTERING_THRESHOLD` | float | `0.99` | The cosine-distance threshold at which two segments are treated as different speakers. **The single most useful knob.** See below. |
-| `MINIMUM_SPEAKER_SECONDS` | float | `3.0` | Any speaker whose total speaking time is below this is absorbed into its nearest stable neighbour. This is what removes phantom speakers created by crosstalk, laughter or a single overlapping syllable. Raise it to 5–8 s for a noisy room; lower it to 1 s if someone who genuinely spoke twice is being folded into another speaker. |
+| `MINIMUM_SPEAKER_SECONDS` | float | `10.0` | Any speaker whose total speaking time across the whole meeting is below this is absorbed into its nearest stable neighbour. This is what removes phantom speakers created by crosstalk, laughter or a single overlapping syllable. **It does not run when the speaker count is already known** — see the note below. Lower it to 1–3 s for a file-based transcription where a genuinely brief contributor must survive as their own speaker. |
+| `CLUSTER_CONSOLIDATION` | bool | `true` | Merges clusters whose speaker centroids are too close to be different people, which is what repairs one person fragmented across several speakers. Turn it off only to measure what it is doing. |
+| `MERGE_SIMILARITY` | float | `0.70` | The cosine similarity two cluster centroids must exceed before consolidation treats them as the same person. **Raising it merges less; lowering it merges more — and lowering it below the default measured worse, not better.** See the note below. |
 | `MAX_SPEAKERS` | int | `8` | Reaches the diarization request but the sherpa engine does not read it. It does not cap anything today. |
 | `MIN_SPEAKERS` | int | `1` | Same: carried, not used. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | Only the literal value `cuda` selects the GPU provider. `auto` resolves to CPU. Diarization is a small share of total time, so this rarely matters. |
@@ -274,6 +276,42 @@ measurement: on the same fixtures, TitaNet gave 0.01 % speaker confusion and
 CAM++ gave 47 %, and CAM++ failed even when handed the correct number of
 clusters. The evidence is in
 [benchmarks](benchmarks.md#6-engineering-findings-worth-knowing).
+
+### `minimum_speaker_seconds` and `merge_similarity`: the pair that was retuned
+
+These two defaults changed together — from `3.0` / `0.60` to **`10.0` / `0.70`**
+— after a parameter sweep on the three AMI meetings, whose reference is four
+speakers each:
+
+| `minimum_speaker_seconds` / `merge_similarity` | Macro DER | Speakers detected |
+| --- | ---: | :---: |
+| 3.0 / 0.60, the previous default | 33.03 % | 6, 6, 6 |
+| **10.0 / 0.70, the default today** | **29.49 %** | **5, 4, 5** |
+| 20.0 / 0.70 | 29.62 % | 5, 4, 2 |
+| 10.0 / 0.60 | 32.89 % | 4, 3, 3 |
+
+*This sweep is not yet written to `bench/results/`; the AMI baseline it was run
+against is [`ami_mix_headset.json`](../bench/results/ami_mix_headset.json).*
+
+Two things follow, and both matter when you reach for these knobs:
+
+**Merging harder is not better.** The instinct on seeing too many speakers is to
+lower `MERGE_SIMILARITY` so more clusters fuse. Every row of that sweep with
+`0.60` is *worse* on DER than the matching row at `0.70`, because below the
+default the consolidator starts fusing genuinely different people. Raise the
+absorption floor before you touch the similarity.
+
+**A 10-second floor has a deliberate cost.** Someone whose *total* speaking time
+across the entire meeting is under ten seconds is folded into a neighbouring
+speaker rather than appearing as their own. That is the trade the default makes:
+a phantom speaker is a more common and more damaging failure than a lost
+ten-second contributor.
+
+**The floor is skipped whenever the speaker count is known.** A Teams roster,
+`--speakers`, or `speaker_count` in the API pins the number of clusters, and
+absorption is then disabled entirely, so it can never push the count below the
+number of people actually in the meeting. In practice this setting only affects
+**file-based transcription**, not meetings the bot joins with a roster.
 
 ---
 
@@ -618,11 +656,12 @@ HANSARD_MINUTES__TEMPERATURE=0.1
 
 The changes that matter here are the lower VAD threshold and longer padding,
 which stop quiet speech being discarded before it reaches the recogniser, and
-the lower `MINIMUM_SPEAKER_SECONDS`, which keeps genuinely short contributions
-as their own speaker. `BATCH_SIZE=1` does not improve accuracy on its own; it
-lowers peak memory so you can afford everything else. `QUANTIZATION=none` is the
-one change here that reliably improves accuracy, but it needs float32 weights the
-shipped bundle does not carry — see [the accuracy profile](#choosing-a-quantization-the-accuracy-profile).
+the much lower `MINIMUM_SPEAKER_SECONDS` — the default of `10.0` absorbs anyone
+who speaks for less than ten seconds in total, which is exactly what an archival
+transcript must not do. Expect to spend that on a few phantom speakers.
+`BATCH_SIZE=1` does not improve accuracy on its own; it lowers peak memory so you
+can afford everything else. `QUANTIZATION=none` is the shipped default and the
+right one here — see [the accuracy profile](#choosing-a-quantization-the-accuracy-profile).
 
 Whatever you change, re-measure. `make bench-meetings` scores speaker
 attribution and transcription together, which is the only number that reflects

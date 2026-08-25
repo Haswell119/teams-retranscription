@@ -16,6 +16,7 @@ from hansard.evaluation.metrics.speaker import (
     concatenated_minimum_permutation_wer,
     diarization_error_rate,
     jaccard_error_rate,
+    overlap_ratio,
     time_constrained_cpwer,
     word_diarization_error_rate,
 )
@@ -154,6 +155,7 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
                 "der_missed_percent": _percent(strict.missed_rate),
                 "der_false_alarm_percent": _percent(strict.false_alarm_rate),
                 "der_confusion_percent": _percent(strict.confusion_rate),
+                "reference_overlap_percent": _percent(overlap_ratio(reference_diarization)),
                 "real_time_factor": round(outcome.real_time_factor, 4),
                 "speedup": round(1 / outcome.real_time_factor, 1) if outcome.real_time_factor else None,
                 "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
@@ -210,6 +212,7 @@ def run_ami(options: RunOptions) -> dict[str, object]:
                 "der_missed_percent": _percent(strict.missed_rate),
                 "der_false_alarm_percent": _percent(strict.false_alarm_rate),
                 "der_confusion_percent": _percent(strict.confusion_rate),
+                "reference_overlap_percent": _percent(overlap_ratio(meeting.diarization)),
                 "real_time_factor": round(elapsed / clip.duration, 4),
                 "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
                 "stage_seconds": outcome.stage_seconds,
@@ -240,6 +243,7 @@ def _aggregate(rows: list[dict[str, object]]) -> dict[str, object]:
         "der_percent",
         "der_collar_percent",
         "jer_percent",
+        "reference_overlap_percent",
     )
     macro = {key: round(sum(_numeric(row, key) for row in rows) / len(rows), 2) for key in metrics}
     weights = [_numeric(row, "reference_words") for row in rows]

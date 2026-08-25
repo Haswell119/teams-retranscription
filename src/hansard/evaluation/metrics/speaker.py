@@ -373,6 +373,27 @@ def speaker_count_error(reference: Diarization, hypothesis: Diarization) -> int:
     return hypothesis.speaker_count - reference.speaker_count
 
 
+def overlap_ratio(diarization: Diarization) -> float:
+    spans = [turn.span for turn in diarization.turns]
+    spoken = sum(span.duration for span in spans)
+    if spoken <= 0.0:
+        return 0.0
+    return max(0.0, (spoken - _covered_duration(spans)) / spoken)
+
+
+def _covered_duration(spans: list[TimeSpan]) -> float:
+    covered = 0.0
+    current: TimeSpan | None = None
+    for span in sorted(spans, key=lambda item: (item.start, item.end)):
+        if current is None or span.start > current.end:
+            if current is not None:
+                covered += current.duration
+            current = span
+            continue
+        current = TimeSpan(current.start, max(current.end, span.end))
+    return covered + (current.duration if current is not None else 0.0)
+
+
 @dataclass(frozen=True, slots=True)
 class _State:
     cost: int
