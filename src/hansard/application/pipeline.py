@@ -91,6 +91,7 @@ class TranscriptionPipeline:
         diarization = Diarization()
         acoustic = clip
         ceiling = _speaker_ceiling(request, roster)
+        asserted = request.speaker_count
         if self.diarizer is not None:
             with _timed(timings, "diarise", logger) as measured:
                 acoustic = self.diarization_enhancer.enhance(clip) if self.diarization_enhancer else clip
@@ -99,13 +100,13 @@ class TranscriptionPipeline:
                     DiarizationRequest(
                         max_speakers=min(self.max_speakers, self.diarizer.max_supported_speakers),
                         min_speakers=self.min_speakers,
-                        known_speaker_count=request.speaker_count,
+                        known_speaker_count=asserted,
                         speaker_ceiling=ceiling,
                     ),
                 )
                 measured["speakers"] = float(diarization.speaker_count)
             record_diarization(diarization.speaker_count)
-        if self.consolidator is not None and diarization.speaker_count > 1:
+        if self.consolidator is not None and asserted is None and diarization.speaker_count > 1:
             with _timed(timings, "consolidate", logger) as measured:
                 diarization = self.consolidator.consolidate(diarization, acoustic, ceiling)
                 measured["speakers"] = float(diarization.speaker_count)

@@ -75,3 +75,105 @@ def test_expected_participants_are_used_when_no_roster_arrived():
 def test_nothing_known_means_no_ceiling():
     assert _speaker_ceiling(request_with(), None) is None
     assert _speaker_ceiling(request_with(), Roster()) is None
+
+
+class RecordingConsolidator:
+    def __init__(self):
+        self.calls = 0
+
+    @property
+    def name(self):
+        return "recording"
+
+    def consolidate(self, diarization, clip, ceiling=None):
+        self.calls += 1
+        return diarization
+
+
+class FixedDiarizer:
+    def __init__(self, diarization):
+        self.diarization = diarization
+        self.seen = []
+
+    @property
+    def name(self):
+        return "fixed"
+
+    @property
+    def max_supported_speakers(self):
+        return 16
+
+    def diarize(self, clip, request):
+        self.seen.append(request)
+        return self.diarization
+
+
+class PassThroughAttributor:
+    def attribute(self, transcript, diarization):
+        return transcript
+
+
+class SilentRecognizer:
+    @property
+    def name(self):
+        return "silent"
+
+    @property
+    def profile(self):
+        from hansard.ports.asr import EngineProfile
+
+        return EngineProfile(
+            name="silent",
+            languages=("en",),
+            emits_word_timestamps=False,
+            emits_punctuation=False,
+            resident_memory_mb=0,
+            license_identifier="MIT",
+        )
+
+    def transcribe(self, clip, hints):
+        from hansard.domain.transcript import Transcript
+
+        return Transcript(utterances=(), language="en", audio_duration=clip.duration)
+
+
+def two_speaker_diarization():
+    from hansard.domain.speakers import Diarization, SpeakerTurn
+    from hansard.domain.timespan import TimeSpan
+
+    turns = (
+        SpeakerTurn(TimeSpan(0.0, 30.0), "a"),
+        SpeakerTurn(TimeSpan(30.0, 60.0), "b"),
+    )
+    return Diarization(turns=turns, labels=("a", "b"))
+
+
+def run_pipeline(request):
+    import numpy as np
+
+    from hansard.application.pipeline import TranscriptionPipeline
+    from hansard.domain.audio import AudioClip
+
+    diarizer = FixedDiarizer(two_speaker_diarization())
+    consolidator = RecordingConsolidator()
+    pipeline = TranscriptionPipeline(
+        recognizer=SilentRecognizer(),
+        attributor=PassThroughAttributor(),
+        diarizer=diarizer,
+        consolidator=consolidator,
+    )
+    clip = AudioClip(samples=np.zeros(16_000, dtype=np.float32), sample_rate=16_000)
+    pipeline.run(clip, request)
+    return diarizer, consolidator
+
+
+def test_an_asserted_count_reaches_the_diarizer_and_skips_consolidation():
+    diarizer, consolidator = run_pipeline(request_with(speaker_count=2))
+    assert diarizer.seen[0].known_speaker_count == 2
+    assert consolidator.calls == 0
+
+
+def test_without_an_assertion_consolidation_still_runs():
+    diarizer, consolidator = run_pipeline(request_with())
+    assert diarizer.seen[0].known_speaker_count is None
+    assert consolidator.calls == 1

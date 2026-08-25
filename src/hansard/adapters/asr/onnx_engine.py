@@ -182,15 +182,16 @@ class OnnxRecognizer:
 def _batches(spans: list[TimeSpan], size: int, seconds: float) -> list[list[TimeSpan]]:
     batches: list[list[TimeSpan]] = []
     current: list[TimeSpan] = []
-    budget = 0.0
+    longest = 0.0
     for span in spans:
+        padded = max(longest, span.duration) * (len(current) + 1)
         exceeds_count = len(current) >= size
-        exceeds_budget = current and seconds > 0 and budget + span.duration > seconds
+        exceeds_budget = bool(current) and seconds > 0 and padded > seconds
         if exceeds_count or exceeds_budget:
             batches.append(current)
-            current, budget = [], 0.0
+            current, longest = [], 0.0
         current.append(span)
-        budget += span.duration
+        longest = max(longest, span.duration)
     if current:
         batches.append(current)
     return batches
