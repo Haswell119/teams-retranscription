@@ -68,8 +68,9 @@ def _build_runtime(settings: Settings) -> Runtime:
 
     async def handler(record: JobRecord) -> JobRecord:
         completed = await service.execute(record)
-        if completed.request.delivery and completed.artifacts:
-            await dispatcher.deliver(completed.request.delivery, _payload(completed))
+        targets = service.delivery_targets(completed.request)
+        if targets and completed.artifacts:
+            await dispatcher.deliver(targets, _payload(completed))
         return completed
 
     store = InMemoryJobStore()

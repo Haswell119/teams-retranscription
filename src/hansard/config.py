@@ -52,7 +52,6 @@ class DiarizationSettings(BaseModel):
     max_speakers: int = 8
     min_speakers: int = 1
     device: Device = "auto"
-    collar_seconds: float = 0.25
     speech_coverage_refinement: bool = True
     cluster_consolidation: bool = True
     merge_similarity: float = 0.60

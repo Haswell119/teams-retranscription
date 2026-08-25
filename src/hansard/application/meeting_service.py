@@ -10,7 +10,13 @@ from hansard.adapters.audio import load_clip
 from hansard.application.jobs import JobRecord
 from hansard.application.pipeline import TranscriptionPipeline
 from hansard.config import Settings
-from hansard.domain.meeting import Capture, JobState, MeetingRequest
+from hansard.domain.meeting import (
+    Capture,
+    DeliveryChannel,
+    DeliveryTarget,
+    JobState,
+    MeetingRequest,
+)
 from hansard.domain.minutes import Minutes
 from hansard.domain.speakers import Roster
 from hansard.domain.transcript import Transcript
@@ -33,6 +39,19 @@ class MeetingService:
     minutes_writer: MinutesWriter | None = None
     biaser: VocabularyBiaser | None = None
     artifact_store: ArtifactStore | None = None
+
+    def delivery_targets(self, request: MeetingRequest) -> tuple[DeliveryTarget, ...]:
+        if request.delivery:
+            return request.delivery
+        return tuple(
+            DeliveryTarget(
+                channel=DeliveryChannel(channel),
+                address=str(self.settings.delivery.output_dir),
+                formats=self.settings.delivery.formats,
+            )
+            for channel in self.settings.delivery.default_channels
+            if channel in {item.value for item in DeliveryChannel}
+        )
 
     async def execute(self, record: JobRecord) -> JobRecord:
         request = record.request

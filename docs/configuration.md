@@ -83,7 +83,6 @@ Prefix `HANSARD_AUDIO__`.
 | `SAMPLE_RATE` | int | `16000` | Rate everything is resampled to on load. Every model in the bundle expects 16 kHz; the diarizer raises if it receives anything else. Leave it alone. |
 | `LOUDNESS_NORMALISATION` | bool | `true` | Applies EBU R128 `loudnorm` on the **recognition** chain only. Turn it off if your source is already mastered and you would rather not touch it. |
 | `TARGET_LUFS` | float | `-23.0` | The loudness target, in LUFS. `-23` is the EBU broadcast reference. Raise it towards `-18` for very quiet conference-room recordings; going higher trades headroom for nothing useful. |
-| `PRESERVE_DYNAMICS_FOR_DIARIZATION` | bool | `true` | Documents that diarization gets a separate, dynamics-preserving chain. The behaviour is unconditional in `factory.py`, so this flag currently changes nothing. See the box below. |
 | `HIGH_PASS_HZ` | float | `60.0` | Corner frequency of the high-pass filter, applied to **both** chains. Raise to 80–100 Hz for recordings with heavy HVAC rumble. Set to `0` to disable filtering entirely, which also removes the only filter the diarization chain has. |
 | `DENOISE` | bool | `false` | Adds ffmpeg `afftdn` to the recognition chain. Off by default: on meeting audio it removes as much speech detail as noise. Try it only on a recording with constant, stationary hiss. |
 | `MAX_SEGMENT_SECONDS` | float | `30.0` | Longest chunk handed to the recogniser. Longer chunks give the model more context and use more memory. |
@@ -128,10 +127,6 @@ Prefix `HANSARD_ASR__`.
 | `BEAM_SIZE` | int | `1` | Only reaches the Whisper adapter. It has no effect on Parakeet. |
 | `BATCH_SIZE` | int | `4` | Speech segments decoded per call. **Raise it to 8–16 on a machine with 8+ cores** for noticeably higher throughput on long recordings; each concurrent segment costs memory, so lower it to `1`–`2` on a small container. |
 | `LANGUAGE` | str \| null | unset | `fr`, `en`, … Leave it unset. Parakeet TDT 0.6b v3 is natively multilingual across 25 European languages and detects the language itself, which is what lets a French/English meeting transcribe in one pass. Pin it only for very short or very noisy audio, and accept that a language switch will then be mis-transcribed. |
-| `FALLBACK_ENGINE` | engine \| null | `whisper` | Declared but not read by any code path. |
-| `FALLBACK_MODEL_ID` | str | `large-v3-turbo` | Model id used if the Whisper adapter is built. |
-| `FALLBACK_CONFIDENCE_THRESHOLD` | float | `0.55` | Declared but not read by any code path. |
-| `VOCABULARY_BOOST` | float | `2.0` | Declared but not read. Custom vocabulary is applied after recognition by phonetic correction, not by decoder biasing, so there is no weight to set. |
 | `INTRA_OP_THREADS` | int | `0` | ONNX Runtime threads **within** one operator. `0` means "let ONNX Runtime decide", which usually means every core. **Set it to your core count** on a dedicated box, or to a smaller number on a shared one — otherwise one transcription starves everything else on the machine. |
 | `INTER_OP_THREADS` | int | `0` | Threads **across** independent operators. `0` leaves it to ONNX Runtime. Raising it rarely helps for this graph; prefer `INTRA_OP_THREADS` and `BATCH_SIZE`. |
 
@@ -182,10 +177,8 @@ tuning, because it is the one that decides who is credited with what.
 | `MAX_SPEAKERS` | int | `8` | Reaches the diarization request but the sherpa engine does not read it. It does not cap anything today. |
 | `MIN_SPEAKERS` | int | `1` | Same: carried, not used. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | Only the literal value `cuda` selects the GPU provider. `auto` resolves to CPU. Diarization is a small share of total time, so this rarely matters. |
-| `COLLAR_SECONDS` | float | `0.25` | Declared but not read. Scoring collars are set by the evaluation harness, not here — see [metrics](metrics.md). |
 | `SPEECH_COVERAGE_REFINEMENT` | bool | `true` | After diarization, any span that the voice-activity detector called speech but the diarizer left uncovered is assigned to the nearest turn. This is what stops short replies from vanishing from the transcript. Turn it off only to see how much it is doing. |
 | `MAXIMUM_TURN_EXTENSION` | float | `2.5` | How far, in seconds, that refinement will reach for a neighbouring turn. Lower it if refinement is stretching one speaker over another's reply. |
-| `OVERFLOW_ENGINE` | engine | `sherpa` | Declared but not read. |
 
 ### Tuning `clustering_threshold` by symptom
 
@@ -276,7 +269,6 @@ Microsoft Graph limitations are in [delivery](delivery.md).
 
 | Variable | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `DEFAULT_CHANNELS` | tuple | `("filesystem",)` | Declared but not read by any current code path; targets are passed explicitly, with `--deliver` or in the API submission. |
 | `FORMATS` | tuple | `("markdown", "html")` | The formats `hansard join` and the API render for every meeting: one `transcript.*` per entry, plus a `minutes.*` for each entry that has a minutes renderer. Any of `markdown`, `html`, `json`, `vtt`, `srt`, `text`; only the first three render minutes. |
 | `WEBHOOK_URL` | str \| null | unset | Default URL for the webhook publisher when a target does not carry its own. |
 | `OUTPUT_DIR` | path | `artifacts` | Where the filesystem publisher writes. |
@@ -419,7 +411,6 @@ Prefix `HANSARD_RUNTIME__`.
 | `MODELS_DIR` | path | `/var/lib/hansard/models` | Root of the model bundle. **The setting you will change first on a laptop.** The container images override it to `/models`. Layout in [installation](installation.md#the-expected-layout). |
 | `ALLOW_MODEL_DOWNLOADS` | bool | `false` | When `false`, a missing model is a hard error rather than a silent download. Leave it off: it is the property that makes an air gap enforceable, and CI runs transcription with the network disabled to prove it. |
 | `MAX_CONCURRENT_MEETINGS` | int | `2` | Number of concurrent job workers inside one `hansard serve` process. Each concurrent meeting holds its own recogniser in memory, so budget roughly 1.4 GB per unit before raising it. It does not apply to `hansard transcribe` or `hansard join`, which process one meeting each. |
-| `WORKER_THREADS` | int | `0` | Declared but not read. Use `HANSARD_ASR__INTRA_OP_THREADS`, or `OMP_NUM_THREADS` for the ONNX Runtime pools. |
 | `LOG_LEVEL` | str | `INFO` | Level applied to Hansard and to every third-party library, through the stdlib root logger. `DEBUG` adds one `stage.started` event per pipeline stage. |
 | `LOG_FORMAT` | `json` \| `console` | `json` | `json` emits one JSON object per line on stdout; `console` emits a readable aligned line. Both go through the redaction and content-elision processors. See [observability](observability.md). |
 | `TELEMETRY_ENABLED` | bool | `false` | Cannot be set to `true`. See above. |
@@ -566,7 +557,6 @@ validate and appear in `model_dump()`, but no code reads them today:
 
 | Setting | Status |
 | --- | --- |
-| `diarization.collar_seconds` | Unused. It is an evaluation parameter, and the evaluation harness takes its own |
 | `storage.retention_days` | Honoured by `purge_older_than()`, but nothing calls it on a schedule — run it from a cron job or a Kubernetes `CronJob` |
 
 ## Related reading
