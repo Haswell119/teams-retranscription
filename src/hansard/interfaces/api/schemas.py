@@ -23,6 +23,7 @@ class MeetingSubmission(BaseModel):
     vocabulary: tuple[str, ...] = ()
     max_duration_seconds: int = 4 * 3600
     speaker_count: int | None = None
+    starts_at: datetime | None = None
     delivery: tuple[DeliveryRequest, ...] = ()
 
 

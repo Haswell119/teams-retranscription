@@ -216,6 +216,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             vocabulary=submission.vocabulary,
             max_duration_seconds=submission.max_duration_seconds,
             speaker_count=submission.speaker_count,
+            starts_at=submission.starts_at,
             delivery=tuple(
                 DeliveryTarget(
                     channel=DeliveryChannel(item.channel), address=item.address, formats=item.formats

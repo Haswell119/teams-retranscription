@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -61,6 +61,7 @@ class MeetingService:
         with stage_span(logger, "capture") as measured:
             captured = await self._acquire(request, workspace)
             measured["audio_seconds"] = round(captured.duration, 1)
+        request = replace(request, starts_at=request.starts_at or captured.started_at)
         with stage_span(logger, "transcribe") as measured:
             transcript, roster, stages = await asyncio.to_thread(self._transcribe, captured, request)
             measured["words"] = float(transcript.word_count)

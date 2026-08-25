@@ -1,0 +1,92 @@
+WEBVTT - Comité de lancement 4.2
+
+NOTE
+Transcription produite localement par Hansard. Aucune donnée n'est sortie de l'organisation.
+
+1
+00:00:00.000 --> 00:00:06.000
+<v Camille Dubois>Bonjour à tous, on ouvre le comité de
+lancement de la version 4.2. Marc, où en</v>
+
+2
+00:00:06.000 --> 00:00:07.500
+<v Camille Dubois>est le périmètre ?</v>
+
+3
+00:00:08.000 --> 00:00:13.909
+<v Marc Lefèvre>Le périmètre est prêt, sauf la traduction
+allemande. L'agence a pris deux semaines</v>
+
+4
+00:00:13.909 --> 00:00:18.000
+<v Marc Lefèvre>de retard, on ne l'aura pas avant fin
+juin.</v>
+
+5
+00:00:18.500 --> 00:00:25.286
+<v Camille Dubois>Alors on part sur un lancement de la
+version 4.2 le douze juin, sans la</v>
+
+6
+00:00:25.286 --> 00:00:28.000
+<v Camille Dubois>traduction allemande. On l'ajoutera en
+4.2.1.</v>
+
+7
+00:00:28.500 --> 00:00:34.929
+<v Sofia Ben Ali>D'accord. Je m'occupe du communiqué de
+presse, je te l'envoie pour relecture</v>
+
+8
+00:00:34.929 --> 00:00:36.000
+<v Sofia Ben Ali>vendredi prochain.</v>
+
+9
+00:00:36.500 --> 00:00:43.500
+<v Marc Lefèvre>De mon côté je t'envoie le périmètre
+détaillé demain matin, avec la liste des</v>
+
+10
+00:00:44.813 --> 00:00:46.000
+<v Marc Lefèvre>fonctionnalités reportées.</v>
+
+11
+00:00:46.500 --> 00:00:53.500
+<v Camille Dubois>Parfait. Autre sujet : la charge de
+production. Marc, on tient avec</v>
+
+12
+00:00:54.100 --> 00:00:56.000
+<v Camille Dubois>l'infrastructure actuelle ?</v>
+
+13
+00:00:56.500 --> 00:01:03.208
+<v Marc Lefèvre>Non. On valide le passage à quatre nœuds
+de transcription, pour absorber la charge</v>
+
+14
+00:01:03.208 --> 00:01:08.000
+<v Marc Lefèvre>de production. Sinon on sature dès le pic
+du matin.</v>
+
+15
+00:01:08.500 --> 00:01:14.594
+<v Sofia Ben Ali>Qui prend en charge la communication
+client sur l'incident de production de la</v>
+
+16
+00:01:14.594 --> 00:01:16.000
+<v Sofia Ben Ali>semaine dernière ?</v>
+
+17
+00:01:16.500 --> 00:01:23.000
+<v Camille Dubois>On en reparle jeudi. Sofia, peux-tu
+préparer les visuels de l'agence pour la</v>
+
+18
+00:01:23.000 --> 00:01:24.000
+<v Camille Dubois>réunion ?</v>
+
+19
+00:01:24.500 --> 00:01:30.000
+<v Sofia Ben Ali>Oui, je les prépare pour jeudi.</v>

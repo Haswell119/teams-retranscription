@@ -46,6 +46,10 @@ Clock = Callable[[], datetime]
 ENGINE_NAME = "extractive"
 
 
+def _reference_date(request: MeetingRequest) -> date | None:
+    return request.starts_at.date() if request.starts_at else None
+
+
 def utc_now() -> datetime:
     return datetime.now(tz=UTC)
 
@@ -139,7 +143,7 @@ class ExtractiveMinutesWriter:
         request: MeetingRequest,
     ) -> TranscriptAnalysis:
         language = resolve_language(self.language, request.language, transcript.language)
-        reference = self.reference_date or self.clock().date()
+        reference = _reference_date(request) or self.reference_date or self.clock().date()
         units = sentence_units(transcript)
         segments = segment_topics(transcript, language, self.topic_options)
         extractor = CandidateExtractor(
