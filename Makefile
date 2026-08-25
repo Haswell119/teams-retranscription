@@ -4,7 +4,7 @@ MODELS_DIR ?= $(CURDIR)/models
 EVAL_DIR ?= $(CURDIR)/bench/data
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev models bench bench-all bench-ami bench-asr bench-meetings bench-data test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
+.PHONY: help install install-dev models bench bench-all bench-ami gates bench-asr bench-meetings bench-data test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
 
 help:
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -32,6 +32,9 @@ bench-meetings: ## Benchmark meeting transcription with speaker attribution
 
 bench-ami: ## Benchmark on the AMI meeting corpus
 	$(PYTHON) -m hansard.evaluation.run ami --output bench/results/ami_mix_headset.json
+
+gates: ## Check the measured results against the quality gates
+	$(PYTHON) -m hansard.evaluation.check
 
 bench: bench-asr bench-meetings ## Run the fast benchmarks
 

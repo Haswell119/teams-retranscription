@@ -166,3 +166,41 @@ Being explicit about this is part of the point.
 - [Metrics](metrics.md) — every formula and how it is computed
 - [Architecture](architecture.md) — what runs where
 - [Sovereignty](sovereignty.md) — the other reason to run this
+
+## 8. Checking the gates
+
+The project defines quality gates in `src/hansard/evaluation/gates.py`: a
+must-pass threshold and a stretch target for every headline metric, separately
+for French and for English. They exist so that "is this good enough?" has an
+answer that does not depend on anyone's opinion.
+
+```bash
+make bench     # produce measurements
+make gates     # score them against the thresholds
+```
+
+The command prints every gate that is not met and exits non-zero if any
+must-pass gate fails. A must-pass failure means the work is not finished.
+
+Current status on the hardware described at the top of this page:
+
+```
+49/57 gates met  (2 must-pass failures, 6 stretch misses)
+
+FAIL must_pass FLEURS fr_fr (read speech)          wer    6.95% <= 6.00%
+FAIL must_pass FLEURS en_us (read speech)          cer    2.27% <= 2.00%
+FAIL stretch   FLEURS fr_fr (read speech)          wer    6.95% <= 5.00%
+FAIL stretch   FLEURS en_us (read speech)          wer    4.59% <= 3.00%
+FAIL stretch   LibriSpeech dev-clean (read speech) wer    3.93% <= 3.00%
+FAIL stretch   meeting_3spk                        der    8.60% <= 8.00%
+FAIL stretch   meeting_6spk                        der    9.41% <= 8.00%
+FAIL stretch   meeting_9spk                        der    9.73% <= 8.00%
+```
+
+Both must-pass failures are on **read speech**, which is a regression guard
+rather than the product's use case. Every meeting gate — cpWER, tcpWER, WDER,
+DER and speaker counting, in both languages — currently passes.
+
+We are not going to lower a threshold to turn a failure into a success. If a
+threshold turns out to be wrong, it changes only with published evidence and a
+note in this page saying what changed and why.
