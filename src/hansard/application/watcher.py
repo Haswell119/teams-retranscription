@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -40,6 +41,7 @@ class InboxWatcher:
     inbox: Path
     outbox: Path
     poll_seconds: float = 5.0
+    heartbeat_path: Path | None = None
     on_event: Callable[[str], None] = _ignore
     _service: MeetingService | None = field(default=None, init=False, repr=False)
 
@@ -82,8 +84,7 @@ class InboxWatcher:
             return {}
         return payload if isinstance(payload, dict) else {}
 
-    def _request(self, audio: Path) -> MeetingRequest:
-        options = self._sidecar(audio)
+    def _request(self, audio: Path, options: dict[str, object]) -> MeetingRequest:
         vocabulary = options.get("vocabulary")
         return MeetingRequest(
             audio_path=audio,
@@ -94,6 +95,7 @@ class InboxWatcher:
         )
 
     async def process(self, audio: Path) -> Path | None:
+        options = self._sidecar(audio)
         staging = self.inbox / PROCESSING_DIRECTORY
         staging.mkdir(parents=True, exist_ok=True)
         claimed = staging / audio.name
@@ -101,7 +103,7 @@ class InboxWatcher:
             audio.rename(claimed)
         except OSError:
             return None
-        request = self._request(claimed)
+        request = self._request(claimed, options)
         self.on_event(f"processing {audio.name}")
         store = InMemoryJobStore()
         record = await store.create(request)
@@ -131,9 +133,17 @@ class InboxWatcher:
                 processed += 1
         return processed
 
+    def _beat(self) -> None:
+        if self.heartbeat_path is None:
+            return
+        self.heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
+        self.heartbeat_path.write_text(str(int(time.time())), encoding="utf-8")
+
     async def run_forever(self) -> None:
         self.inbox.mkdir(parents=True, exist_ok=True)
         self.outbox.mkdir(parents=True, exist_ok=True)
+        self._beat()
         while True:
             await self.run_once()
+            self._beat()
             await asyncio.sleep(self.poll_seconds)

@@ -110,7 +110,7 @@ services:
       - models:/models:ro
       - workspace:/var/lib/hansard
       - ./artifacts:/artifacts
-      - ./inbox:/inbox:ro
+      - ./inbox:/inbox
     depends_on:
       redis:
         condition: service_healthy
@@ -121,26 +121,22 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.worker
     image: hansard-worker:${HANSARD_VERSION:-0.1.0}
-    command: ["worker"]
+    command: ["worker", "--inbox", "/inbox", "--outbox", "/artifacts"]
     <<: *security
     environment:
       <<: *common-env
       HANSARD_ASR__DEVICE: cpu
       HANSARD_DIARIZATION__DEVICE: cpu
-      HANSARD_METRICS_PORT: "9095"
       # Keep one worker honest on a laptop: ONNX Runtime will otherwise take
       # every core and starve the rest of the machine.
-      OMP_NUM_THREADS: ${HANSARD_WORKER_THREADS:-4}
+      OMP_NUM_THREADS: ${WORKER_THREADS:-4}
     deploy:
-      replicas: ${HANSARD_WORKER_REPLICAS:-1}
+      replicas: ${WORKER_REPLICAS:-1}
     volumes:
       - models:/models:ro
       - workspace:/var/lib/hansard
       - ./artifacts:/artifacts
-      - ./inbox:/inbox:ro
-    depends_on:
-      redis:
-        condition: service_healthy
+      - ./inbox:/inbox
     restart: unless-stopped
 
   # One-shot CLI against the same images, models and volumes.
@@ -156,7 +152,7 @@ services:
       - models:/models:ro
       - workspace:/var/lib/hansard
       - ./artifacts:/artifacts
-      - ./inbox:/inbox:ro
+      - ./inbox:/inbox
     depends_on:
       - redis
 

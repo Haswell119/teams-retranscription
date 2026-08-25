@@ -369,7 +369,7 @@ orchestrator:
 # workers
 # -----------------------------------------------------------------------------
 worker:
-  args: ["worker"]
+  args: ["worker", "--inbox", "/var/lib/hansard/inbox", "--outbox", "/var/lib/hansard/outbox", "--metrics-port", "9095"]
   metricsPort: 9095
   revisionHistoryLimit: 3
   terminationGracePeriodSeconds: 120

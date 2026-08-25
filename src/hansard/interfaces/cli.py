@@ -28,6 +28,16 @@ application = typer.Typer(
 console = Console()
 
 
+def _serve_metrics(port: int) -> None:
+    try:
+        from prometheus_client import start_http_server
+    except ImportError:
+        console.print("[yellow]prometheus-client is not installed; metrics disabled[/yellow]")
+        return
+    start_http_server(port)
+    console.print(f"metrics on http://0.0.0.0:{port}/metrics")
+
+
 def _provenance(settings: Settings) -> tuple[ModelProvenance, ...]:
 
     entries = [
@@ -172,6 +182,12 @@ def worker(
     ] = None,
     poll_seconds: Annotated[float, typer.Option("--poll", help="Seconds between scans")] = 5.0,
     once: Annotated[bool, typer.Option("--once", help="Process what is present, then exit")] = False,
+    heartbeat: Annotated[
+        Path, typer.Option("--heartbeat", help="File touched on every scan, for liveness probes")
+    ] = Path("/tmp/hansard-worker.alive"),
+    metrics_port: Annotated[
+        int, typer.Option("--metrics-port", help="Serve Prometheus metrics on this port, 0 to disable")
+    ] = 0,
 ) -> None:
     import asyncio
 
@@ -180,11 +196,14 @@ def worker(
     settings = load_settings()
     watched = inbox or settings.runtime.workspace / "inbox"
     produced = outbox or settings.runtime.workspace / "outbox"
+    if metrics_port:
+        _serve_metrics(metrics_port)
     watcher = InboxWatcher(
         settings=settings,
         inbox=watched,
         outbox=produced,
         poll_seconds=poll_seconds,
+        heartbeat_path=None if once else heartbeat,
         on_event=lambda message: console.print(message),
     )
     console.print(f"watching [bold]{watched}[/bold], writing to [bold]{produced}[/bold]")

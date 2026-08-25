@@ -671,10 +671,8 @@ spec:
               value: {{ ternary "cuda" "cpu" (eq $variant "gpu") | quote }}
             - name: HANSARD_DIARIZATION__DEVICE
               value: {{ ternary "cuda" "cpu" (eq $variant "gpu") | quote }}
-            - name: HANSARD_WORKER_COMPUTE
+            - name: WORKER_COMPUTE
               value: {{ $variant | quote }}
-            - name: HANSARD_METRICS_PORT
-              value: {{ $ctx.Values.worker.metricsPort | quote }}
             {{- with $ctx.Values.config.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
