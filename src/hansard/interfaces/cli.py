@@ -16,6 +16,7 @@ from hansard.adapters.audio import load_clip
 from hansard.config import Settings, load_settings
 from hansard.domain.meeting import MeetingRequest
 from hansard.factory import Composition
+from hansard.rendering.ports import ModelProvenance, RenderContext
 
 application = typer.Typer(
     name="hansard",
@@ -26,8 +27,7 @@ application = typer.Typer(
 console = Console()
 
 
-def _provenance(settings: Settings) -> tuple[object, ...]:
-    from hansard.rendering.ports import ModelProvenance
+def _provenance(settings: Settings) -> tuple[ModelProvenance, ...]:
 
     entries = [
         ModelProvenance("recognition", settings.asr.engine, settings.asr.model_id),
@@ -96,8 +96,7 @@ def transcribe(
     speakers: Annotated[int | None, typer.Option("--speakers", help="Known number of participants")] = None,
     title: Annotated[str, typer.Option("--title", help="Meeting title")] = "Meeting",
 ) -> None:
-    from hansard.rendering.ports import RenderContext
-    from hansard.rendering.registry import renderer_for
+    from hansard.rendering.registry import transcript_renderer_for
 
     settings = _settings({"asr.language": language})
     phrases = (
@@ -137,7 +136,7 @@ def transcribe(
     )
     written: list[Path] = []
     for name in (item.strip() for item in formats.split(",") if item.strip()):
-        renderer = renderer_for(name)
+        renderer = transcript_renderer_for(name)
         payload = renderer.render_transcript(transcript, context)
         path = destination / f"transcript{renderer.file_extension}"
         path.write_bytes(payload if isinstance(payload, bytes) else payload.encode("utf-8"))

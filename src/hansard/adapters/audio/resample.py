@@ -12,7 +12,8 @@ def _sinc_kernel(up: int, down: int, half_width: int) -> np.ndarray:
     taps = half_width * max(up, down) * 2 + 1
     positions = (np.arange(taps) - (taps - 1) / 2.0) / up
     kernel = cutoff * np.sinc(cutoff * positions * up) * np.blackman(taps)
-    return (kernel / kernel.sum()).astype(np.float32)
+    normalised: np.ndarray = (kernel / kernel.sum()).astype(np.float32)
+    return normalised
 
 
 def resample(samples: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
@@ -24,5 +25,6 @@ def resample(samples: np.ndarray, source_rate: int, target_rate: int) -> np.ndar
     kernel = _sinc_kernel(up, down, _FILTER_HALF_WIDTH)
     upsampled = np.zeros(len(samples) * up, dtype=np.float32)
     upsampled[::up] = samples.astype(np.float32, copy=False)
-    filtered = np.convolve(upsampled, kernel, mode="same")
-    return np.ascontiguousarray(filtered[::down], dtype=np.float32)
+    filtered: np.ndarray = np.convolve(upsampled, kernel, mode="same")
+    result: np.ndarray = np.ascontiguousarray(filtered[::down], dtype=np.float32)
+    return result

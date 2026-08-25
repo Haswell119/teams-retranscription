@@ -22,6 +22,15 @@ FLEURS_PARQUET_INDEX = "https://huggingface.co/api/datasets/google/fleurs/parque
 
 
 @dataclass(frozen=True, slots=True)
+class TimelineEntry:
+    speaker: str
+    start: float
+    end: float
+    text: str
+    samples: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
 class MeetingRecipe:
     name: str
     speakers: int
@@ -157,7 +166,7 @@ def synthesise_meeting(
     order = [speaker for speaker in chosen for _ in pools[speaker]]
     generator.shuffle(order)
     cursors = dict.fromkeys(chosen, 0)
-    timeline: list[dict[str, object]] = []
+    timeline: list[TimelineEntry] = []
     position = 1.0
     for speaker in order:
         index = cursors[speaker]
@@ -175,21 +184,13 @@ def synthesise_meeting(
             if overlapping
             else position + generator.uniform(0.15, 0.8)
         )
-        timeline.append(
-            {
-                "speaker": speaker,
-                "start": start,
-                "end": start + duration,
-                "text": text,
-                "samples": samples,
-            }
-        )
+        timeline.append(TimelineEntry(speaker, start, start + duration, text, samples))
         position = max(position, start + duration)
     total = position + 1.0
     mixture = np.zeros(int(total * TARGET_SAMPLE_RATE) + TARGET_SAMPLE_RATE, dtype=np.float32)
     for segment in timeline:
-        offset = int(float(segment["start"]) * TARGET_SAMPLE_RATE)
-        block = np.asarray(segment["samples"], dtype=np.float32)
+        offset = int(segment.start * TARGET_SAMPLE_RATE)
+        block = np.asarray(segment.samples, dtype=np.float32)
         mixture[offset : offset + len(block)] += block * 0.9
     peak = float(np.max(np.abs(mixture)))
     if peak > 0:
@@ -198,24 +199,24 @@ def synthesise_meeting(
     directory.mkdir(parents=True, exist_ok=True)
     audio_path = directory / f"{recipe.name}.wav"
     sf.write(str(audio_path), mixture, TARGET_SAMPLE_RATE)
-    ordered = sorted(timeline, key=lambda item: float(item["start"]))
+    ordered = sorted(timeline, key=lambda item: item.start)
     with (directory / f"{recipe.name}.rttm").open("w", encoding="utf-8") as handle:
         for segment in ordered:
-            start = float(segment["start"])
-            span = float(segment["end"]) - start
+            span = segment.end - segment.start
             handle.write(
-                f"SPEAKER {recipe.name} 1 {start:.3f} {span:.3f} <NA> <NA> {segment['speaker']} <NA> <NA>\n"
+                f"SPEAKER {recipe.name} 1 {segment.start:.3f} {span:.3f} "
+                f"<NA> <NA> {segment.speaker} <NA> <NA>\n"
             )
     reference = {
         "audio": str(audio_path),
         "duration": len(mixture) / TARGET_SAMPLE_RATE,
-        "speakers": sorted({str(item["speaker"]) for item in ordered}),
+        "speakers": sorted({item.speaker for item in ordered}),
         "segments": [
             {
-                "speaker": item["speaker"],
-                "start": round(float(item["start"]), 3),
-                "end": round(float(item["end"]), 3),
-                "text": item["text"],
+                "speaker": item.speaker,
+                "start": round(item.start, 3),
+                "end": round(item.end, 3),
+                "text": item.text,
             }
             for item in ordered
         ],

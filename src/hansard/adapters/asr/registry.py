@@ -66,14 +66,15 @@ def _build_onnx(settings: AsrSettings, models_dir: Path) -> SpeechRecognizer:
 def _build_whisper(settings: AsrSettings, models_dir: Path) -> SpeechRecognizer:
     from hansard.adapters.asr.whisper_engine import WhisperRecognizer
 
-    return WhisperRecognizer(
-        model_id=settings.model_id if settings.engine == "whisper" else settings.fallback_model_id,
+    recognizer: SpeechRecognizer = WhisperRecognizer(
+        model_id=settings.model_id,
         device="cuda" if settings.device == "cuda" else "cpu",
         compute_type="int8" if settings.quantization == "int8" else "float32",
         models_dir=models_dir,
         beam_size=settings.beam_size,
         language=settings.language,
     )
+    return recognizer
 
 
 def _build_null(_settings: AsrSettings, _models_dir: Path) -> SpeechRecognizer:

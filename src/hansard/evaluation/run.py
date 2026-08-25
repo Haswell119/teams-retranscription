@@ -105,6 +105,9 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
         if not reference_path.exists():
             continue
         sample = load_reference_json(reference_path, "en", "synthetic")
+        reference_diarization = sample.reference_diarization
+        if reference_diarization is None:
+            continue
         clip = load_clip(Path(str(sample.audio_path)))
         pipeline = Composition(settings).pipeline()
         request = MeetingRequest(audio_path=Path(str(sample.audio_path)), title=name, language="en")
@@ -113,13 +116,13 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
         normalizer = normalizer_for("en")
         reference = sample.reference
         hypothesis = outcome.transcript
-        strict = diarization_error_rate(sample.reference_diarization, outcome.diarization, collar=0.0)
-        lenient = diarization_error_rate(sample.reference_diarization, outcome.diarization, collar=0.25)
+        strict = diarization_error_rate(reference_diarization, outcome.diarization, collar=0.0)
+        lenient = diarization_error_rate(reference_diarization, outcome.diarization, collar=0.25)
         rows.append(
             {
                 "meeting": name,
                 "duration_seconds": round(clip.duration, 1),
-                "reference_speakers": len({turn.label for turn in sample.reference_diarization.turns}),
+                "reference_speakers": len({turn.label for turn in reference_diarization.turns}),
                 "detected_speakers": outcome.diarization.speaker_count,
                 "wer_percent": _percent(word_error_rate(reference.text, hypothesis.text, normalizer).wer),
                 "cpwer_percent": _percent(
@@ -131,9 +134,7 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
                 "wder_percent": _percent(word_diarization_error_rate(reference, hypothesis, normalizer)),
                 "der_percent": _percent(strict.der),
                 "der_collar_percent": _percent(lenient.der),
-                "jer_percent": _percent(
-                    jaccard_error_rate(sample.reference_diarization, outcome.diarization).jer
-                ),
+                "jer_percent": _percent(jaccard_error_rate(reference_diarization, outcome.diarization).jer),
                 "der_missed_percent": _percent(strict.missed_rate),
                 "der_false_alarm_percent": _percent(strict.false_alarm_rate),
                 "der_confusion_percent": _percent(strict.confusion_rate),
@@ -171,8 +172,10 @@ def main(argv: list[str] | None = None) -> int:
     report = run_asr(options) if arguments.benchmark == "asr" else run_meetings(options)
     options.output.parent.mkdir(parents=True, exist_ok=True)
     options.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    for row in report["rows"]:  # type: ignore[index]
-        print(json.dumps(row))
+    rows = report.get("rows")
+    if isinstance(rows, list):
+        for row in rows:
+            print(json.dumps(row))
     print(f"wrote {options.output}")
     return 0
 

@@ -27,6 +27,7 @@ from hansard.interfaces.api.schemas import (
     MeetingSubmission,
     SpeakerShare,
 )
+from hansard.ports.delivery import Payload
 
 
 @dataclass(slots=True)
@@ -64,9 +65,7 @@ def _build_runtime(settings: Settings) -> Runtime:
     return Runtime(settings=settings, store=store, queue=queue)
 
 
-def _payload(record: JobRecord) -> object:
-    from hansard.ports.delivery import Payload
-
+def _payload(record: JobRecord) -> Payload:
     body = ""
     for artifact in record.artifacts:
         if artifact.suffix == ".md" and artifact.stem == "minutes":
