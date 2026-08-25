@@ -10,7 +10,7 @@ The prefix is `HANSARD_` and nesting uses a double underscore:
 
 ```bash
 HANSARD_ASR__ENGINE=parakeet
-HANSARD_DIARIZATION__CLUSTERING_THRESHOLD=0.95
+HANSARD_DIARIZATION__CLUSTERING_THRESHOLD=0.99
 HANSARD_DELIVERY__SMTP__HOST=smtp.internal
 ```
 
@@ -49,8 +49,11 @@ Five fields are `SecretStr`: `minutes.api_key`, `delivery.smtp.password`,
 Pydantic renders a `SecretStr` as `**********` in every `repr`, log line and
 `model_dump()`, so a settings object cannot leak a credential into a log or a
 crash report. Reading the value takes an explicit `.get_secret_value()` call,
-which happens in exactly two places: the `Authorization` header for the minutes
-endpoint and the Entra ID client-credentials request.
+which happens in exactly three places: the `Authorization` header for the
+minutes endpoint, the Entra ID client-credentials request, and the moment the S3
+artifact-store client is constructed. Logging adds a second line of defence: the
+structlog pipeline replaces every `SecretStr`, and every field whose name looks
+like a credential, with `***` — see [observability](observability.md).
 
 In Kubernetes these come from a `Secret` or an `ExternalSecret` rather than the
 ConfigMap — see [deployment](deployment.md).
@@ -118,7 +121,7 @@ Prefix `HANSARD_ASR__`.
 
 | Variable | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `ENGINE` | `parakeet` \| `whisper` \| `qwen3` \| `ensemble` \| `null` | `parakeet` | `parakeet` and `qwen3` both build the ONNX recogniser. `null` produces an empty transcript, for testing the rest of the pipeline. `whisper` and `ensemble` are not usable today — see below. |
+| `ENGINE` | `parakeet` \| `whisper` \| `qwen3` \| `null` | `parakeet` | `parakeet` and `qwen3` both build the ONNX recogniser. `whisper` builds the faster-whisper recogniser and needs the `asr-whisper` extra — see below. `null` produces an empty transcript, for testing the rest of the pipeline. |
 | `MODEL_ID` | str | `nemo-parakeet-tdt-0.6b-v3` | Directory name under `runtime.models_dir`, and the id passed to `onnx-asr`. |
 | `QUANTIZATION` | `int8` \| `none` | `int8` | `int8` is what the model bundle contains: about 600 MB on disk, roughly 1.4 GB resident, and the quality in [benchmarks](benchmarks.md) was measured on it. `none` loads float32 weights, costs roughly 2.2× the memory, and the shipped bundle does not include those files — you would have to fetch them yourself. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | `auto` selects the CUDA execution provider if ONNX Runtime reports one, and falls back to CPU. Pin to `cpu` when a GPU is present but you want it left for something else. |
@@ -132,11 +135,35 @@ Prefix `HANSARD_ASR__`.
 | `INTRA_OP_THREADS` | int | `0` | ONNX Runtime threads **within** one operator. `0` means "let ONNX Runtime decide", which usually means every core. **Set it to your core count** on a dedicated box, or to a smaller number on a shared one — otherwise one transcription starves everything else on the machine. |
 | `INTER_OP_THREADS` | int | `0` | Threads **across** independent operators. `0` leaves it to ONNX Runtime. Raising it rarely helps for this graph; prefer `INTRA_OP_THREADS` and `BATCH_SIZE`. |
 
-**Engines that are declared but not available.** `HANSARD_ASR__ENGINE=whisper`
-raises `ImportError` because `hansard.adapters.asr.whisper_engine` is not in the
-tree, even with the `asr-whisper` extra installed. `ensemble` is in the type but
-is not registered, so it raises
-`ConfigurationError: unknown ASR engine 'ensemble'`.
+### The Whisper engine
+
+`HANSARD_ASR__ENGINE=whisper` builds `WhisperRecognizer`, which runs
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2) locally.
+Install the extra first: `pip install 'hansard[asr-whisper]'`. `MODEL_ID` is a
+Whisper model name (`large-v3-turbo`, `small`, `tiny`, `medium.en`, …) or a
+Hugging Face id such as `Systran/faster-whisper-large-v3`. `QUANTIZATION=int8`
+becomes the CTranslate2 `int8` compute type, `none` becomes `float32`, and
+`DEVICE=cuda` moves the model to the GPU. `BEAM_SIZE` and `LANGUAGE` reach the
+decoder directly; leave `LANGUAGE` unset to let Whisper detect French or English
+per segment.
+
+**Model resolution is local-first.** The adapter looks for a CTranslate2
+directory — one holding `model.bin` — under `runtime.models_dir`, trying
+`<models_dir>/<model_id with / replaced by __>`, `<models_dir>/<model_id>` and
+`<models_dir>/whisper/<model_id>`. When it finds one it loads it with
+`local_files_only=True`, so an air-gapped host never reaches for the network.
+Only when no local copy exists does it fall back to the model name, with
+`download_root` pointing at `models_dir`.
+
+**Hallucination mitigations are always on.** Whisper invents fluent text on
+silence and on music. The adapter therefore always passes `vad_filter=True`,
+`condition_on_previous_text=False`, `no_speech_threshold=0.6`,
+`compression_ratio_threshold=2.4` and `log_prob_threshold=-1.0`, and then drops
+any segment that comes back repetitive (compression ratio above the threshold)
+or silent-but-unlikely (no-speech probability above the threshold *and* average
+log probability below it). Custom vocabulary is passed as faster-whisper
+`hotwords`. See [observability](observability.md) for what this looks like in
+the logs.
 
 ---
 
@@ -300,20 +327,48 @@ Prefix `HANSARD_STORAGE__`.
 
 | Variable | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `BACKEND` | `filesystem` \| `s3` | `filesystem` | |
-| `ROOT` | path | `artifacts` | Filesystem root. |
-| `ENDPOINT_URL` | str \| null | unset | S3-compatible endpoint. |
-| `BUCKET` | str \| null | unset | |
-| `ACCESS_KEY` | SecretStr \| null | unset | Never logged. |
-| `SECRET_KEY` | SecretStr \| null | unset | Never logged. |
-| `RETENTION_DAYS` | int | `30` | |
+| `BACKEND` | `filesystem` \| `s3` | `filesystem` | Which `ArtifactStore` implementation is built. |
+| `ROOT` | path | `artifacts` | Filesystem root. A relative path is resolved **inside `runtime.workspace`**, so the default keeps everything under one directory; an absolute path is used as given. |
+| `ENDPOINT_URL` | str \| null | unset | S3-compatible endpoint, e.g. `https://objects.internal`. Leave unset for AWS itself. |
+| `BUCKET` | str \| null | unset | Required when `BACKEND=s3`; a missing bucket raises `ConfigurationError` at startup. |
+| `REGION` | str | `us-east-1` | Region name sent to the endpoint. Nutanix Objects and MinIO ignore the value but the signature needs one. |
+| `ACCESS_KEY` | SecretStr \| null | unset | Never logged. Read once, when the S3 client is built. |
+| `SECRET_KEY` | SecretStr \| null | unset | Never logged. Read once, when the S3 client is built. |
+| `CA_BUNDLE` | path \| null | unset | PEM bundle used to verify the endpoint's certificate, for an internal CA. **TLS verification is never disabled**; there is no switch for that. |
+| `FORCE_PATH_STYLE` | bool | `true` | Path-style addressing (`https://endpoint/bucket/key`). Nutanix Objects and most on-premises gateways require it. Set it to `false` only for AWS-style virtual-host buckets. |
+| `RETENTION_DAYS` | int | `30` | Horizon used by `purge_older_than()`. `0` disables purging entirely. Nothing purges on a timer yet — call it from a cron job or a Kubernetes `CronJob`. |
 
-**The whole section is currently inert.** `src/hansard/adapters/storage/` is
-empty, and nothing implements the `ArtifactStore` port. Artefacts are written by
-the filesystem delivery publisher, which is governed by
-`HANSARD_DELIVERY__OUTPUT_DIR`. The Helm chart already emits these variables, so
-they are ready for the adapter when it lands. Retention is your filesystem's or
-your bucket's job today.
+Both backends implement the `ArtifactStore` port: `put`, `get`, `delete`,
+`exists`, plus `list_keys(prefix)` and `purge_older_than(days)`. The
+`MeetingService` copies every rendered artefact into the store after a meeting
+completes, under the key `<meeting identifier>/<file name>`, and the API's
+`GET /v1/meetings/{id}/artifacts/{name}` falls back to the store when the file
+is no longer in the workspace. A store that is unreachable is logged and
+recorded in `hansard_object_storage_reachable`; it never fails the meeting,
+because the artefacts are already on local disk.
+
+**Keys are sanitised, not trusted.** A key must be relative, free of `.` and
+`..` segments, backslashes, colons, control characters and padding, and the
+resolved path must stay under the root — symlinks included. Anything else raises
+`ArtifactKeyError` before a byte is written. Filesystem writes are atomic: the
+content is staged next to the target and renamed into place.
+
+The `s3` backend needs the `storage-s3` extra (`pip install 'hansard[storage-s3]'`),
+which pulls in `boto3`. Without it, selecting `s3` raises a `ConfigurationError`
+that says so.
+
+```bash
+HANSARD_STORAGE__BACKEND=s3
+HANSARD_STORAGE__ENDPOINT_URL=https://objects.internal
+HANSARD_STORAGE__BUCKET=hansard-artifacts
+HANSARD_STORAGE__REGION=eu-west-3
+HANSARD_STORAGE__CA_BUNDLE=/etc/ssl/certs/internal-ca.pem
+HANSARD_STORAGE__ACCESS_KEY=...
+HANSARD_STORAGE__SECRET_KEY=...
+```
+
+Delivery is a separate concern: the filesystem delivery publisher still writes
+where `HANSARD_DELIVERY__OUTPUT_DIR` points.
 
 ---
 
@@ -328,7 +383,7 @@ Prefix `HANSARD_API__`.
 | `ROOT_PATH` | str | `""` | Path prefix behind a reverse proxy. |
 | `API_KEY` | SecretStr \| null | unset | Never logged. |
 | `CORS_ORIGINS` | tuple | `()` | |
-| `METRICS_ENABLED` | bool | `true` | Declared but not read. The Prometheus exporter is separate and reads `HANSARD_METRICS_PORT`, defaulting to `9095`. See [metrics](metrics.md). |
+| `METRICS_ENABLED` | bool | `true` | Serves the Prometheus exposition on `GET /metrics`, unauthenticated, when `prometheus-client` is installed. Set it to `false` and the route is not registered at all. The standalone exporter for workers is separate and reads `HANSARD_METRICS_PORT`, defaulting to `9095`. See [observability](observability.md). |
 
 These settings drive `hansard serve`, which runs the FastAPI application in
 `hansard.interfaces.api.app`. It needs the `api` extra.
@@ -365,8 +420,8 @@ Prefix `HANSARD_RUNTIME__`.
 | `ALLOW_MODEL_DOWNLOADS` | bool | `false` | When `false`, a missing model is a hard error rather than a silent download. Leave it off: it is the property that makes an air gap enforceable, and CI runs transcription with the network disabled to prove it. |
 | `MAX_CONCURRENT_MEETINGS` | int | `2` | Number of concurrent job workers inside one `hansard serve` process. Each concurrent meeting holds its own recogniser in memory, so budget roughly 1.4 GB per unit before raising it. It does not apply to `hansard transcribe` or `hansard join`, which process one meeting each. |
 | `WORKER_THREADS` | int | `0` | Declared but not read. Use `HANSARD_ASR__INTRA_OP_THREADS`, or `OMP_NUM_THREADS` for the ONNX Runtime pools. |
-| `LOG_LEVEL` | str | `INFO` | Declared but not read; no logging configuration is wired up yet. |
-| `LOG_FORMAT` | `json` \| `console` | `json` | Same. |
+| `LOG_LEVEL` | str | `INFO` | Level applied to Hansard and to every third-party library, through the stdlib root logger. `DEBUG` adds one `stage.started` event per pipeline stage. |
+| `LOG_FORMAT` | `json` \| `console` | `json` | `json` emits one JSON object per line on stdout; `console` emits a readable aligned line. Both go through the redaction and content-elision processors. See [observability](observability.md). |
 | `TELEMETRY_ENABLED` | bool | `false` | Cannot be set to `true`. See above. |
 
 ---
@@ -511,19 +566,12 @@ validate and appear in `model_dump()`, but no code reads them today:
 
 | Setting | Status |
 | --- | --- |
-| `asr.fallback_engine`, `asr.fallback_confidence_threshold` | No fallback path is implemented |
-| `asr.vocabulary_boost` | Vocabulary is corrected after recognition, not boosted in the decoder |
-| `diarization.max_speakers`, `diarization.min_speakers` | Carried into the request; the sherpa engine ignores them |
-| `diarization.collar_seconds`, `diarization.overflow_engine` | Unused |
-| `attribution.fallback_label_prefix` | The namer uses the literal `Speaker` |
-| `audio.preserve_dynamics_for_diarization` | The behaviour is unconditional |
-| `delivery.default_channels` | Targets are always explicit |
-| Every field of `storage` | No `ArtifactStore` implementation exists |
-| `api.metrics_enabled` | Unused; the exporter reads `HANSARD_METRICS_PORT` |
-| `runtime.worker_threads`, `runtime.log_level`, `runtime.log_format` | Unused |
+| `diarization.collar_seconds` | Unused. It is an evaluation parameter, and the evaluation harness takes its own |
+| `storage.retention_days` | Honoured by `purge_older_than()`, but nothing calls it on a schedule — run it from a cron job or a Kubernetes `CronJob` |
 
 ## Related reading
 
+- [Observability](observability.md) — logging, redaction, metrics
 - [Installation](installation.md) — extras, models, `hansard doctor`
 - [Architecture](architecture.md) — what each setting actually reaches
 - [Deployment](deployment.md) — the same settings as Helm values

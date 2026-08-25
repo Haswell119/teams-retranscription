@@ -41,6 +41,10 @@ class ArtifactNotFoundError(HansardError):
     pass
 
 
+class ArtifactKeyError(HansardError):
+    pass
+
+
 class QualityGateFailedError(HansardError):
     pass
 

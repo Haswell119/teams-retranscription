@@ -43,7 +43,7 @@ transcribes correctly in one pass, and the CPU worker still sits at roughly
 2 GB RSS.
 
 Voice activity detection (Silero) and diarization (pyannote segmentation 3.0 +
-CAM++ embeddings) are language independent by construction.
+TitaNet embeddings) are language independent by construction.
 
 ## The model artifact
 
@@ -122,7 +122,7 @@ Two consequences worth internalising:
   `diarization.minimumSpeakerSeconds` as values (env
   `HANSARD_DIARIZATION__EMBEDDING_MODEL`, `..._CLUSTERING_THRESHOLD`,
   `..._MINIMUM_SPEAKER_SECONDS`). Add the candidate to `models.manifest`, ship
-  both, and switch with a value. `clusteringThreshold: 0.95` is calibrated for
+  both, and switch with a value. `clusteringThreshold: 0.99` is calibrated for
   TitaNet and is not transferable to a different embedding space.
 
 ### Changing models

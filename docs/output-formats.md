@@ -104,7 +104,7 @@ caption file.
 - **Duration:** 25 min
 - **Participants:** Amara Okafor, Léa Fontaine, Jonas Weber
 - **Language:** English (en)
-- **Produced with:** parakeet (nemo-parakeet-tdt-0.6b-v3), sortformer (diar_streaming_sortformer_4spk), qwen3 (qwen3-8b-instruct)
+- **Produced with:** parakeet (nemo-parakeet-tdt-0.6b-v3), sherpa (nemo_en_titanet_small.onnx), local (qwen3-8b-instruct)
 
 ---
 
@@ -331,8 +331,8 @@ A citation is `{ "speaker": …, "quote": …, "start": …, "end": …, "timeco
 Markdown, HTML and plain-text headers state where the meeting was processed and which models were used, and
 the WebVTT file repeats a short version in a `NOTE` block:
 
-> Transcribed and summarised locally by Hansard using parakeet (nemo-parakeet-tdt-0.6b-v3), sortformer
-> (diar_streaming_sortformer_4spk), qwen3 (qwen3-8b-instruct). No audio, transcript or minutes left the
+> Transcribed and summarised locally by Hansard using parakeet (nemo-parakeet-tdt-0.6b-v3), sherpa
+> (nemo_en_titanet_small.onnx), local (qwen3-8b-instruct). No audio, transcript or minutes left the
 > organisation.
 
 The model list comes from `RenderContext.provenance`, so it is never a marketing claim: it is whatever

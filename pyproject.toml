@@ -50,6 +50,7 @@ metrics = [
   "unidecode>=1.3",
 ]
 observability = ["prometheus-client>=0.20"]
+storage-s3 = ["boto3>=1.34"]
 dev = [
   "ruff>=0.6",
   "mypy>=1.11",

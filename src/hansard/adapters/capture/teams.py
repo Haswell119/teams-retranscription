@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -26,16 +27,27 @@ from hansard.adapters.capture.browser.events import (
 from hansard.adapters.capture.browser.session import (
     DEFAULT_UI_LOCALE,
     BrowserOptions,
+    JoinOutcome,
     MeetingState,
     PlaywrightRuntimeFactory,
     TeamsBrowserSession,
 )
 from hansard.config import CaptureSettings
-from hansard.domain.errors import CaptureError
+from hansard.domain.errors import (
+    CaptureError,
+    MeetingAdmissionTimeoutError,
+    MeetingJoinRefusedError,
+)
 from hansard.domain.meeting import Capture, MeetingRequest
+from hansard.observability.metrics import bot_session, record_bot_join
 
 SessionBuilder = Callable[[Callable[[CaptureEvent], None]], TeamsBrowserSession]
 RecorderBuilder = Callable[[str], FfmpegRecorder]
+
+JOIN_ADMITTED: Final[str] = "admitted"
+JOIN_REFUSED: Final[str] = "refused"
+JOIN_TIMED_OUT: Final[str] = "timeout"
+JOIN_FAILED: Final[str] = "error"
 
 DEFAULT_ANNOUNCEMENTS: Final[dict[str, str]] = {
     "en": (
@@ -190,9 +202,10 @@ class TeamsBrowserCapture:
         reducer.set_origin(origin_epoch_ms)
         try:
             await recorder.start(output)
-            outcome = await session.join(request.join_url)
+            outcome = await self._join(session, request.join_url)
             announced = await self._announce(session, request)
-            reason = await self._monitor(session, recorder, reducer, request, origin_epoch_ms)
+            with bot_session():
+                reason = await self._monitor(session, recorder, reducer, request, origin_epoch_ms)
             await session.leave()
         except BaseException:
             await session.aclose()
@@ -220,6 +233,16 @@ class TeamsBrowserCapture:
             ended_at=ended_at,
             sample_rate=self.sample_rate,
         )
+
+    async def _join(self, session: TeamsBrowserSession, join_url: str) -> JoinOutcome:
+        started = time.monotonic()
+        try:
+            outcome = await session.join(join_url)
+        except BaseException as error:
+            record_bot_join(_join_result(error))
+            raise
+        record_bot_join(JOIN_ADMITTED, time.monotonic() - started)
+        return outcome
 
     async def _announce(self, session: TeamsBrowserSession, request: MeetingRequest) -> bool:
         if not self.settings.announce_recording:
@@ -273,3 +296,11 @@ class TeamsBrowserCapture:
             if self._saw_roster and now_ms - self._last_company_epoch_ms >= alone_ms:
                 return StopReason.ALONE_TIMEOUT
             await self.sleep(poll)
+
+
+def _join_result(error: BaseException) -> str:
+    if isinstance(error, MeetingJoinRefusedError):
+        return JOIN_REFUSED
+    if isinstance(error, MeetingAdmissionTimeoutError):
+        return JOIN_TIMED_OUT
+    return JOIN_FAILED

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from hansard.adapters.asr.biasing import VocabularyBiaser
@@ -14,10 +14,15 @@ from hansard.domain.meeting import Capture, JobState, MeetingRequest
 from hansard.domain.minutes import Minutes
 from hansard.domain.speakers import Roster
 from hansard.domain.transcript import Transcript
+from hansard.observability.logging import StageLogger, get_logger, stage_span
+from hansard.observability.metrics import record_minutes_generated, record_object_storage_reachable
 from hansard.ports.capture import MeetingCapture
+from hansard.ports.storage import ArtifactStore
 from hansard.ports.summarization import MinutesWriter
 from hansard.rendering.ports import ModelProvenance, RenderContext
 from hansard.rendering.registry import minutes_renderer_for, transcript_renderer_for
+
+LOGGER = get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -27,17 +32,29 @@ class MeetingService:
     capture: MeetingCapture
     minutes_writer: MinutesWriter | None = None
     biaser: VocabularyBiaser | None = None
+    artifact_store: ArtifactStore | None = None
 
     async def execute(self, record: JobRecord) -> JobRecord:
         request = record.request
+        logger = LOGGER.bind(meeting=request.identifier)
         workspace = self.settings.runtime.workspace / request.identifier
         workspace.mkdir(parents=True, exist_ok=True)
-        captured = await self._acquire(request, workspace)
-        transcript, roster, stages = await asyncio.to_thread(self._transcribe, captured, request)
-        minutes = await asyncio.to_thread(self._compose, transcript, roster, request)
-        artifacts = await asyncio.to_thread(
-            self._render, transcript, minutes, roster, request, captured, workspace
-        )
+        with stage_span(logger, "capture") as measured:
+            captured = await self._acquire(request, workspace)
+            measured["audio_seconds"] = round(captured.duration, 1)
+        with stage_span(logger, "transcribe") as measured:
+            transcript, roster, stages = await asyncio.to_thread(self._transcribe, captured, request)
+            measured["words"] = float(transcript.word_count)
+            measured["speakers"] = float(len(transcript.speakers))
+        with stage_span(logger, "minutes") as measured:
+            minutes = await asyncio.to_thread(self._compose, transcript, roster, request)
+            measured["composed"] = float(minutes is not None)
+        with stage_span(logger, "render") as measured:
+            artifacts = await asyncio.to_thread(
+                self._render, transcript, minutes, roster, request, captured, workspace
+            )
+            measured["artifacts"] = float(len(artifacts))
+        stored = await self._persist(request.identifier, artifacts, logger)
         return record.advanced(
             JobState.COMPLETED,
             transcript=transcript,
@@ -49,20 +66,50 @@ class MeetingService:
                 "audio_seconds": round(captured.duration, 1),
                 "word_count": float(transcript.word_count),
                 "speaker_count": float(len(transcript.speakers)),
+                "stored_artifacts": float(len(stored)),
             },
         )
 
+    async def _persist(
+        self, identifier: str, artifacts: tuple[Path, ...], logger: StageLogger
+    ) -> tuple[str, ...]:
+        store = self.artifact_store
+        if store is None or not artifacts:
+            return ()
+        with stage_span(logger, "persist", store=store.name) as measured:
+            locations: list[str] = []
+            for path in artifacts:
+                try:
+                    locations.append(await store.put(artifact_key(identifier, path.name), path))
+                except Exception as error:
+                    logger.warning(
+                        "artifact.persist_failed",
+                        store=store.name,
+                        artifact=path.name,
+                        error=type(error).__name__,
+                    )
+                    record_object_storage_reachable(False)
+                    break
+            else:
+                record_object_storage_reachable(True)
+            measured["artifacts"] = float(len(locations))
+        return tuple(locations)
+
     async def _acquire(self, request: MeetingRequest, workspace: Path) -> Capture:
-        if request.audio_path is not None and request.join_url is None:
-            moment = datetime.now(UTC)
-            return Capture(
-                audio_path=request.audio_path,
-                roster=Roster(),
-                started_at=moment,
-                ended_at=moment,
-                sample_rate=self.settings.audio.sample_rate,
-            )
-        return await self.capture.capture(request, workspace)
+        if request.audio_path is None or request.join_url is not None:
+            return await self.capture.capture(request, workspace)
+        seconds = await asyncio.to_thread(self._measure, request.audio_path)
+        finished = datetime.now(UTC)
+        return Capture(
+            audio_path=request.audio_path,
+            roster=Roster(),
+            started_at=finished - timedelta(seconds=seconds),
+            ended_at=finished,
+            sample_rate=self.settings.audio.sample_rate,
+        )
+
+    def _measure(self, path: Path) -> float:
+        return load_clip(path, self.settings.audio.sample_rate).duration
 
     def _transcribe(
         self, captured: Capture, request: MeetingRequest
@@ -79,7 +126,9 @@ class MeetingService:
     def _compose(self, transcript: Transcript, roster: Roster, request: MeetingRequest) -> Minutes | None:
         if self.minutes_writer is None or not self.settings.minutes.enabled:
             return None
-        return self.minutes_writer.compose(transcript, roster, request)
+        minutes = self.minutes_writer.compose(transcript, roster, request)
+        record_minutes_generated()
+        return minutes
 
     def _render(
         self,
@@ -124,3 +173,7 @@ class MeetingService:
             target.write_bytes(body if isinstance(body, bytes) else body.encode("utf-8"))
             written.append(target)
         return tuple(written)
+
+
+def artifact_key(identifier: str, name: str) -> str:
+    return f"{identifier}/{name}"

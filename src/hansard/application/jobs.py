@@ -12,6 +12,7 @@ from hansard.domain.meeting import JobState, MeetingRequest
 from hansard.domain.minutes import Minutes
 from hansard.domain.speakers import Roster
 from hansard.domain.transcript import Transcript
+from hansard.observability.metrics import record_job_state
 
 
 def _now() -> datetime:
@@ -110,6 +111,7 @@ class JobQueue:
 
     async def submit(self, request: MeetingRequest) -> JobRecord:
         record = await self.store.create(request)
+        record_job_state(record.state.value)
         await self._queue.put(record.identifier)
         return record
 
@@ -122,16 +124,22 @@ class JobQueue:
             identifier = await self._queue.get()
             try:
                 record = await self.store.get(identifier)
-                await self.store.save(record.advanced(JobState.TRANSCRIBING))
+                await self._transition(record, JobState.TRANSCRIBING)
                 completed = await self.handler(record)
+                record_job_state(completed.state.value)
                 await self.store.save(completed)
             except asyncio.CancelledError:
                 raise
             except Exception as error:
                 try:
                     failed = await self.store.get(identifier)
+                    record_job_state(JobState.FAILED.value)
                     await self.store.save(failed.advanced(JobState.FAILED, error=str(error)))
                 except ArtifactNotFound:
                     pass
             finally:
                 self._queue.task_done()
+
+    async def _transition(self, record: JobRecord, state: JobState) -> JobRecord:
+        record_job_state(state.value)
+        return await self.store.save(record.advanced(state))

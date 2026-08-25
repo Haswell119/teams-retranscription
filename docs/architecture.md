@@ -17,7 +17,7 @@ what actually runs during a meeting, and where the seams are.
 | `interfaces/` | The Typer CLI (`version`, `doctor`, `transcribe`, `serve`, `join`) and the FastAPI application behind `serve` | Drivers. Both compose the same `MeetingService`. |
 | `rendering/` | Markdown, HTML, JSON, WebVTT, SubRip and plain-text renderers, plus bilingual strings and a timecode module | Domain objects in, bytes out. |
 | `evaluation/` | The quality harness, the text normalizers, the metric implementations, corpus preparation and reporting | Depends on `ports` and `domain`, never on `adapters`. |
-| `observability/` | Prometheus metric definitions and the exporter | Optional; absent `prometheus-client`, the module degrades to no-ops. |
+| `observability/` | Prometheus metric definitions and the exporter, plus the structlog configuration with its secret-redaction and content-elision processors | Optional; absent `prometheus-client`, the metric module degrades to no-ops. Logging is configured once, by `create_app()` and by the CLI's `main()`. See [observability](observability.md). |
 
 `factory.py` is the composition root for the pipeline. It is the one place that
 reads `Settings` and decides which adapter each port gets, so nothing else in the
@@ -59,7 +59,7 @@ Everything below is what is in the tree today.
 
 | Port | Module | Implementations |
 | --- | --- | --- |
-| `SpeechRecognizer` | `ports/asr.py` | `OnnxRecognizer` (`adapters/asr/onnx_engine.py`), `NullRecognizer` (`adapters/asr/null_engine.py`) |
+| `SpeechRecognizer` | `ports/asr.py` | `OnnxRecognizer` (`adapters/asr/onnx_engine.py`), `WhisperRecognizer` (`adapters/asr/whisper_engine.py`), `NullRecognizer` (`adapters/asr/null_engine.py`) |
 | `LanguageIdentifier` | `ports/asr.py` | None. Parakeet detects language internally, so nothing has needed it. |
 | `Diarizer` | `ports/diarization.py` | `SherpaDiarizer` (`adapters/diarization/sherpa.py`), `NullDiarizer` |
 | `SpeakerAttributor` | `ports/diarization.py` | `WordLevelAttributor` (`adapters/attribution/fusion.py`) |
@@ -70,7 +70,7 @@ Everything below is what is in the tree today.
 | `MinutesWriter` | `ports/summarization.py` | `LlmMinutesWriter`, `ExtractiveMinutesWriter` |
 | `TextGenerator` | `ports/summarization.py` | `OpenAiCompatibleGenerator` |
 | `MinutesPublisher` | `ports/delivery.py` | `FilesystemPublisher`, `EmailPublisher`, `WebhookPublisher`, `TeamsChatPublisher` (Graph), `TeamsBotPublisher` (Bot Framework), and `AddressRoutedPublisher`, which dispatches by address scheme |
-| `ArtifactStore` | `ports/storage.py` | **None.** `adapters/storage/` is empty; the `storage` settings section is inert. Artefacts are written to `runtime.workspace` by `MeetingService` and to `delivery.output_dir` by `FilesystemPublisher`. |
+| `ArtifactStore` | `ports/storage.py` | `FilesystemArtifactStore` and `S3ArtifactStore` (`adapters/storage/`), selected by `storage.backend`. `MeetingService` copies every rendered artefact into the store; `delivery.output_dir` remains the separate concern of `FilesystemPublisher`. |
 | `JobStore` | `application/jobs.py` | `InMemoryJobStore`. Declared beside its use rather than in `ports/`, because it is an application concern rather than an external system. |
 
 Rendering has its own two protocols in `rendering/ports.py`, `TranscriptRenderer`

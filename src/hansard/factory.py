@@ -10,9 +10,11 @@ from hansard.adapters.diarization.registry import build_diarizer
 from hansard.adapters.enhancement.ffmpeg_chain import FfmpegEnhancer
 from hansard.adapters.enhancement.segmentation import SegmentationPolicy
 from hansard.adapters.enhancement.vad import EnergyVoiceActivityDetector, SileroVoiceActivityDetector
+from hansard.adapters.storage.registry import build_artifact_store
 from hansard.application.pipeline import TranscriptionPipeline
-from hansard.config import Settings
+from hansard.config import Settings, StorageSettings
 from hansard.ports.enhancement import AudioEnhancer, VoiceActivityDetector
+from hansard.ports.storage import ArtifactStore
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +56,15 @@ class Composition:
             speech_pad_seconds=vad.speech_pad_seconds,
             max_speech_seconds=self.settings.audio.max_segment_seconds,
         )
+
+    def artifact_store(self) -> ArtifactStore:
+        return build_artifact_store(self._storage_settings())
+
+    def _storage_settings(self) -> StorageSettings:
+        storage = self.settings.storage
+        if storage.backend != "filesystem" or storage.root.is_absolute():
+            return storage
+        return storage.model_copy(update={"root": self.settings.runtime.workspace / storage.root})
 
     def segmentation(self) -> SegmentationPolicy:
         audio = self.settings.audio

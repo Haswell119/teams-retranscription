@@ -10,6 +10,7 @@ from hansard.adapters.asr.onnx_engine import OnnxRecognizer
 from hansard.adapters.audio import load_clip
 from hansard.config import Settings
 from hansard.domain.meeting import MeetingRequest
+from hansard.evaluation.ami import discover_meetings
 from hansard.evaluation.datasets import load_manifest, load_reference_json
 from hansard.evaluation.metrics.speaker import (
     concatenated_minimum_permutation_wer,
@@ -33,6 +34,7 @@ ASR_CORPORA: tuple[tuple[str, str, str], ...] = (
 )
 
 MEETING_FIXTURES: tuple[str, ...] = ("meeting_3spk", "meeting_6spk", "meeting_9spk")
+AMI_CONDITION = "Mix-Headset"
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,9 +153,94 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
     }
 
 
+def run_ami(options: RunOptions) -> dict[str, object]:
+    audio_root = options.data_dir / "ami"
+    annotations = audio_root / "annotations"
+    settings = Settings()
+    settings.asr.intra_op_threads = options.threads
+    normalizer = normalizer_for("en")
+    rows: list[dict[str, object]] = []
+    for meeting in discover_meetings(audio_root, annotations):
+        clip = load_clip(meeting.audio_path)
+        pipeline = Composition(settings).pipeline()
+        request = MeetingRequest(audio_path=meeting.audio_path, title=meeting.identifier, language="en")
+        started = time.perf_counter()
+        with ResourceProbe() as probe:
+            outcome = pipeline.run(clip, request)
+        elapsed = time.perf_counter() - started
+        reference = meeting.reference
+        hypothesis = outcome.transcript
+        strict = diarization_error_rate(meeting.diarization, outcome.diarization, collar=0.0)
+        lenient = diarization_error_rate(meeting.diarization, outcome.diarization, collar=0.25)
+        rows.append(
+            {
+                "meeting": meeting.identifier,
+                "condition": AMI_CONDITION,
+                "duration_minutes": round(clip.duration / 60, 1),
+                "reference_speakers": meeting.speaker_count,
+                "detected_speakers": outcome.diarization.speaker_count,
+                "reference_words": reference.word_count,
+                "wer_percent": _percent(word_error_rate(reference.text, hypothesis.text, normalizer).wer),
+                "cpwer_percent": _percent(
+                    concatenated_minimum_permutation_wer(reference, hypothesis, normalizer).wer
+                ),
+                "tcpwer_percent": _percent(
+                    time_constrained_cpwer(reference, hypothesis, normalizer, collar=5.0).wer
+                ),
+                "wder_percent": _percent(word_diarization_error_rate(reference, hypothesis, normalizer)),
+                "der_percent": _percent(strict.der),
+                "der_collar_percent": _percent(lenient.der),
+                "jer_percent": _percent(jaccard_error_rate(meeting.diarization, outcome.diarization).jer),
+                "der_missed_percent": _percent(strict.missed_rate),
+                "der_false_alarm_percent": _percent(strict.false_alarm_rate),
+                "der_confusion_percent": _percent(strict.confusion_rate),
+                "real_time_factor": round(elapsed / clip.duration, 4),
+                "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
+                "stage_seconds": outcome.stage_seconds,
+            }
+        )
+    return {
+        "benchmark": "ami",
+        "condition": AMI_CONDITION,
+        "normalizer_version": NORMALIZER_VERSION,
+        "rows": rows,
+        "summary": _aggregate(rows),
+    }
+
+
+def _numeric(row: dict[str, object], key: str) -> float:
+    value = row.get(key)
+    return float(value) if isinstance(value, int | float) else 0.0
+
+
+def _aggregate(rows: list[dict[str, object]]) -> dict[str, object]:
+    if not rows:
+        return {}
+    metrics = (
+        "wer_percent",
+        "cpwer_percent",
+        "tcpwer_percent",
+        "wder_percent",
+        "der_percent",
+        "der_collar_percent",
+        "jer_percent",
+    )
+    macro = {key: round(sum(_numeric(row, key) for row in rows) / len(rows), 2) for key in metrics}
+    weights = [_numeric(row, "reference_words") for row in rows]
+    total = sum(weights) or 1.0
+    pairs = zip(rows, weights, strict=True)
+    weighted = sum(_numeric(row, "cpwer_percent") * weight for row, weight in pairs)
+    return {
+        "meetings": len(rows),
+        "total_minutes": round(sum(_numeric(row, "duration_minutes") for row in rows), 1),
+        "macro_average": macro,
+        "word_weighted_cpwer_percent": round(weighted / total, 2),
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hansard-bench")
-    parser.add_argument("benchmark", choices=("asr", "meetings"))
+    parser.add_argument("benchmark", choices=("asr", "meetings", "ami"))
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--threads", type=int, default=0)
@@ -169,7 +256,8 @@ def main(argv: list[str] | None = None) -> int:
         threads=arguments.threads,
         language=arguments.language,
     )
-    report = run_asr(options) if arguments.benchmark == "asr" else run_meetings(options)
+    runners = {"asr": run_asr, "meetings": run_meetings, "ami": run_ami}
+    report = runners[arguments.benchmark](options)
     options.output.parent.mkdir(parents=True, exist_ok=True)
     options.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     rows = report.get("rows")

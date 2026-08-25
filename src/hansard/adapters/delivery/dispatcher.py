@@ -8,12 +8,18 @@ from dataclasses import dataclass, field
 from hansard.adapters.delivery.registry import build_publisher
 from hansard.config import DeliverySettings
 from hansard.domain.meeting import DeliveryChannel, DeliveryTarget
+from hansard.observability.logging import get_logger
+from hansard.observability.metrics import record_delivery
 from hansard.ports.delivery import MinutesPublisher, Payload
 
 PublisherResolver = Callable[[DeliveryChannel], MinutesPublisher]
 Clock = Callable[[], float]
 
 DEFAULT_TARGET_TIMEOUT_SECONDS = 120.0
+DELIVERED = "success"
+UNDELIVERED = "failure"
+
+LOGGER = get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,14 +84,23 @@ class DeliveryDispatcher:
             return self._failure(target, started, f"timed out after {self.timeout_seconds:g}s")
         except Exception as error:
             return self._failure(target, started, f"{type(error).__name__}: {error}")
+        duration_seconds = self.clock() - started
+        record_delivery(target.channel.value, DELIVERED)
+        LOGGER.info(
+            "delivery.completed",
+            channel=target.channel.value,
+            duration_seconds=round(duration_seconds, 3),
+        )
         return DeliveryOutcome(
             channel=target.channel,
             address=target.address,
             succeeded=True,
-            duration_seconds=self.clock() - started,
+            duration_seconds=duration_seconds,
         )
 
     def _failure(self, target: DeliveryTarget, started: float, message: str) -> DeliveryOutcome:
+        record_delivery(target.channel.value, UNDELIVERED)
+        LOGGER.warning("delivery.failed", channel=target.channel.value, reason=_reason(message))
         return DeliveryOutcome(
             channel=target.channel,
             address=target.address,
@@ -93,6 +108,10 @@ class DeliveryDispatcher:
             error=message,
             duration_seconds=self.clock() - started,
         )
+
+
+def _reason(message: str) -> str:
+    return message.split(":", 1)[0]
 
 
 def dispatcher_from_settings(

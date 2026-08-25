@@ -163,7 +163,7 @@ HANSARD_DIARIZATION__CLUSTERING_THRESHOLD=1.00
 **Fix.** Lower it.
 
 ```bash
-HANSARD_DIARIZATION__CLUSTERING_THRESHOLD=0.95   # then 0.90
+HANSARD_DIARIZATION__CLUSTERING_THRESHOLD=0.99   # then 0.95, then 0.90
 ```
 
 `0.99` is calibrated for the TitaNet embedding space and **does not transfer** to
@@ -499,7 +499,10 @@ read.
 | Error | Meaning |
 | --- | --- |
 | `ConfigurationError: unknown ASR engine 'ensemble', available: ('null', 'parakeet', 'qwen3', 'whisper')` | The name is in the type but not registered |
-| `ModuleNotFoundError: No module named 'hansard.adapters.asr.whisper_engine'` | `HANSARD_ASR__ENGINE=whisper`. The adapter is not in the tree; use `parakeet` |
+| `RecognitionError: faster-whisper is not installed` | `HANSARD_ASR__ENGINE=whisper` without the extra; `pip install 'hansard[asr-whisper]'` or use `parakeet` |
+| `ConfigurationError: storage backend 's3' requires HANSARD_STORAGE__BUCKET` | `HANSARD_STORAGE__BACKEND=s3` with no bucket set |
+| `ConfigurationError: the s3 artifact store needs boto3` | `pip install 'hansard[storage-s3]'` |
+| `ArtifactKeyError: artifact key ...` | An artefact key that is absolute, padded, or contains `..`, `\`, `:` or a control character. Keys are relative paths under the store root |
 | `ConfigurationError: unknown diarization engine ...` | Valid names are `sherpa`, `sortformer`, `pyannote`, `null`. The first three all resolve to the same sherpa implementation |
 | `ConfigurationError: unknown output format 'pdf', available: ('html', 'json', 'markdown', 'srt', 'text', 'vtt')` | A `--format` value that no renderer claims |
 | `ValidationError: ... Hansard never emits telemetry; this switch exists only to document that` | `HANSARD_RUNTIME__TELEMETRY_ENABLED=true`. There is no telemetry to enable |

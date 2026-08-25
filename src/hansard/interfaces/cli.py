@@ -16,6 +16,7 @@ from hansard.adapters.audio import load_clip
 from hansard.config import Settings, load_settings
 from hansard.domain.meeting import MeetingRequest
 from hansard.factory import Composition
+from hansard.observability.logging import configure_logging
 from hansard.rendering.ports import ModelProvenance, RenderContext
 
 application = typer.Typer(
@@ -162,6 +163,36 @@ def transcribe(
 
 
 @application.command()
+def worker(
+    inbox: Annotated[
+        Path | None, typer.Option("--inbox", help="Directory watched for recordings to process")
+    ] = None,
+    outbox: Annotated[
+        Path | None, typer.Option("--outbox", help="Directory artefacts are written to")
+    ] = None,
+    poll_seconds: Annotated[float, typer.Option("--poll", help="Seconds between scans")] = 5.0,
+    once: Annotated[bool, typer.Option("--once", help="Process what is present, then exit")] = False,
+) -> None:
+    import asyncio
+
+    from hansard.application.watcher import InboxWatcher
+
+    settings = load_settings()
+    watched = inbox or settings.runtime.workspace / "inbox"
+    produced = outbox or settings.runtime.workspace / "outbox"
+    watcher = InboxWatcher(
+        settings=settings,
+        inbox=watched,
+        outbox=produced,
+        poll_seconds=poll_seconds,
+        on_event=lambda message: console.print(message),
+    )
+    console.print(f"watching [bold]{watched}[/bold], writing to [bold]{produced}[/bold]")
+    console.print("drop an audio file in the inbox; a sidecar .json may carry title, language, vocabulary")
+    asyncio.run(watcher.run_once() if once else watcher.run_forever())
+
+
+@application.command()
 def serve(
     host: Annotated[str | None, typer.Option("--host", help="Bind address")] = None,
     port: Annotated[int | None, typer.Option("--port", help="Bind port")] = None,
@@ -226,12 +257,14 @@ def join(
             minutes_writer = build_minutes_writer(settings.minutes)
         except Exception as error:
             console.print(f"[yellow]minutes generator unavailable: {error}[/yellow]")
+    composition = Composition(settings)
     service = MeetingService(
         settings=settings,
-        pipeline=Composition(settings).pipeline(),
+        pipeline=composition.pipeline(),
         capture=build_capture(settings.capture, settings.audio.sample_rate),
         minutes_writer=minutes_writer,
         biaser=VocabularyBiaser(),
+        artifact_store=composition.artifact_store(),
     )
 
     async def run() -> None:
@@ -247,6 +280,7 @@ def join(
 
 
 def main() -> None:
+    configure_logging(load_settings().runtime)
     application()
 
 

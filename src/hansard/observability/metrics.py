@@ -303,6 +303,10 @@ MEETINGS_SCHEDULED: Final[Counter] = _counter(
     "meetings_scheduled_total", "Meetings accepted for capture or file transcription"
 )
 
+JOB_STATE_TRANSITIONS: Final[Counter] = _counter(
+    "job_state_transitions_total", "Job lifecycle transitions, counted by the state entered", ("state",)
+)
+
 BOT_JOIN_ATTEMPTS: Final[Counter] = _counter(
     "bot_join_attempts_total", "Meeting join attempts by outcome", ("result",)
 )
@@ -376,6 +380,10 @@ def set_build_info(
 
 def record_meeting_scheduled() -> None:
     MEETINGS_SCHEDULED.inc()
+
+
+def record_job_state(state: str) -> None:
+    JOB_STATE_TRANSITIONS.labels(state=state).inc()
 
 
 def record_bot_join(result: str, duration_seconds: float | None = None) -> None:

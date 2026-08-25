@@ -89,6 +89,8 @@ Every extra is declared in `pyproject.toml`. Pick by what you intend to do.
 | Teams delivery through Microsoft Graph | `delivery-msal` (optional) | `msal`. Without it the client-credentials flow runs over `httpx` instead |
 | The browser bot | `capture` | `playwright`, plus the system packages above |
 | The HTTP API (`hansard serve`) | `api` | `fastapi`, `uvicorn`, `python-multipart` |
+| Transcribe with Whisper instead of Parakeet | `asr-whisper` | `faster-whisper` (CTranslate2); set `HANSARD_ASR__ENGINE=whisper` |
+| Store artefacts in S3-compatible object storage | `storage-s3` | `boto3`; set `HANSARD_STORAGE__BACKEND=s3` |
 | Prometheus metrics | `observability` | `prometheus-client` |
 | Run the benchmarks | `metrics` | `jiwer`, `scipy`, `meeteval`, `whisper-normalizer`, `unidecode` |
 | Contribute | `dev` | `ruff`, `mypy`, `pytest` and friends |
@@ -102,14 +104,22 @@ pip install "hansard[asr-onnx,diarization,delivery,metrics,observability]"
 `make install` does the same thing with `uv`, and `make install-dev` adds `dev`,
 `capture` and the Chromium download.
 
-### One extra that does not do what its name suggests
+### Choosing between Parakeet and Whisper
 
-**`asr-whisper`** installs `faster-whisper`, but the module the ASR registry
-imports for the `whisper` engine, `hansard.adapters.asr.whisper_engine`, is not
-present. `HANSARD_ASR__ENGINE=whisper` therefore fails with
-`ModuleNotFoundError: No module named 'hansard.adapters.asr.whisper_engine'`.
-Parakeet is the supported recogniser, and the reasons are in
+**Parakeet is the recommended recogniser** and the one the published
+[benchmarks](benchmarks.md) measure; the reasons are in
 [architecture](architecture.md#design-decisions-and-why).
+
+**`asr-whisper`** installs `faster-whisper` and enables
+`HANSARD_ASR__ENGINE=whisper`, which is useful when you already have Whisper
+weights staged, when you need a language Parakeet does not cover, or when you
+want word-level timestamps from a model you have already validated. Stage a
+CTranslate2 model directory (one containing `model.bin`) under
+`HANSARD_RUNTIME__MODELS_DIR` and the adapter loads it with
+`local_files_only=True`, so an air-gapped host stays air-gapped. Whisper
+hallucinates on silence, so the adapter always runs with VAD gating and the
+other mitigations described in
+[configuration](configuration.md#the-whisper-engine).
 
 ---
 

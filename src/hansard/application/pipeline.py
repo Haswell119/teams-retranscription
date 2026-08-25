@@ -12,9 +12,18 @@ from hansard.domain.meeting import MeetingRequest
 from hansard.domain.speakers import Diarization, Roster
 from hansard.domain.timespan import TimeSpan
 from hansard.domain.transcript import Transcript
+from hansard.observability.logging import StageLogger, get_logger, stage_span
+from hansard.observability.metrics import (
+    record_asr_failure,
+    record_diarization,
+    record_transcription,
+)
 from hansard.ports.asr import RecognitionHints, SpeechRecognizer
 from hansard.ports.diarization import DiarizationRequest, Diarizer, SpeakerAttributor, SpeakerNamer
 from hansard.ports.enhancement import AudioEnhancer, VoiceActivityDetector
+
+LOGGER = get_logger(__name__)
+UNKNOWN_COMPUTE = "unknown"
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,12 +66,14 @@ class TranscriptionPipeline:
         request: MeetingRequest,
         roster: Roster | None = None,
     ) -> PipelineOutcome:
+        logger = LOGGER.bind(meeting=request.identifier)
         timings: dict[str, float] = {}
         duration = clip.duration
-        with _timed(timings, "enhance"):
+        with _timed(timings, "enhance", logger):
             prepared = self.enhancer.enhance(clip) if self.enhancer else clip
-        with _timed(timings, "voice_activity"):
+        with _timed(timings, "voice_activity", logger) as measured:
             speech = self.detector.detect(prepared) if self.detector else ()
+            measured["speech_spans"] = float(len(speech))
         segments = plan_segments(speech, self.segmentation, prepared.duration)
         hints = RecognitionHints(
             language=request.language,
@@ -70,11 +81,14 @@ class TranscriptionPipeline:
             speaker_names=request.expected_participants,
             segments=segments,
         )
-        with _timed(timings, "recognise"):
-            transcript = self.recognizer.transcribe(prepared, hints)
+        with _timed(timings, "recognise", logger) as measured:
+            transcript = self._recognise(prepared, hints)
+            measured["utterances"] = float(len(transcript.utterances))
+            measured["words"] = float(transcript.word_count)
+        self._record_recognition(transcript, prepared.duration, timings["recognise"], request)
         diarization = Diarization()
         if self.diarizer is not None:
-            with _timed(timings, "diarise"):
+            with _timed(timings, "diarise", logger) as measured:
                 acoustic = self.diarization_enhancer.enhance(clip) if self.diarization_enhancer else clip
                 diarization = self.diarizer.diarize(
                     acoustic,
@@ -84,15 +98,18 @@ class TranscriptionPipeline:
                         known_speaker_count=_known_speaker_count(request, roster),
                     ),
                 )
+                measured["speakers"] = float(diarization.speaker_count)
+            record_diarization(diarization.speaker_count)
         if self.refiner is not None and diarization.turns and speech:
-            with _timed(timings, "refine"):
+            with _timed(timings, "refine", logger):
                 diarization = self.refiner.refine(diarization, speech)
-        with _timed(timings, "attribute"):
+        with _timed(timings, "attribute", logger):
             attributed = self.attributor.attribute(transcript, diarization)
         names: dict[str, str] = {}
         if self.namer is not None and diarization.turns:
-            with _timed(timings, "resolve_names"):
+            with _timed(timings, "resolve_names", logger) as measured:
                 names = self.namer.resolve_names(attributed, diarization, roster or Roster())
+                measured["named_speakers"] = float(len(names))
             attributed = attributed.renamed(names)
         return PipelineOutcome(
             transcript=attributed,
@@ -101,6 +118,30 @@ class TranscriptionPipeline:
             names=names,
             stage_seconds=timings,
             audio_duration=duration,
+        )
+
+    def _recognise(self, clip: AudioClip, hints: RecognitionHints) -> Transcript:
+        try:
+            return self.recognizer.transcribe(clip, hints)
+        except Exception as error:
+            record_asr_failure(type(error).__name__)
+            raise
+
+    def _record_recognition(
+        self,
+        transcript: Transcript,
+        audio_seconds: float,
+        processing_seconds: float,
+        request: MeetingRequest,
+    ) -> None:
+        profile = self.recognizer.profile
+        metadata = profile.metadata
+        record_transcription(
+            model=profile.name,
+            compute=metadata.get("compute_type", metadata.get("quantization", UNKNOWN_COMPUTE)),
+            processing_seconds=processing_seconds,
+            audio_seconds=audio_seconds,
+            language=transcript.language or request.language,
         )
 
 
@@ -115,9 +156,10 @@ def _known_speaker_count(request: MeetingRequest, roster: Roster | None) -> int 
 
 
 @contextmanager
-def _timed(store: dict[str, float], label: str) -> Iterator[None]:
+def _timed(store: dict[str, float], label: str, logger: StageLogger) -> Iterator[dict[str, float]]:
     started = time.perf_counter()
     try:
-        yield
+        with stage_span(logger, label) as measurements:
+            yield measurements
     finally:
         store[label] = round(time.perf_counter() - started, 3)

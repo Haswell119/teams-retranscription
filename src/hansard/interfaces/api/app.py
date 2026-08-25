@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,7 @@ from hansard.adapters.capture.registry import build_capture
 from hansard.adapters.delivery.dispatcher import dispatcher_from_settings
 from hansard.adapters.summarization.registry import build_minutes_writer
 from hansard.application.jobs import InMemoryJobStore, JobQueue, JobRecord
-from hansard.application.meeting_service import MeetingService
+from hansard.application.meeting_service import MeetingService, artifact_key
 from hansard.config import Settings, load_settings
 from hansard.domain.errors import ArtifactNotFound, ConfigurationError
 from hansard.domain.meeting import DeliveryChannel, DeliveryTarget, MeetingRequest
@@ -27,7 +28,15 @@ from hansard.interfaces.api.schemas import (
     MeetingSubmission,
     SpeakerShare,
 )
+from hansard.observability import metrics
+from hansard.observability.logging import configure_logging, get_logger
 from hansard.ports.delivery import Payload
+from hansard.ports.storage import ArtifactStore
+
+LOGGER = get_logger(__name__)
+METRICS_PATH = "/metrics"
+QUEUE_STREAM = "meetings"
+QUEUE_GROUP = "api"
 
 
 @dataclass(slots=True)
@@ -35,6 +44,7 @@ class Runtime:
     settings: Settings
     store: InMemoryJobStore
     queue: JobQueue
+    artifacts: ArtifactStore
 
 
 def _build_runtime(settings: Settings) -> Runtime:
@@ -45,12 +55,14 @@ def _build_runtime(settings: Settings) -> Runtime:
             minutes_writer = build_minutes_writer(settings.minutes)
         except (ConfigurationError, ImportError):
             minutes_writer = None
+    artifacts = composition.artifact_store()
     service = MeetingService(
         settings=settings,
         pipeline=composition.pipeline(),
         capture=build_capture(settings.capture, settings.audio.sample_rate),
         minutes_writer=minutes_writer,
         biaser=VocabularyBiaser(),
+        artifact_store=artifacts,
     )
     dispatcher = dispatcher_from_settings(settings.delivery)
 
@@ -62,7 +74,7 @@ def _build_runtime(settings: Settings) -> Runtime:
 
     store = InMemoryJobStore()
     queue = JobQueue(store=store, handler=handler, concurrency=settings.runtime.max_concurrent_meetings)
-    return Runtime(settings=settings, store=store, queue=queue)
+    return Runtime(settings=settings, store=store, queue=queue, artifacts=artifacts)
 
 
 def _payload(record: JobRecord) -> Payload:
@@ -74,6 +86,16 @@ def _payload(record: JobRecord) -> Payload:
     if not body and record.artifacts:
         body = record.artifacts[0].read_text(encoding="utf-8", errors="replace")
     return Payload(subject=record.request.title, body=body, body_format="markdown")
+
+
+async def _restored(runtime: Runtime, identifier: str, name: str) -> bytes:
+    key = artifact_key(identifier, name)
+    try:
+        with TemporaryDirectory() as directory:
+            restored = await runtime.artifacts.get(key, Path(directory) / name)
+            return restored.read_bytes()
+    except Exception as error:
+        raise HTTPException(404, f"unknown artifact {name}") from error
 
 
 def _summary(record: JobRecord) -> JobSummary:
@@ -116,7 +138,16 @@ def _detail(record: JobRecord) -> JobDetail:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     resolved = settings or load_settings()
+    configure_logging(resolved.runtime)
     runtime = _build_runtime(resolved)
+    metrics.set_build_info(
+        version=__version__,
+        component="api",
+        asr_engine=resolved.asr.engine,
+        asr_model=resolved.asr.model_id,
+        compute=resolved.asr.quantization,
+        language=resolved.asr.language,
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -159,6 +190,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         degraded = any(value == "missing" for value in checks.values())
         return HealthReport(status="degraded" if degraded else "ok", version=__version__, checks=checks)
 
+    if resolved.api.metrics_enabled and metrics.backend_available():
+
+        @application.get(METRICS_PATH)
+        async def prometheus_metrics() -> Response:
+            payload, content_type = metrics.render_latest()
+            return Response(content=payload, media_type=content_type)
+
     @application.get("/readyz")
     async def readyz() -> Response:
         ready = resolved.runtime.models_dir.is_dir() and shutil.which("ffmpeg") is not None
@@ -184,7 +222,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 for item in submission.delivery
             ),
         )
-        return _summary(await runtime.queue.submit(request))
+        summary = _summary(await runtime.queue.submit(request))
+        metrics.record_meeting_scheduled()
+        metrics.record_queue_depth(QUEUE_STREAM, QUEUE_GROUP, runtime.queue.pending)
+        LOGGER.info("meeting.submitted", meeting=summary.identifier, language=request.language or "auto")
+        return summary
 
     @meetings.get("", response_model=list[JobSummary])
     async def index(limit: int = 50) -> list[JobSummary]:
@@ -204,12 +246,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except ArtifactNotFound as error:
             raise HTTPException(404, str(error)) from error
         for path in record.artifacts:
-            if path.name == name:
-                return Response(
-                    content=path.read_bytes(),
-                    media_type="application/octet-stream",
-                    headers={"content-disposition": f'attachment; filename="{name}"'},
-                )
+            if path.name != name:
+                continue
+            content = path.read_bytes() if path.is_file() else await _restored(runtime, identifier, name)
+            return Response(
+                content=content,
+                media_type="application/octet-stream",
+                headers={"content-disposition": f'attachment; filename="{name}"'},
+            )
         raise HTTPException(404, f"unknown artifact {name}")
 
     application.include_router(meetings)

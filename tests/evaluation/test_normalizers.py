@@ -140,3 +140,39 @@ def test_normalizer_factory_dispatches_on_language():
     assert isinstance(normalizer_for("en_US"), EnglishNormalizer)
     assert isinstance(normalizer_for("de"), BasicNormalizer)
     assert isinstance(normalizer_for(None), BasicNormalizer)
+
+
+@pytest.mark.parametrize(
+    ("abbreviated", "expanded"),
+    [
+        ("Mme Kirchner", "mme kirchner"),
+        ("M. Dupont", "m. dupont"),
+        ("Dr Martin", "dr martin"),
+        ("Pr. Curie", "pr curie"),
+        ("St-Étienne", "st-étienne"),
+    ],
+)
+def test_french_titles_expand_independently_of_case(abbreviated, expanded):
+    assert FRENCH.normalize(abbreviated) == FRENCH.normalize(expanded)
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    ["Premier ministre", "Premièrement", "Stéréotype", "Drapeau", "Mlleret", "Stern"],
+)
+def test_french_titles_do_not_swallow_longer_words(phrase):
+    assert FRENCH.normalize(phrase) == phrase.lower()
+
+
+@pytest.mark.parametrize("written", ["30 %", "trente pour cent", "trente pourcent", "trente pour-cent"])
+def test_french_percent_spellings_converge(written):
+    assert FRENCH.normalize(written) == "trente pour cent"
+
+
+@pytest.mark.parametrize("token", ["m16", "a320", "35mm", "covid19"])
+def test_french_numbers_glued_to_letters_are_left_alone(token):
+    assert FRENCH.normalize(f"le {token} arrive") == f"le {token} arrive"
+
+
+def test_french_standalone_numbers_still_expand():
+    assert FRENCH.normalize("le 35 mm en 2005") == "le trente cinq mm en deux mille cinq"

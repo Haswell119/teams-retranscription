@@ -55,7 +55,7 @@ embedding model, or retune clustering, **without rebuilding the model bundle**:
 diarization:
   engine: sherpa
   embeddingModel: nemo_en_titanet_small.onnx   # relative to models.mountPath
-  clusteringThreshold: 0.95    # higher = fewer speakers; calibrated for TitaNet
+  clusteringThreshold: 0.99    # higher = fewer speakers; calibrated for TitaNet
   minimumSpeakerSeconds: 3.0   # shorter clusters are absorbed into their neighbour
   maxSpeakers: 8
 ```

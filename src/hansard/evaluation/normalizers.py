@@ -10,7 +10,7 @@ from typing import Protocol, cast, runtime_checkable
 from hansard.evaluation.english_numbers import normalize_digit_groups, words_to_digits
 from hansard.evaluation.french_numbers import expand_numbers
 
-NORMALIZER_VERSION = "hansard-normalizers-1.0.0"
+NORMALIZER_VERSION = "hansard-normalizers-1.1.0"
 
 _BRACKETED = re.compile(r"[<\[][^>\]]*[>\]]")
 _PARENTHESISED = re.compile(r"\(([^)]+?)\)")
@@ -18,8 +18,8 @@ _WHITESPACE = re.compile(r"\s+")
 _APOSTROPHES = re.compile("[\u2018\u2019\u02bc\u00b4`\u201b]")
 _ENGLISH_FILLERS = re.compile(r"\b(hmm|mm|mhm|mmm|uh|um)\b")
 _FRENCH_FILLERS = re.compile(r"\b(euh+|heu|hein|ben|bah|hum+|hm+|mmh)\b")
-_FRENCH_ELISIONS = re.compile(r"\b(l|d|j|n|s|t|c|m|qu|jusqu|lorsqu|puisqu|quoiqu|aujourd)'")
 _FRENCH_NUMBER_PLURALS = re.compile(r"\b(vingt|cent)s\b")
+_FRENCH_PERCENT_WORD = re.compile(r"\bpour[-\s]?cents?\b")
 _FRENCH_ISSUE_NUMBER = re.compile(r"n\s*[°ºo]\s*(?=\d)")
 _SPACE_BEFORE_APOSTROPHE = re.compile(r"\s+'")
 _TRAILING_SYMBOL = re.compile(r"[.$¢€£]([^0-9])")
@@ -131,17 +131,19 @@ _BRITISH_TO_AMERICAN: dict[str, str] = {
     "dreamt": "dreamed",
 }
 
+_NOT_FOLLOWED_BY_LETTER = r"(?![^\W\d_])"
+
 _FRENCH_TITLES: tuple[tuple[str, str], ...] = (
-    (r"\bMM\.", "messieurs"),
-    (r"\bM\.", "monsieur"),
-    (r"\bMmes\.?", "mesdames"),
-    (r"\bMme\.?", "madame"),
-    (r"\bMlles\.?", "mesdemoiselles"),
-    (r"\bMlle\.?", "mademoiselle"),
-    (r"\bDr\.?", "docteur"),
-    (r"\bPr\.?", "professeur"),
-    (r"\bSte\.?", "sainte"),
-    (r"\bSt\.?", "saint"),
+    (r"\bmm\." + _NOT_FOLLOWED_BY_LETTER, "messieurs"),
+    (r"\bm\." + _NOT_FOLLOWED_BY_LETTER, "monsieur"),
+    (r"\bmmes\.?" + _NOT_FOLLOWED_BY_LETTER, "mesdames"),
+    (r"\bmme\.?" + _NOT_FOLLOWED_BY_LETTER, "madame"),
+    (r"\bmlles\.?" + _NOT_FOLLOWED_BY_LETTER, "mesdemoiselles"),
+    (r"\bmlle\.?" + _NOT_FOLLOWED_BY_LETTER, "mademoiselle"),
+    (r"\bdr\.?" + _NOT_FOLLOWED_BY_LETTER, "docteur"),
+    (r"\bpr\.?" + _NOT_FOLLOWED_BY_LETTER, "professeur"),
+    (r"\bste\.?" + _NOT_FOLLOWED_BY_LETTER, "sainte"),
+    (r"\bst\.?" + _NOT_FOLLOWED_BY_LETTER, "saint"),
 )
 
 _FRENCH_SYMBOLS: tuple[tuple[str, str], ...] = (
@@ -218,15 +220,14 @@ class FrenchNormalizer:
         result = unicodedata.normalize("NFKC", text)
         result = _BRACKETED.sub(" ", result)
         result = _PARENTHESISED.sub(" ", result)
-        result = _APOSTROPHES.sub("'", result)
+        result = _APOSTROPHES.sub("'", result).lower()
         for pattern, replacement in _FRENCH_TITLES:
             result = re.sub(pattern, replacement, result)
-        result = result.lower()
         result = _FRENCH_ISSUE_NUMBER.sub("numéro ", result)
         for pattern, replacement in _FRENCH_SYMBOLS:
             result = re.sub(pattern, replacement, result)
+        result = _FRENCH_PERCENT_WORD.sub(" pour cent ", result)
         result = result.replace("œ", "oe").replace("æ", "ae")
-        result = _FRENCH_ELISIONS.sub(r"\1 ", result)
         result = result.replace("'", " ")
         if self.expand_numbers:
             result = expand_numbers(result)

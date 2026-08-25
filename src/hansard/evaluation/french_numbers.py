@@ -34,7 +34,7 @@ _THOUSAND_SEPARATOR = re.compile(r"(?<=\d)[\s.](?=\d{3}(?!\d))")
 _CLOCK = re.compile(r"\b(\d{1,2})\s*h\s*(\d{1,2})?\b")
 _ORDINAL = re.compile(r"\b(\d+)(ers|ères|res|èmes|emes|er|ère|re|ème|eme|nde|nds|nd|es|e)\b")
 _DECIMAL = re.compile(r"\b(\d+),(\d+)\b")
-_INTEGER = re.compile(r"\d+")
+_INTEGER = re.compile(r"(?<![^\W_])\d+(?![^\W_])")
 _FEMININE_SUFFIXES = ("ère", "re", "ères", "res", "nde", "ndes")
 
 

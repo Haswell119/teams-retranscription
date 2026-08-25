@@ -128,8 +128,11 @@ class StorageSettings(BaseModel):
     root: Path = Path("artifacts")
     endpoint_url: str | None = None
     bucket: str | None = None
+    region: str = "us-east-1"
     access_key: SecretStr | None = None
     secret_key: SecretStr | None = None
+    ca_bundle: Path | None = None
+    force_path_style: bool = True
     retention_days: int = 30
 
 
