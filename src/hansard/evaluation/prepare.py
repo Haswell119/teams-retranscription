@@ -337,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
             path = synthesise_meeting(recipe, speakers, output)
             print(f"{recipe.name} -> {path}")
 
-    if not arguments.skip_french_meetings:
+    if not arguments.skip_meetings and not arguments.skip_french_meetings:
         try:
             root = prepare_mls_french_corpus(output)
             speakers = _collect_mls_speakers(root)

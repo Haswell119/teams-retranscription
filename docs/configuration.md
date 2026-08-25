@@ -85,7 +85,7 @@ Prefix `HANSARD_AUDIO__`.
 | `TARGET_LUFS` | float | `-23.0` | The loudness target, in LUFS. `-23` is the EBU broadcast reference. Raise it towards `-18` for very quiet conference-room recordings; going higher trades headroom for nothing useful. |
 | `HIGH_PASS_HZ` | float | `60.0` | Corner frequency of the high-pass filter, applied to **both** chains. Raise to 80–100 Hz for recordings with heavy HVAC rumble. Set to `0` to disable filtering entirely, which also removes the only filter the diarization chain has. |
 | `DENOISE` | bool | `false` | Adds ffmpeg `afftdn` to the recognition chain. Off by default: on meeting audio it removes as much speech detail as noise. Try it only on a recording with constant, stationary hiss. |
-| `MAX_SEGMENT_SECONDS` | float | `120.0` | Longest chunk handed to the recogniser. Longer chunks give the model more context and cost memory: measured on an AMI meeting, 120 s beats 28 s by 4.1 points of word error rate and costs about 1.9 GB more at peak. Lower it on small nodes and expect worse transcription. See [benchmarks](benchmarks.md#5-engineering-findings-worth-knowing). |
+| `MAX_SEGMENT_SECONDS` | float | `120.0` | Longest chunk handed to the recogniser. Longer chunks give the model more context and cost memory: measured on an AMI meeting, 120 s beats 28 s by 4.1 points of word error rate and costs about 1.9 GB more at peak. Lower it on small nodes and expect worse transcription. See [benchmarks](benchmarks.md#6-engineering-findings-worth-knowing). |
 | `MIN_SEGMENT_SECONDS` | float | `1.0` | Segments shorter than this are dropped before recognition. Raise it if you see one-word phantom utterances between real turns. |
 | `SEGMENT_PADDING_SECONDS` | float | `0.2` | Padding added either side of each speech segment, so a word is not clipped at the boundary. |
 
@@ -95,7 +95,7 @@ Prefix `HANSARD_AUDIO__`.
 > 14.75 %. Dynamic-range processing changes the spectral envelope over time,
 > which is exactly the signal a speaker-embedding model reads. Hansard therefore
 > runs two chains from the same source — full enhancement for recognition, high
-> pass only for diarization. Full numbers in [benchmarks](benchmarks.md#5-engineering-findings-worth-knowing).
+> pass only for diarization. Full numbers in [benchmarks](benchmarks.md#6-engineering-findings-worth-knowing).
 
 ---
 
@@ -122,7 +122,7 @@ Prefix `HANSARD_ASR__`.
 | --- | --- | --- | --- |
 | `ENGINE` | `parakeet` \| `whisper` \| `qwen3` \| `null` | `parakeet` | `parakeet` and `qwen3` both build the ONNX recogniser. `whisper` builds the faster-whisper recogniser and needs the `asr-whisper` extra — see below. `null` produces an empty transcript, for testing the rest of the pipeline. |
 | `MODEL_ID` | str | `nemo-parakeet-tdt-0.6b-v3` | Directory name under `runtime.models_dir`, and the id passed to `onnx-asr`. |
-| `QUANTIZATION` | `int8` \| `none` | `int8` | `int8` is what the model bundle contains: about 600 MB on disk and roughly 1.4 GB resident. `none` loads float32 weights, needs roughly 2× the memory, and is **substantially more accurate on French** — see the quality profile below. The shipped bundle does not include the float32 files, so `none` only works once you have fetched them yourself. |
+| `QUANTIZATION` | `none` \| `int8` | `none` | `none` is the shipped default: float32 weights, about 2.5 GB on disk and 2.8 GB resident, and the numbers published in [benchmarks](benchmarks.md). `int8` is the opt-in low-memory profile: about 640 MB on disk and 1.4 GB resident, **no faster**, and about 2.0 WER points worse on French. Both sets of weights are in the bundle, so switching needs no download. See the quality profile below. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | `auto` selects the CUDA execution provider if ONNX Runtime reports one, and falls back to CPU. Pin to `cpu` when a GPU is present but you want it left for something else. |
 | `BEAM_SIZE` | int | `1` | Only reaches the Whisper adapter. It has no effect on Parakeet. |
 | `BATCH_SECONDS` | float | `240.0` | Ceiling on the total audio held in flight for one decoding call. This is what actually bounds memory, because it holds regardless of how long individual segments are. `0` disables it and leaves only `BATCH_SIZE`. |
@@ -134,34 +134,41 @@ Prefix `HANSARD_ASR__`.
 ### Choosing a quantization: the accuracy profile
 
 `QUANTIZATION` is the single setting with the largest effect on transcription
-quality, and the trade-off is **not** the one the name suggests. Measured on this
-repository's own corpora with `INTRA_OP_THREADS=4` and `BATCH_SIZE=4`:
+quality, and the trade-off is **not** the one the name suggests. `none` —
+float32 — is the shipped default. Measured on this repository's own corpora with
+`INTRA_OP_THREADS=4` and `BATCH_SIZE=4`:
 
-| Corpus | `int8` WER / CER | `none` (float32) WER / CER |
+| Corpus | `none` (float32, default) WER / CER | `int8` WER / CER |
 | --- | --- | --- |
-| FLEURS `fr_fr`, 80 utterances | 6.67 % / 2.25 % | **4.63 % / 1.62 %** |
-| FLEURS `en_us`, 80 utterances | 4.59 % / 2.27 % | **4.47 % / 1.99 %** |
-| LibriSpeech dev-clean, 73 utterances | 3.93 % / 1.50 % | **3.34 % / 1.19 %** |
-| Synthetic 9-speaker meeting | 8.29 % / 7.65 % | **3.67 % / 2.56 %** |
+| FLEURS `fr_fr`, 80 utterances | **4.63 % / 1.62 %** | 6.67 % / 2.25 % |
+| FLEURS `en_us`, 80 utterances | **4.47 % / 1.99 %** | 4.59 % / 2.27 % |
+| LibriSpeech dev-clean, 73 utterances | **3.34 % / 1.19 %** | 3.93 % / 1.50 % |
+| Synthetic 9-speaker meeting, WER / cpWER | **3.67 % / 6.51 %** | 8.29 % / 11.12 % |
 
 Cost, same runs:
 
-| | `int8` | `none` (float32) |
+| | `none` (float32, default) | `int8` |
 | --- | --- | --- |
-| Peak resident memory, read speech | 1.38 GB | 2.80 GB |
-| Peak resident memory, meeting pipeline | 2.65 GB | 3.59 GB |
-| CPU-seconds per second of audio | 0.650 | 0.645 |
+| On disk | 2.5 GB | 640 MB |
+| Peak resident memory, read speech | 2.74 – 2.86 GB | 1.38 – 1.40 GB |
+| Peak resident memory, meeting pipeline | 3.21 – 3.59 GB | 2.09 – 2.73 GB |
+| CPU-seconds per second of audio | 0.645 | 0.650 |
 
 **Float32 is not slower.** On an AVX-512/VNNI Xeon the two configurations cost the
 same CPU time to within one percent, because the dynamic quantize/dequantize work
-around each INT8 matmul cancels out the arithmetic saving. INT8 buys memory, and
-it pays for that memory in accuracy — most visibly on French read speech
-(+2.0 WER points) and on multi-speaker meetings, where INT8 drops whole segments
-rather than mis-transcribing them: the 9-speaker fixture loses 66 reference words
-to deletions at `int8` against 23 at `none`.
+around each INT8 matmul cancels out the arithmetic saving. That is why the
+default changed: INT8 buys memory, and it pays for that memory in accuracy —
+most visibly on French read speech (+2.04 WER points) and on multi-speaker
+meetings, where the 9-speaker fixture more than doubles its word error rate. Part
+of the loss is words dropped rather than misheard: on FLEURS `fr_fr`, `int8`
+deletes 22 reference words against 14 at `none`.
 
-Use `int8` when the container has less than about 4 GB for the recogniser.
-Use `none` everywhere else, and always for French-language meetings:
+Speaker counting and diarization error rate are identical under both profiles —
+the diarizer does not use the recognition weights — so what you are trading is
+transcription accuracy alone.
+
+Use the default `none` everywhere you can, and **always for French-language
+meetings**:
 
 ```dotenv
 HANSARD_ASR__ENGINE=parakeet
@@ -170,11 +177,23 @@ HANSARD_ASR__BATCH_SIZE=4
 HANSARD_ASR__INTRA_OP_THREADS=4
 ```
 
-This requires `encoder-model.onnx`, `encoder-model.onnx.data` and
-`decoder_joint-model.onnx` from
+Use `int8` when the container has less than about 4 GB for the recogniser, and
+accept roughly two points of French word error rate for it:
+
+```dotenv
+HANSARD_ASR__ENGINE=parakeet
+HANSARD_ASR__QUANTIZATION=int8
+HANSARD_ASR__BATCH_SIZE=2
+HANSARD_ASR__INTRA_OP_THREADS=4
+```
+
+Both profiles ship in the model bundle — `encoder-model.onnx`,
+`encoder-model.onnx.data` and `decoder_joint-model.onnx` for float32, plus
+`encoder-model.int8.onnx` and `decoder_joint-model.int8.onnx` for INT8, all from
 [`istupakov/parakeet-tdt-0.6b-v3-onnx`](https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx)
-next to the INT8 files in `runtime.models_dir`, or a cache warm enough for
-`onnx-asr` to find them. The bundle shipped today carries only the INT8 files.
+and pinned by digest in `deploy/docker/models.manifest`. Switching between them
+is an environment variable and a restart, with no network access. The layout is
+in [installation](installation.md#the-expected-layout).
 
 ### Alternative models
 
@@ -195,8 +214,9 @@ decoding is greedy and there is no decode-side knob to turn.
 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2) locally.
 Install the extra first: `pip install 'hansard[asr-whisper]'`. `MODEL_ID` is a
 Whisper model name (`large-v3-turbo`, `small`, `tiny`, `medium.en`, …) or a
-Hugging Face id such as `Systran/faster-whisper-large-v3`. `QUANTIZATION=int8`
-becomes the CTranslate2 `int8` compute type, `none` becomes `float32`, and
+Hugging Face id such as `Systran/faster-whisper-large-v3`. `QUANTIZATION=none`
+— the default — becomes the CTranslate2 `float32` compute type, `int8` becomes
+the `int8` compute type, and
 `DEVICE=cuda` moves the model to the GPU. `BEAM_SIZE` and `LANGUAGE` reach the
 decoder directly; leave `LANGUAGE` unset to let Whisper detect French or English
 per segment.
@@ -253,7 +273,7 @@ different embedding model**. If you change `EMBEDDING_MODEL`, re-run
 measurement: on the same fixtures, TitaNet gave 0.01 % speaker confusion and
 CAM++ gave 47 %, and CAM++ failed even when handed the correct number of
 clusters. The evidence is in
-[benchmarks](benchmarks.md#5-engineering-findings-worth-knowing).
+[benchmarks](benchmarks.md#6-engineering-findings-worth-knowing).
 
 ---
 
@@ -469,7 +489,7 @@ Prefix `HANSARD_RUNTIME__`.
 | `WORKSPACE` | path | `/var/lib/hansard` | Scratch directory for captured audio and intermediate files. On a bare-metal install point it somewhere your user can write. |
 | `MODELS_DIR` | path | `/var/lib/hansard/models` | Root of the model bundle. **The setting you will change first on a laptop.** The container images override it to `/models`. Layout in [installation](installation.md#the-expected-layout). |
 | `ALLOW_MODEL_DOWNLOADS` | bool | `false` | When `false`, a missing model is a hard error rather than a silent download. Leave it off: it is the property that makes an air gap enforceable, and CI runs transcription with the network disabled to prove it. |
-| `MAX_CONCURRENT_MEETINGS` | int | `2` | Number of concurrent job workers inside one `hansard serve` process. Each concurrent meeting holds its own recogniser in memory, so budget roughly 1.4 GB per unit before raising it. It does not apply to `hansard transcribe` or `hansard join`, which process one meeting each. |
+| `MAX_CONCURRENT_MEETINGS` | int | `2` | Number of concurrent job workers inside one `hansard serve` process. Each concurrent meeting holds its own recogniser in memory, so budget roughly 2.8 GB per unit at the float32 default, or 1.4 GB with `HANSARD_ASR__QUANTIZATION=int8`, before raising it. It does not apply to `hansard transcribe` or `hansard join`, which process one meeting each. |
 | `LOG_LEVEL` | str | `INFO` | Level applied to Hansard and to every third-party library, through the stdlib root logger. `DEBUG` adds one `stage.started` event per pipeline stage. |
 | `LOG_FORMAT` | `json` \| `console` | `json` | `json` emits one JSON object per line on stdout; `console` emits a readable aligned line. Both go through the redaction and content-elision processors. See [observability](observability.md). |
 | `TELEMETRY_ENABLED` | bool | `false` | Cannot be set to `true`. See above. |
@@ -491,7 +511,7 @@ HANSARD_RUNTIME__ALLOW_MODEL_DOWNLOADS=false
 
 HANSARD_CAPTURE__ENGINE=file
 HANSARD_ASR__ENGINE=parakeet
-HANSARD_ASR__QUANTIZATION=int8
+HANSARD_ASR__QUANTIZATION=none
 HANSARD_ASR__DEVICE=cpu
 HANSARD_ASR__BATCH_SIZE=4
 HANSARD_ASR__INTRA_OP_THREADS=4
@@ -502,10 +522,12 @@ HANSARD_MINUTES__ENABLED=false
 HANSARD_DELIVERY__OUTPUT_DIR=/home/you/hansard-artifacts
 ```
 
-Expect roughly 3× real time and about 2.9 GB peak resident memory for the full
-pipeline — a 60-minute meeting in about 20 minutes. Leaving
-`INTRA_OP_THREADS` at `0` lets ONNX Runtime take every core; set it explicitly if
-you want to keep using the machine.
+Expect a real-time factor of roughly 0.6–0.8 and up to 3.6 GB peak resident
+memory for the full pipeline — a 60-minute recording in about 44 minutes. If the
+machine cannot spare that much memory, add
+`HANSARD_ASR__QUANTIZATION=int8` and expect about two points more word error rate
+in French. Leaving `INTRA_OP_THREADS` at `0` lets ONNX Runtime take every core;
+set it explicitly if you want to keep using the machine.
 
 ### GPU server
 
@@ -516,7 +538,7 @@ HANSARD_RUNTIME__MODELS_DIR=/models
 HANSARD_RUNTIME__ALLOW_MODEL_DOWNLOADS=false
 
 HANSARD_ASR__DEVICE=cuda
-HANSARD_ASR__QUANTIZATION=int8
+HANSARD_ASR__QUANTIZATION=none
 HANSARD_ASR__BATCH_SIZE=16
 HANSARD_ASR__INTRA_OP_THREADS=8
 HANSARD_DIARIZATION__DEVICE=cuda
@@ -574,7 +596,7 @@ An archival recording where the transcript has to be right.
 HANSARD_RUNTIME__MODELS_DIR=/models
 
 HANSARD_ASR__ENGINE=parakeet
-HANSARD_ASR__QUANTIZATION=int8
+HANSARD_ASR__QUANTIZATION=none
 HANSARD_ASR__BATCH_SIZE=1
 HANSARD_ASR__INTRA_OP_THREADS=0
 

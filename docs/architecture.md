@@ -38,7 +38,7 @@ Two reasons, and neither is architectural taste.
 
 **Every model is replaceable, and that is not hypothetical.** The choice of
 speaker-embedding model moved speaker confusion from 47 % to 0.01 % on identical
-audio ([benchmarks](benchmarks.md#5-engineering-findings-worth-knowing)). A
+audio ([benchmarks](benchmarks.md#6-engineering-findings-worth-knowing)). A
 project that had welded one embedding model into its diarization code would have
 had to rewrite that code to find that out. Here it is a filename in a setting.
 The same applies to the recogniser, the summariser and the delivery channel: if

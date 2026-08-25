@@ -49,13 +49,13 @@ class DiarizationSettings(BaseModel):
     segmentation_model: str = "sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx"
     embedding_model: str = "nemo_en_titanet_small.onnx"
     clustering_threshold: float = 0.99
-    minimum_speaker_seconds: float = 3.0
+    minimum_speaker_seconds: float = 10.0
     max_speakers: int = 8
     min_speakers: int = 1
     device: Device = "auto"
     speech_coverage_refinement: bool = True
     cluster_consolidation: bool = True
-    merge_similarity: float = 0.60
+    merge_similarity: float = 0.70
     maximum_turn_extension: float = 2.5
 
 

@@ -90,9 +90,13 @@ class SherpaDiarizer:
             for segment in outcome
             if segment.end > segment.start
         )
-        turns = _absorb_marginal_speakers(turns, self.minimum_speaker_seconds)
+        turns = _absorb_marginal_speakers(turns, _absorption_floor(request, self.minimum_speaker_seconds))
         labels = tuple(dict.fromkeys(turn.label for turn in turns))
         return Diarization(turns=turns, labels=labels)
+
+
+def _absorption_floor(request: DiarizationRequest, configured: float) -> float:
+    return 0.0 if request.known_speaker_count else configured
 
 
 def _bounded_cluster_count(request: DiarizationRequest) -> int:
