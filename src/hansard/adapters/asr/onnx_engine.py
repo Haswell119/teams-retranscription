@@ -132,8 +132,12 @@ class OnnxRecognizer:
             raise RecognitionError(f"ONNX ASR decoding failed: {error}") from error
         if not isinstance(results, list):
             results = [results]
+        if len(results) != len(spans):
+            raise RecognitionError(
+                f"ONNX ASR returned {len(results)} results for {len(spans)} speech segments"
+            )
         utterances: list[Utterance] = []
-        for result, span in zip(results, spans, strict=False):
+        for result, span in zip(results, spans, strict=True):
             stream = TokenStream(
                 tokens=tuple(result.tokens or ()),
                 timestamps=tuple(result.timestamps or ()),

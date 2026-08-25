@@ -40,3 +40,20 @@ def test_a_disabled_budget_falls_back_to_the_count_limit():
 
 def test_no_segments_yields_no_batches():
     assert _batches([], size=4, seconds=240.0) == []
+
+
+def test_a_batch_budget_accounts_for_padding_to_the_longest_segment():
+    batches = _batches(spans_of([120.0, 1.5, 2.0, 3.0]), size=4, seconds=240.0)
+    for batch in batches:
+        longest = max(span.duration for span in batch)
+        assert len(batch) * longest <= 240.0
+
+
+def test_a_long_segment_does_not_drag_short_ones_into_its_padding():
+    batches = _batches(spans_of([120.0, 1.5, 1.5, 1.5]), size=4, seconds=240.0)
+    assert [len(batch) for batch in batches] == [2, 2]
+
+
+def test_uniform_short_segments_still_fill_the_count_limit():
+    batches = _batches(spans_of([30.0] * 8), size=4, seconds=240.0)
+    assert [len(batch) for batch in batches] == [4, 4]
