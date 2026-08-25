@@ -23,6 +23,13 @@ opens the **Teams web client**, and joins the meeting like any other web partici
   does not expose per-participant audio to any web client, so who-said-what is reconstructed from
   those signals and from local diarisation.
 
+The participant list does one more thing worth knowing about, because it is the single biggest
+quality difference between a meeting the bot joined and a recording dropped on it afterwards: it
+caps how many distinct speakers the transcript can contain. The bot excludes itself from that
+count, and the cap is an **upper bound**, never a target — it can bring an over-count back down,
+but it will never split one person in two to reach the number of people in the room. Meetings where
+several invitees never say a word are therefore handled correctly.
+
 Everything after the browser — speech recognition, diarisation, minutes — runs locally. No audio and
 no text leave your organisation, unless you deliberately enable the Microsoft Graph fallback
 described in section 8.
