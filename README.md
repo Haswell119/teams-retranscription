@@ -194,6 +194,20 @@ Hansard still produces decisions, action items with owners and deadlines, open
 questions and per-topic summaries using deterministic extraction. It never
 returns an empty recap.
 
+Here is that no-LLM path on a French meeting
+([full example](docs/examples/worked-example-minutes-fr.md)):
+
+| Owner | Action | Due |
+| --- | --- | --- |
+| Sofia Ben Ali | Communiqué de presse, relecture vendredi prochain | 2026-06-12 |
+| Marc Lefèvre | Périmètre détaillé demain matin | 2026-06-04 |
+| Sofia Ben Ali | Visuels de l'agence pour la réunion | 2026-06-04 |
+
+Relative deadlines resolve against the meeting date, not the day the transcript
+happened to be processed. Two decisions, two open questions and a per-topic
+breakdown come out of the same pass, and every item carries the timecode and the
+speaker it came from.
+
 ## Models
 
 Everything ships under a licence that permits commercial use. Nothing is gated.
