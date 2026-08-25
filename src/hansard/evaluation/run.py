@@ -10,7 +10,15 @@ from hansard.adapters.asr.onnx_engine import OnnxRecognizer
 from hansard.adapters.audio import load_clip
 from hansard.config import Settings
 from hansard.domain.meeting import MeetingRequest
+from hansard.domain.speakers import Diarization
+from hansard.domain.transcript import Transcript
 from hansard.evaluation.ami import discover_meetings
+from hansard.evaluation.corpora import (
+    SUMM_RE_LANGUAGE,
+    meeting_diarization,
+    meeting_transcript,
+    read_meeting,
+)
 from hansard.evaluation.datasets import load_manifest, load_reference_json
 from hansard.evaluation.metrics.speaker import (
     concatenated_minimum_permutation_wer,
@@ -58,7 +66,12 @@ def _percent(value: float) -> float:
 
 
 def run_asr(options: RunOptions) -> dict[str, object]:
-    engine = OnnxRecognizer(quantization="int8", batch_size=4, intra_op_threads=options.threads)
+    settings = Settings()
+    engine = OnnxRecognizer(
+        quantization=settings.asr.quantization,
+        batch_size=settings.asr.batch_size,
+        intra_op_threads=options.threads,
+    )
     engine.warm_up()
     rows: list[dict[str, object]] = []
     for filename, language, label in ASR_CORPORA:
@@ -98,9 +111,10 @@ def run_asr(options: RunOptions) -> dict[str, object]:
                 "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
             }
         )
+    precision = "float32" if settings.asr.quantization == "none" else settings.asr.quantization
     return {
         "benchmark": "asr",
-        "model": "nemo-parakeet-tdt-0.6b-v3 int8 ONNX",
+        "model": f"{settings.asr.model_id} {precision} ONNX",
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
     }
@@ -167,58 +181,104 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
     }
 
 
+def _score_corpus_meeting(
+    settings: Settings,
+    identifier: str,
+    audio_path: Path,
+    reference: Transcript,
+    reference_diarization: Diarization,
+    language: str,
+) -> dict[str, object]:
+    normalizer = normalizer_for(language)
+    clip = load_clip(audio_path)
+    pipeline = Composition(settings).pipeline()
+    request = MeetingRequest(audio_path=audio_path, title=identifier, language=language)
+    started = time.perf_counter()
+    with ResourceProbe() as probe:
+        outcome = pipeline.run(clip, request)
+    elapsed = time.perf_counter() - started
+    hypothesis = outcome.transcript
+    scored = word_error_rate(reference.text, hypothesis.text, normalizer)
+    strict = diarization_error_rate(reference_diarization, outcome.diarization, collar=0.0)
+    lenient = diarization_error_rate(reference_diarization, outcome.diarization, collar=0.25)
+    return {
+        "meeting": identifier,
+        "language": language,
+        "duration_minutes": round(clip.duration / 60, 1),
+        "reference_speakers": len({turn.label for turn in reference_diarization.turns}),
+        "detected_speakers": outcome.diarization.speaker_count,
+        "reference_words": reference.word_count,
+        "hypothesis_words": hypothesis.word_count,
+        "wer_percent": _percent(scored.wer),
+        "cer_percent": _percent(scored.cer),
+        "cpwer_percent": _percent(
+            concatenated_minimum_permutation_wer(reference, hypothesis, normalizer).wer
+        ),
+        "tcpwer_percent": _percent(time_constrained_cpwer(reference, hypothesis, normalizer, collar=5.0).wer),
+        "wder_percent": _percent(word_diarization_error_rate(reference, hypothesis, normalizer)),
+        "der_percent": _percent(strict.der),
+        "der_collar_percent": _percent(lenient.der),
+        "jer_percent": _percent(jaccard_error_rate(reference_diarization, outcome.diarization).jer),
+        "der_missed_percent": _percent(strict.missed_rate),
+        "der_false_alarm_percent": _percent(strict.false_alarm_rate),
+        "der_confusion_percent": _percent(strict.confusion_rate),
+        "reference_overlap_percent": _percent(overlap_ratio(reference_diarization)),
+        "real_time_factor": round(elapsed / clip.duration, 4),
+        "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
+        "stage_seconds": outcome.stage_seconds,
+    }
+
+
 def run_ami(options: RunOptions) -> dict[str, object]:
     audio_root = options.data_dir / "ami"
     annotations = audio_root / "annotations"
     settings = Settings()
     settings.asr.intra_op_threads = options.threads
-    normalizer = normalizer_for("en")
     rows: list[dict[str, object]] = []
     for meeting in discover_meetings(audio_root, annotations):
-        clip = load_clip(meeting.audio_path)
-        pipeline = Composition(settings).pipeline()
-        request = MeetingRequest(audio_path=meeting.audio_path, title=meeting.identifier, language="en")
-        started = time.perf_counter()
-        with ResourceProbe() as probe:
-            outcome = pipeline.run(clip, request)
-        elapsed = time.perf_counter() - started
-        reference = meeting.reference
-        hypothesis = outcome.transcript
-        scored = word_error_rate(reference.text, hypothesis.text, normalizer)
-        strict = diarization_error_rate(meeting.diarization, outcome.diarization, collar=0.0)
-        lenient = diarization_error_rate(meeting.diarization, outcome.diarization, collar=0.25)
-        rows.append(
-            {
-                "meeting": meeting.identifier,
-                "condition": AMI_CONDITION,
-                "duration_minutes": round(clip.duration / 60, 1),
-                "reference_speakers": meeting.speaker_count,
-                "detected_speakers": outcome.diarization.speaker_count,
-                "reference_words": reference.word_count,
-                "wer_percent": _percent(scored.wer),
-                "cer_percent": _percent(scored.cer),
-                "cpwer_percent": _percent(
-                    concatenated_minimum_permutation_wer(reference, hypothesis, normalizer).wer
-                ),
-                "tcpwer_percent": _percent(
-                    time_constrained_cpwer(reference, hypothesis, normalizer, collar=5.0).wer
-                ),
-                "wder_percent": _percent(word_diarization_error_rate(reference, hypothesis, normalizer)),
-                "der_percent": _percent(strict.der),
-                "der_collar_percent": _percent(lenient.der),
-                "jer_percent": _percent(jaccard_error_rate(meeting.diarization, outcome.diarization).jer),
-                "der_missed_percent": _percent(strict.missed_rate),
-                "der_false_alarm_percent": _percent(strict.false_alarm_rate),
-                "der_confusion_percent": _percent(strict.confusion_rate),
-                "reference_overlap_percent": _percent(overlap_ratio(meeting.diarization)),
-                "real_time_factor": round(elapsed / clip.duration, 4),
-                "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
-                "stage_seconds": outcome.stage_seconds,
-            }
+        row = _score_corpus_meeting(
+            settings,
+            meeting.identifier,
+            meeting.audio_path,
+            meeting.reference,
+            meeting.diarization,
+            "en",
         )
+        row["condition"] = AMI_CONDITION
+        rows.append(row)
     return {
         "benchmark": "ami",
         "condition": AMI_CONDITION,
+        "normalizer_version": NORMALIZER_VERSION,
+        "rows": rows,
+        "summary": _aggregate(rows),
+    }
+
+
+def run_summ_re(options: RunOptions) -> dict[str, object]:
+    root = options.data_dir / "summ-re"
+    settings = Settings()
+    settings.asr.intra_op_threads = options.threads
+    rows: list[dict[str, object]] = []
+    if not root.is_dir():
+        return {"benchmark": "summ-re", "normalizer_version": NORMALIZER_VERSION, "rows": rows}
+    for directory in sorted(item for item in root.iterdir() if item.is_dir()):
+        meeting = read_meeting(directory)
+        if meeting.mixed_audio is None:
+            continue
+        rows.append(
+            _score_corpus_meeting(
+                settings,
+                meeting.identifier,
+                meeting.mixed_audio,
+                meeting_transcript(meeting),
+                meeting_diarization(meeting),
+                SUMM_RE_LANGUAGE,
+            )
+        )
+    return {
+        "benchmark": "summ-re",
+        "condition": "mixed headsets",
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
         "summary": _aggregate(rows),
@@ -258,7 +318,7 @@ def _aggregate(rows: list[dict[str, object]]) -> dict[str, object]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hansard-bench")
-    parser.add_argument("benchmark", choices=("asr", "meetings", "ami"))
+    parser.add_argument("benchmark", choices=("asr", "meetings", "ami", "summ-re"))
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--threads", type=int, default=0)
@@ -274,7 +334,12 @@ def main(argv: list[str] | None = None) -> int:
         threads=arguments.threads,
         language=arguments.language,
     )
-    runners = {"asr": run_asr, "meetings": run_meetings, "ami": run_ami}
+    runners = {
+        "asr": run_asr,
+        "meetings": run_meetings,
+        "ami": run_ami,
+        "summ-re": run_summ_re,
+    }
     report = runners[arguments.benchmark](options)
     options.output.parent.mkdir(parents=True, exist_ok=True)
     options.output.write_text(json.dumps(report, indent=2), encoding="utf-8")

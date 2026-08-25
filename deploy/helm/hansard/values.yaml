@@ -142,11 +142,14 @@ asr:
   engine: parakeet
   # ONE model serves BOTH French and English. Parakeet TDT 0.6b v3 is natively
   # multilingual across 25 European languages, so there is no per-language
-  # model, no per-language worker pool and no per-language deployment. This is
-  # what keeps the CPU profile at roughly 2 GB RSS.
+  # model, no per-language worker pool and no per-language deployment.
   modelId: nemo-parakeet-tdt-0.6b-v3
   # none | int8
-  quantization: int8
+  #   none -> float32, the shipped default. int8 measured no faster on CPU
+  #           and cost 2.0 WER points in French, so it buys memory, not speed.
+  #   int8 -> 640 MB instead of 2.5 GB on disk and a smaller resident set.
+  #           Use it on memory-constrained nodes and accept the accuracy cost.
+  quantization: none
   # auto | gpu | cpu | both
   #   auto -> CPU only. Helm cannot see node GPU capacity at template time, so
   #           `auto` never silently schedules onto GPUs; ask for it explicitly.
