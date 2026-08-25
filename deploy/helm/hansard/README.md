@@ -72,6 +72,29 @@ mis-transcribed.
 
 Diarization and VAD are language independent by construction.
 
+### Diarization tuning
+
+```yaml
+diarization:
+  engine: sherpa
+  embeddingModel: nemo_en_titanet_small.onnx   # relative to models.mountPath
+  clusteringThreshold: 0.95    # higher = fewer speakers
+  minimumSpeakerSeconds: 3.0   # shorter clusters are absorbed into their neighbour
+```
+
+These reach the app as `HANSARD_DIARIZATION__EMBEDDING_MODEL`,
+`..._CLUSTERING_THRESHOLD` and `..._MINIMUM_SPEAKER_SECONDS`, so diarization can
+be retuned - or a different embedding model evaluated - **without rebuilding the
+model bundle**.
+
+The default was chosen by measurement: on synthetic multi-speaker meetings with
+exact ground truth, `nemo_en_titanet_small.onnx` scored **0.01 % speaker
+confusion (DER 14.96 %)** against **47 % (DER 62.77 %)** for
+`3dspeaker_..._campplus_..._voxceleb_16k.onnx`, which failed even when handed
+the correct number of clusters. `clusteringThreshold: 0.95` is calibrated for
+TitaNet's embedding space and does not transfer to another model - re-benchmark
+if you change `embeddingModel`.
+
 Metrics carry a bounded `language` label on
 `hansard_asr_transcribe_duration_seconds` and `hansard_asr_realtime_factor`
 (25 known codes plus `unknown`), so the dashboard can show the language mix

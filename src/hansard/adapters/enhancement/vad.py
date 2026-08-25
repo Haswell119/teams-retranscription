@@ -19,6 +19,7 @@ class SileroVoiceActivityDetector:
     speech_pad_seconds: float = 0.15
     max_speech_seconds: float = 28.0
     model_path: str | None = None
+    allow_download: bool = True
     _detector: Any | None = field(default=None, init=False, repr=False)
 
     @property
@@ -29,7 +30,12 @@ class SileroVoiceActivityDetector:
         if self._detector is None:
             import onnx_asr
 
-            self._detector = onnx_asr.load_vad("silero", self.model_path)
+            try:
+                self._detector = onnx_asr.load_vad("silero", self.model_path)
+            except Exception:
+                if self.model_path is None or not self.allow_download:
+                    raise
+                self._detector = onnx_asr.load_vad("silero")
         return self._detector
 
     def detect(self, clip: AudioClip) -> tuple[TimeSpan, ...]:

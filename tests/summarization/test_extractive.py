@@ -174,3 +174,18 @@ def test_empty_transcript_does_not_crash(writer):
     assert isinstance(minutes, Minutes)
     assert minutes.abstract == ""
     assert minutes.decisions == ()
+
+
+@pytest.mark.parametrize(
+    ("language", "closing"),
+    [("fr", "Merci à tous, on se retrouve lundi prochain."), ("en", "Same time next week, thanks everyone.")],
+)
+def test_greetings_and_closings_stay_out_of_the_summary(writer, language, closing, fr_transcript,
+                                                        en_transcript, fr_roster, en_roster,
+                                                        fr_request, en_request):
+    transcript = fr_transcript if language == "fr" else en_transcript
+    roster = fr_roster if language == "fr" else en_roster
+    request = fr_request if language == "fr" else en_request
+    minutes = writer.compose(transcript, roster, request)
+    assert closing not in minutes.abstract
+    assert all(closing not in topic.summary for topic in minutes.topics)

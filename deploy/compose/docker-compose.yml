@@ -33,7 +33,10 @@ x-common-env: &common-env
   HANSARD_ASR__ENGINE: parakeet
   HANSARD_ASR__MODEL_ID: nemo-parakeet-tdt-0.6b-v3
   HANSARD_ASR__QUANTIZATION: int8
-  HANSARD_DIARIZATION__ENGINE: spectral
+  HANSARD_DIARIZATION__ENGINE: sherpa
+  HANSARD_DIARIZATION__EMBEDDING_MODEL: nemo_en_titanet_small.onnx
+  HANSARD_DIARIZATION__CLUSTERING_THRESHOLD: "0.95"
+  HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS: "3.0"
   HANSARD_STORAGE__BACKEND: filesystem
   HANSARD_STORAGE__ROOT: /artifacts
   HANSARD_DELIVERY__OUTPUT_DIR: /artifacts
@@ -93,8 +96,6 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.api
-      args:
-        EXTRA_PIP_PACKAGES: sherpa-onnx>=1.13
     image: hansard-api:${HANSARD_VERSION:-0.1.0}
     command: ["serve"]
     <<: *security
@@ -119,8 +120,6 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.worker
-      args:
-        EXTRA_PIP_PACKAGES: sherpa-onnx>=1.13
     image: hansard-worker:${HANSARD_VERSION:-0.1.0}
     command: ["worker"]
     <<: *security

@@ -1,0 +1,93 @@
+{
+  "normalizer_version": "hansard-normalizers-1.0.0",
+  "hardware": "4 vCPU, no GPU",
+  "rows": [
+    {
+      "meeting": "meeting_3spk",
+      "duration_s": 153.1,
+      "ref_speakers": 3,
+      "hyp_speakers": 3,
+      "WER": 2.52,
+      "CER": 0.98,
+      "cpWER": 3.02,
+      "tcpWER@5s": 3.53,
+      "WDER": 0.26,
+      "DER@0.0": 8.6,
+      "DER@0.25": 3.17,
+      "JER": 8.73,
+      "DER_miss": 6.99,
+      "DER_fa": 1.37,
+      "DER_conf": 0.23,
+      "RTF": 0.3502,
+      "speedup_x": 2.9,
+      "peak_rss_mb": 2009.3,
+      "stages": {
+        "enhance": 4.731,
+        "voice_activity": 1.56,
+        "recognise": 25.615,
+        "diarise": 21.693,
+        "refine": 0.001,
+        "attribute": 0.013,
+        "resolve_names": 0.0
+      }
+    },
+    {
+      "meeting": "meeting_6spk",
+      "duration_s": 400.5,
+      "ref_speakers": 6,
+      "hyp_speakers": 6,
+      "WER": 6.5,
+      "CER": 5.82,
+      "cpWER": 9.51,
+      "tcpWER@5s": 10.64,
+      "WDER": 1.71,
+      "DER@0.0": 9.41,
+      "DER@0.25": 4.81,
+      "JER": 12.69,
+      "DER_miss": 6.64,
+      "DER_fa": 0.33,
+      "DER_conf": 2.44,
+      "RTF": 0.3299,
+      "speedup_x": 3.0,
+      "peak_rss_mb": 2856.3,
+      "stages": {
+        "enhance": 12.695,
+        "voice_activity": 3.869,
+        "recognise": 64.577,
+        "diarise": 50.947,
+        "refine": 0.001,
+        "attribute": 0.054,
+        "resolve_names": 0.0
+      }
+    },
+    {
+      "meeting": "meeting_9spk",
+      "duration_s": 348.9,
+      "ref_speakers": 9,
+      "hyp_speakers": 9,
+      "WER": 11.02,
+      "CER": 11.58,
+      "cpWER": 13.75,
+      "tcpWER@5s": 13.85,
+      "WDER": 1.77,
+      "DER@0.0": 9.73,
+      "DER@0.25": 4.14,
+      "JER": 11.91,
+      "DER_miss": 7.87,
+      "DER_fa": 0.81,
+      "DER_conf": 1.06,
+      "RTF": 0.325,
+      "speedup_x": 3.1,
+      "peak_rss_mb": 2856.3,
+      "stages": {
+        "enhance": 10.794,
+        "voice_activity": 3.219,
+        "recognise": 55.907,
+        "diarise": 43.41,
+        "refine": 0.002,
+        "attribute": 0.06,
+        "resolve_names": 0.0
+      }
+    }
+  ]
+}

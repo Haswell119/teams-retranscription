@@ -28,8 +28,44 @@ For an NKP operator this means:
 * **~2 GB RSS per CPU worker.** Sizing a node pool is a single calculation.
 * **`asr.language: auto`** is the default and sends no language tag at all.
 
-Diarization (pyannote segmentation 3.0 + CAM++ embeddings) and VAD (Silero) are
-language independent, so nothing downstream changes either.
+Diarization (pyannote segmentation 3.0 + NVIDIA TitaNet embeddings) and VAD
+(Silero) are language independent, so nothing downstream changes either.
+
+### Diarization: the embedding model was chosen on evidence
+
+Worth knowing before anyone proposes swapping a model to "improve accuracy".
+Diarization uses two models - one segments audio into speech turns, one embeds
+each turn for clustering - and the embedding model is where the quality lives.
+Benchmarked end to end on synthetic multi-speaker meetings with exact ground
+truth:
+
+| Embedding model | Speaker confusion | DER |
+|---|---|---|
+| `nemo_en_titanet_small.onnx` (39 MB, CC-BY-4.0) | **0.01 %** | **14.96 %** |
+| `3dspeaker_..._campplus_..._voxceleb_16k.onnx` (29 MB) | 47 % | 62.77 % |
+
+CAM++ failed **even when given the correct number of clusters**, so the gap is
+the embedding space itself, not a clustering hyperparameter. The bundle ships
+TitaNet; CAM++ was removed.
+
+The practical consequence for an operator: you can evaluate a different
+embedding model, or retune clustering, **without rebuilding the model bundle**:
+
+```yaml
+diarization:
+  engine: sherpa
+  embeddingModel: nemo_en_titanet_small.onnx   # relative to models.mountPath
+  clusteringThreshold: 0.95    # higher = fewer speakers; calibrated for TitaNet
+  minimumSpeakerSeconds: 3.0   # shorter clusters are absorbed into their neighbour
+  maxSpeakers: 8
+```
+
+Symptom-driven tuning: one person split into two speakers means the threshold is
+too low; two people merged into one means it is too high. Phantom speakers from
+crosstalk and backchannel are what `minimumSpeakerSeconds` suppresses. Note that
+`clusteringThreshold` is calibrated for TitaNet's embedding space and does not
+transfer to a different model - if you change `embeddingModel`, re-benchmark
+before trusting the threshold.
 
 ---
 

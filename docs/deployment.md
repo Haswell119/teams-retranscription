@@ -31,12 +31,36 @@ What follows from that, concretely:
   RSS**. Running two monolingual models would double it, and holding both
   loaded would double it again.
 * **Diarization and VAD are language independent** by construction: pyannote
-  segmentation 3.0 for speaker turns, CAM++ for speaker embeddings, Silero for
-  voice activity. Nothing there changes with language either.
+  segmentation 3.0 for speaker turns, NVIDIA TitaNet for speaker embeddings,
+  Silero for voice activity. Nothing there changes with language either.
 
 Set `asr.language: fr` or `asr.language: en` only if you want to pin the
 decoder for very short or very noisy audio, and accept that a language switch
 mid-meeting will then be mis-transcribed. Leave it on `auto` otherwise.
+
+### Tuning diarization
+
+Speaker separation has three knobs, and none of them requires rebuilding the
+model bundle:
+
+```yaml
+diarization:
+  engine: sherpa
+  embeddingModel: nemo_en_titanet_small.onnx   # relative to models.mountPath
+  clusteringThreshold: 0.95    # higher = fewer speakers
+  minimumSpeakerSeconds: 3.0   # shorter clusters are absorbed into their neighbour
+```
+
+Tune by symptom: one person appearing as two speakers means
+`clusteringThreshold` is too low; two people merged into one means it is too
+high. Phantom speakers from crosstalk are what `minimumSpeakerSeconds` removes.
+
+The default embedding model was picked by measurement, not reputation. On
+synthetic multi-speaker meetings with exact ground truth, TitaNet scored 0.01 %
+speaker confusion (DER 14.96 %) against 47 % (DER 62.77 %) for CAM++ - which
+failed even when handed the correct number of clusters. If you change
+`embeddingModel`, re-benchmark: `clusteringThreshold: 0.95` is calibrated for
+TitaNet's embedding space and does not transfer.
 
 ---
 

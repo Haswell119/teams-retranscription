@@ -6,6 +6,20 @@
   "additionalProperties": false,
   "required": ["global", "images", "asr", "models", "orchestrator", "worker", "secrets", "storage"],
   "definitions": {
+    "unitInterval": {
+      "description": "A number in [0,1]. Helm's --set cannot produce a float, so a numeric string is accepted too and range-checked by pattern.",
+      "type": ["number", "string"],
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "pattern": "^(0(\\.[0-9]+)?|1(\\.0+)?)$"
+    },
+    "nonNegativeSeconds": {
+      "description": "Seconds, >= 0. Accepts a numeric string because Helm's --set cannot produce a float.",
+      "type": ["number", "string"],
+      "minimum": 0.0,
+      "maximum": 600.0,
+      "pattern": "^[0-9]{1,3}(\\.[0-9]+)?$"
+    },
     "digest": {
       "type": "string",
       "description": "Empty, or an OCI digest. Set global.requireImageDigests to forbid the empty form.",
@@ -174,8 +188,25 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "engine": { "enum": ["spectral", "sherpa", "sortformer", "pyannote", "null"] },
-        "modelId": { "type": "string" },
+        "engine": { "enum": ["sherpa", "spectral", "sortformer", "pyannote", "null"] },
+        "segmentationModel": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path relative to models.mountPath."
+        },
+        "embeddingModel": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path relative to models.mountPath. nemo_en_titanet_small.onnx measured 0.01% speaker confusion against 47% for CAM++; re-benchmark before changing."
+        },
+        "clusteringThreshold": {
+          "allOf": [{ "$ref": "#/definitions/unitInterval" }],
+          "description": "Cosine distance at which two clusters stop being the same speaker. Higher = fewer speakers. 0.95 is calibrated."
+        },
+        "minimumSpeakerSeconds": {
+          "allOf": [{ "$ref": "#/definitions/nonNegativeSeconds" }],
+          "description": "Clusters with less total speech than this are absorbed into their nearest neighbour."
+        },
         "maxSpeakers": { "type": "integer", "minimum": 1, "maximum": 32 },
         "minSpeakers": { "type": "integer", "minimum": 1 }
       }
@@ -185,7 +216,7 @@
       "additionalProperties": false,
       "properties": {
         "engine": { "enum": ["silero", "energy", "null"] },
-        "threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+        "threshold": { "$ref": "#/definitions/unitInterval" }
       }
     },
     "minutes": {
@@ -197,7 +228,12 @@
         "modelId": { "type": "string" },
         "contextTokens": { "type": "integer", "minimum": 1024 },
         "maxOutputTokens": { "type": "integer", "minimum": 256 },
-        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "temperature": {
+          "type": ["number", "string"],
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "pattern": "^[0-2](\\.[0-9]+)?$"
+        },
         "language": { "type": "string" }
       }
     },

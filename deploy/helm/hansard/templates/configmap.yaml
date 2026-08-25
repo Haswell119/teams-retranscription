@@ -38,7 +38,12 @@ data:
   {{- end }}
 
   HANSARD_DIARIZATION__ENGINE: {{ .Values.diarization.engine | quote }}
-  HANSARD_DIARIZATION__MODEL_ID: {{ .Values.diarization.modelId | quote }}
+  HANSARD_DIARIZATION__SEGMENTATION_MODEL: {{ .Values.diarization.segmentationModel | quote }}
+  # Tunable without rebuilding the model bundle. The default embedding model was
+  # selected on a measured benchmark; see values.yaml before changing it.
+  HANSARD_DIARIZATION__EMBEDDING_MODEL: {{ .Values.diarization.embeddingModel | quote }}
+  HANSARD_DIARIZATION__CLUSTERING_THRESHOLD: {{ .Values.diarization.clusteringThreshold | quote }}
+  HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS: {{ .Values.diarization.minimumSpeakerSeconds | quote }}
   HANSARD_DIARIZATION__MAX_SPEAKERS: {{ .Values.diarization.maxSpeakers | quote }}
   HANSARD_DIARIZATION__MIN_SPEAKERS: {{ .Values.diarization.minSpeakers | quote }}
 

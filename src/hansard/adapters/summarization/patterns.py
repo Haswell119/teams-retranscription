@@ -249,6 +249,30 @@ FRENCH_ANSWER_MARKERS: tuple[str, ...] = (
     r"\bj'ai (?:verifie|confirme)\b",
 )
 
+ENGLISH_BOILERPLATE: tuple[str, ...] = (
+    r"^(?:good )?(?:morning|afternoon|evening)\b",
+    r"^(?:hi|hello|hey|thanks|thank you)\b",
+    r"\bthanks (?:everyone|all|folks)\b",
+    r"\bsame time next week\b",
+    r"\bhave a (?:good|great) (?:day|week|weekend)\b",
+    r"\b(?:see|talk to) you (?:soon|later|next week)\b",
+    r"\blet'?s get started\b",
+    r"\bcan you hear me\b",
+    r"\bsorry i'?m late\b",
+)
+
+FRENCH_BOILERPLATE: tuple[str, ...] = (
+    r"^(?:bonjour|bonsoir|salut|merci|re)\b",
+    r"\bmerci a (?:tous|toutes)\b",
+    r"\bon se retrouve\b",
+    r"\bbonne (?:journee|soiree|fin de semaine|continuation)\b",
+    r"\ba (?:bientot|la semaine prochaine|tout a l'heure)\b",
+    r"\bau revoir\b",
+    r"\bon (?:peut )?commence[rz]?\b",
+    r"\bvous m'entendez\b",
+    r"\bdesole pour le retard\b",
+)
+
 ENGLISH_CAUSAL: tuple[str, ...] = (
     r"\bbecause\b",
     r"\bsince\b",
@@ -317,6 +341,7 @@ class CueSet:
     question_openers: tuple[re.Pattern[str], ...]
     answer_markers: tuple[re.Pattern[str], ...]
     causal: tuple[re.Pattern[str], ...]
+    boilerplate: tuple[re.Pattern[str], ...]
     third_person_verbs: tuple[str, ...]
 
 
@@ -335,6 +360,7 @@ ENGLISH_CUES = CueSet(
     question_openers=_compile(ENGLISH_QUESTION_OPENERS),
     answer_markers=_compile(ENGLISH_ANSWER_MARKERS),
     causal=_compile(ENGLISH_CAUSAL),
+    boilerplate=_compile(ENGLISH_BOILERPLATE),
     third_person_verbs=ENGLISH_THIRD_PERSON_VERBS,
 )
 
@@ -349,6 +375,7 @@ FRENCH_CUES = CueSet(
     question_openers=_compile(FRENCH_QUESTION_OPENERS),
     answer_markers=_compile(FRENCH_ANSWER_MARKERS),
     causal=_compile(FRENCH_CAUSAL),
+    boilerplate=_compile(FRENCH_BOILERPLATE),
     third_person_verbs=FRENCH_THIRD_PERSON_VERBS,
 )
 
@@ -363,6 +390,7 @@ BILINGUAL_CUES = CueSet(
     question_openers=ENGLISH_CUES.question_openers + FRENCH_CUES.question_openers,
     answer_markers=ENGLISH_CUES.answer_markers + FRENCH_CUES.answer_markers,
     causal=ENGLISH_CUES.causal + FRENCH_CUES.causal,
+    boilerplate=ENGLISH_CUES.boilerplate + FRENCH_CUES.boilerplate,
     third_person_verbs=ENGLISH_THIRD_PERSON_VERBS + FRENCH_THIRD_PERSON_VERBS,
 )
 

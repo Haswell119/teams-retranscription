@@ -86,6 +86,9 @@ expect_failure "proxy egress with no host" --set networkPolicy.egress.mode=proxy
 expect_failure "unpinned images when pinning is required" --set global.requireImageDigests=true
 expect_failure "browser capture with no bot" --set capture.engine=browser --set bot.enabled=false
 expect_failure "oras models with no reference" --set models.source=oras
+expect_failure "a clustering threshold above 1"  --set diarization.clusteringThreshold=1.5
+expect_failure "an empty embedding model"        --set diarization.embeddingModel=
+expect_failure "an unknown diarization engine"   --set diarization.engine=nemo
 
 echo
 echo "== Pod Security Standards (restricted) and bot Job invariants =="

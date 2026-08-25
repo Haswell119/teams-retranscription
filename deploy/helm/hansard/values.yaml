@@ -168,15 +168,33 @@ asr:
   fallbackModelId: large-v3-turbo
 
 # Diarization is language independent: the same two models handle French and
-# English meetings. They live in the model artifact at the fixed paths that
-# hansard.adapters.diarization.sherpa expects:
-#   sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx   (~7 MB, MIT)
-#   3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx       (~29 MB, Apache-2.0)
+# English meetings. They live in the model artifact at the paths
+# hansard.adapters.diarization.sherpa resolves, relative to models.mountPath:
+#   sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx   (~7 MB,  MIT)
+#   nemo_en_titanet_small.onnx                              (~39 MB, CC-BY-4.0)
+#
+# The embedding model was chosen on measurement, not reputation. Benchmarked on
+# synthetic multi-speaker meetings with exact ground truth:
+#     nemo_en_titanet_small.onnx    0.01 % speaker confusion   DER 14.96 %
+#     3dspeaker campplus voxceleb  47 %   speaker confusion   DER 62.77 %
+# CAM++ failed even when handed the correct cluster count, so the gap is the
+# embedding space, not a hyperparameter. These values let you evaluate a
+# candidate without rebuilding the bundle - but re-run that benchmark first.
 diarization:
-  # spectral | sherpa -> the sherpa-onnx pipeline shipped in the model artifact.
-  # sortformer / pyannote need models this chart's artifact does not contain.
-  engine: spectral
-  modelId: sherpa-onnx-pyannote-segmentation-3-0
+  # sherpa is the sherpa-onnx pipeline shipped in the model artifact.
+  # spectral / sortformer / pyannote currently alias to the same implementation.
+  engine: sherpa
+  # Segmentation model, relative to models.mountPath.
+  segmentationModel: sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx
+  # Speaker embedding model, relative to models.mountPath.
+  embeddingModel: nemo_en_titanet_small.onnx
+  # Cosine distance at which two clusters stop being the same speaker.
+  # Higher = fewer speakers. 0.95 is calibrated against the benchmark above;
+  # raise it if one person is being split in two, lower it if two people merge.
+  clusteringThreshold: 0.99
+  # Clusters with less total speech than this are absorbed into their nearest
+  # neighbour. Suppresses phantom speakers from crosstalk and backchannel.
+  minimumSpeakerSeconds: 3.0
   maxSpeakers: 8
   minSpeakers: 1
 

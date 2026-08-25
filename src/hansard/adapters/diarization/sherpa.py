@@ -21,7 +21,7 @@ class SherpaDiarizer:
     embedding_model: str = EMBEDDING_FILENAME
     num_threads: int = 4
     provider: str = "cpu"
-    clustering_threshold: float = 0.95
+    clustering_threshold: float = 0.99
     min_duration_on: float = 0.25
     min_duration_off: float = 0.40
     window_shift_ratio: float = 0.1

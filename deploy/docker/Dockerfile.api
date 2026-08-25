@@ -21,8 +21,8 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_EXTRA_INDEX_URL=
 ARG PIP_TRUSTED_HOST=
 ARG EXTRAS=api,asr-onnx,diarization,delivery,observability
-# Packages the project's extras do not (yet) declare, e.g. sherpa-onnx for the
-# diarization pipeline. Verify with `hansard doctor` inside the built image.
+# Packages the project's extras do not declare. Normally empty - sherpa-onnx
+# ships in the `diarization` extra. Verify with `hansard doctor` in the image.
 ARG EXTRA_PIP_PACKAGES=
 
 ENV PIP_INDEX_URL=${PIP_INDEX_URL} \

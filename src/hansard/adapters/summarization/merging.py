@@ -11,13 +11,14 @@ from hansard.domain.minutes import ActionItem, Citation, Decision, OpenQuestion
 ITEM = TypeVar("ITEM")
 
 DEFAULT_MERGE_THRESHOLD = 0.6
+DEFAULT_MAX_CITATIONS = 4
 PHONETIC_FLOOR = 0.85
 
 
 @dataclass(frozen=True, slots=True)
 class MergeOptions:
     threshold: float = DEFAULT_MERGE_THRESHOLD
-    max_citations: int = 4
+    max_citations: int = DEFAULT_MAX_CITATIONS
 
 
 def text_similarity(left: str, right: str, language: str) -> float:
@@ -29,7 +30,7 @@ def text_similarity(left: str, right: str, language: str) -> float:
 def merge_citations(
     left: Sequence[Citation],
     right: Sequence[Citation],
-    limit: int = MergeOptions.max_citations,
+    limit: int = DEFAULT_MAX_CITATIONS,
 ) -> tuple[Citation, ...]:
     seen: dict[tuple[float, float, str], Citation] = {}
     for citation in (*left, *right):
@@ -75,7 +76,7 @@ def _longer(left: str, right: str) -> str:
     return left if len(left) >= len(right) else right
 
 
-def combine_decisions(left: Decision, right: Decision, limit: int = MergeOptions.max_citations) -> Decision:
+def combine_decisions(left: Decision, right: Decision, limit: int = DEFAULT_MAX_CITATIONS) -> Decision:
     return replace(
         left,
         statement=_longer(left.statement, right.statement),
@@ -87,7 +88,7 @@ def combine_decisions(left: Decision, right: Decision, limit: int = MergeOptions
 def combine_actions(
     left: ActionItem,
     right: ActionItem,
-    limit: int = MergeOptions.max_citations,
+    limit: int = DEFAULT_MAX_CITATIONS,
 ) -> ActionItem:
     return replace(
         left,
@@ -101,7 +102,7 @@ def combine_actions(
 def combine_questions(
     left: OpenQuestion,
     right: OpenQuestion,
-    limit: int = MergeOptions.max_citations,
+    limit: int = DEFAULT_MAX_CITATIONS,
 ) -> OpenQuestion:
     return replace(
         left,

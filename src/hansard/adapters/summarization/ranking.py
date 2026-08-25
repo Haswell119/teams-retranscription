@@ -7,7 +7,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from hansard.adapters.summarization.citations import SentenceUnit
-from hansard.adapters.summarization.text import content_terms, jaccard
+from hansard.adapters.summarization.patterns import cues_for, matches_any
+from hansard.adapters.summarization.text import content_terms, fold_for_matching, jaccard
 from hansard.adapters.summarization.topics import TopicSegment
 
 DAMPING = 0.85
@@ -22,6 +23,7 @@ class RankedSentence:
     unit: SentenceUnit
     score: float
     terms: frozenset[str]
+    is_boilerplate: bool = False
 
     @property
     def word_count(self) -> int:
@@ -70,7 +72,9 @@ def pagerank(
     teleport = (1.0 - damping) / size
     for _ in range(iterations):
         redistributed = damping * float(scores[dangling].sum()) / size
-        updated = teleport + redistributed + damping * (transition.T @ scores)
+        updated: np.ndarray = np.asarray(
+            teleport + redistributed + damping * (transition.T @ scores), dtype=np.float64
+        )
         if float(np.abs(updated - scores).sum()) < tolerance:
             return updated
         scores = updated
@@ -80,8 +84,14 @@ def pagerank(
 def rank_sentences(units: Sequence[SentenceUnit], language: str) -> tuple[RankedSentence, ...]:
     term_sets = _term_sets(units, language)
     scores = pagerank(similarity_matrix(term_sets))
+    boilerplate = cues_for(language).boilerplate
     return tuple(
-        RankedSentence(unit=unit, score=float(score), terms=terms)
+        RankedSentence(
+            unit=unit,
+            score=float(score),
+            terms=terms,
+            is_boilerplate=matches_any(fold_for_matching(unit.text), boilerplate),
+        )
         for unit, score, terms in zip(units, scores, term_sets, strict=True)
     )
 
@@ -91,6 +101,7 @@ def is_summary_candidate(sentence: RankedSentence, minimum_words: int = MINIMUM_
         sentence.word_count >= minimum_words
         and len(sentence.terms) >= 2
         and not sentence.unit.is_question
+        and not sentence.is_boilerplate
     )
 
 

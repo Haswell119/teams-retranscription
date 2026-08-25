@@ -538,18 +538,18 @@ class LlmMinutesWriter:
                 described[index - 1] = item
         topics: list[Topic] = []
         for segment in analysis.segments:
-            item = described.get(segment.index)
+            described_topic = described.get(segment.index)
             sentences = sentences_in_segment(analysis.sentences, segment)
-            if item is None:
+            if described_topic is None:
                 topics.append(topic_from_segment(segment, sentences, self.key_points_per_topic))
                 continue
             topic = topic_from_segment(
                 segment,
                 sentences,
                 self.key_points_per_topic,
-                title=as_text(item.get("title")),
-                summary=as_text(item.get("summary")),
+                title=as_text(described_topic.get("title")),
+                summary=as_text(described_topic.get("summary")),
             )
-            points = as_texts(item.get("key_points"))
+            points = as_texts(described_topic.get("key_points"))
             topics.append(replace(topic, key_points=points) if points else topic)
         return tuple(topics)

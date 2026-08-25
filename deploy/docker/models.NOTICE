@@ -46,15 +46,31 @@ no per-language deployment, and no language tag required at inference time.
 --------------------------------------------------------------------------
 4. Speaker embedding (diarization)
 --------------------------------------------------------------------------
-   Model      3D-Speaker CAM++ speaker verification, VoxCeleb 16 kHz
-   Files      3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
-   Origin     Alibaba DAMO Academy 3D-Speaker, redistributed by k2-fsa/sherpa-onnx
-   Licence    Apache License 2.0
+   Model      NVIDIA TitaNet-Small speaker verification (English)
+   Files      nemo_en_titanet_small.onnx
+   Origin     NVIDIA Corporation, https://huggingface.co/nvidia/speakerverification_en_titanet_large
+              ONNX export redistributed by k2-fsa/sherpa-onnx
+   Licence    Creative Commons Attribution 4.0 International (CC-BY-4.0)
+              https://creativecommons.org/licenses/by/4.0/
+
+   ATTRIBUTION, as required by CC-BY-4.0 section 3(a):
+       "TitaNet" (c) NVIDIA Corporation, licensed under CC-BY-4.0.
+       Exported to ONNX by the k2-fsa/sherpa-onnx project. Redistributed
+       unmodified as part of the Hansard model artifact.
+
+   WHY THIS MODEL: it was chosen on measurement. Benchmarked end to end on
+   synthetic multi-speaker meetings with exact ground truth:
+
+       nemo_en_titanet_small.onnx      0.01 % speaker confusion   DER 14.96 %
+       3dspeaker_campplus_voxceleb    47 %   speaker confusion   DER 62.77 %
+
+   CAM++ failed even when handed the correct number of clusters, so the gap is
+   the embedding space itself, not a clustering hyperparameter.
 
 --------------------------------------------------------------------------
 Bundle
 --------------------------------------------------------------------------
-   Total size  ~0.71 GB uncompressed
+   Total size  ~0.72 GB uncompressed
    Integrity   SHA256SUMS in the artifact root covers every file above.
    Runtime     Nothing in this artifact is fetched at pod start. The workers
                run with HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1 and

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from hansard.adapters.asr.registry import build_recognizer
 from hansard.adapters.attribution.fusion import WordLevelAttributor
 from hansard.adapters.attribution.naming import RosterSpeakerNamer
+from hansard.adapters.diarization.refinement import SpeechCoverageRefiner
 from hansard.adapters.diarization.registry import build_diarizer
 from hansard.adapters.enhancement.ffmpeg_chain import FfmpegEnhancer
 from hansard.adapters.enhancement.segmentation import SegmentationPolicy
@@ -28,6 +29,12 @@ class Composition:
             denoise=audio.denoise,
         )
 
+    def diarization_enhancer(self) -> AudioEnhancer | None:
+        audio = self.settings.audio
+        if audio.high_pass_hz <= 0:
+            return None
+        return FfmpegEnhancer(high_pass_hz=audio.high_pass_hz, target_lufs=None, denoise=False)
+
     def detector(self) -> VoiceActivityDetector | None:
         vad = self.settings.vad
         if vad.engine == "null":
@@ -40,6 +47,7 @@ class Composition:
             )
         return SileroVoiceActivityDetector(
             model_path=str(self.settings.runtime.models_dir / vad.model_subdirectory),
+            allow_download=self.settings.runtime.allow_model_downloads,
             threshold=vad.threshold,
             min_speech_seconds=vad.min_speech_seconds,
             min_silence_seconds=vad.min_silence_seconds,
@@ -64,6 +72,7 @@ class Composition:
                 boundary_dilation=settings.attribution.boundary_tolerance_seconds,
             ),
             enhancer=self.enhancer(),
+            diarization_enhancer=self.diarization_enhancer(),
             detector=self.detector(),
             diarizer=(
                 None
@@ -76,6 +85,11 @@ class Composition:
                 else RosterSpeakerNamer(
                     minimum_coverage=settings.attribution.min_observation_overlap,
                 )
+            ),
+            refiner=(
+                SpeechCoverageRefiner(maximum_extension=diarization.maximum_turn_extension)
+                if diarization.speech_coverage_refinement
+                else None
             ),
             segmentation=self.segmentation(),
             max_speakers=diarization.max_speakers,

@@ -15,6 +15,7 @@ class AudioSettings(BaseModel):
     sample_rate: int = 16_000
     loudness_normalisation: bool = True
     target_lufs: float = -23.0
+    preserve_dynamics_for_diarization: bool = True
     high_pass_hz: float = 60.0
     denoise: bool = False
     max_segment_seconds: float = 30.0
@@ -51,12 +52,14 @@ class DiarizationSettings(BaseModel):
     engine: DiarizationEngine = "sherpa"
     segmentation_model: str = "sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx"
     embedding_model: str = "nemo_en_titanet_small.onnx"
-    clustering_threshold: float = 0.95
+    clustering_threshold: float = 0.99
     minimum_speaker_seconds: float = 3.0
     max_speakers: int = 8
     min_speakers: int = 1
     device: Device = "auto"
     collar_seconds: float = 0.25
+    speech_coverage_refinement: bool = True
+    maximum_turn_extension: float = 2.5
     overflow_engine: DiarizationEngine = "sherpa"
 
 

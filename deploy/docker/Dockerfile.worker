@@ -13,10 +13,8 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_EXTRA_INDEX_URL=
 ARG PIP_TRUSTED_HOST=
 ARG EXTRAS=asr-onnx,diarization,observability
-# Diarization runs on sherpa-onnx (pyannote segmentation 3.0 int8 + CAM++
-# embeddings, both language independent). If the project's `diarization` extra
-# does not yet pull it in, add it here rather than editing pyproject.toml:
-#   --build-arg EXTRA_PIP_PACKAGES="sherpa-onnx>=1.10"
+# Packages the project's extras do not declare. Normally empty - sherpa-onnx
+# ships in the `diarization` extra. Verify with `hansard doctor` in the image.
 ARG EXTRA_PIP_PACKAGES=
 
 ENV PIP_INDEX_URL=${PIP_INDEX_URL} \

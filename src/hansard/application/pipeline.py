@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
+from hansard.adapters.diarization.refinement import SpeechCoverageRefiner
 from hansard.adapters.enhancement.segmentation import SegmentationPolicy, plan_segments
 from hansard.domain.audio import AudioClip
 from hansard.domain.meeting import MeetingRequest
@@ -41,9 +42,11 @@ class TranscriptionPipeline:
     recognizer: SpeechRecognizer
     attributor: SpeakerAttributor
     enhancer: AudioEnhancer | None = None
+    diarization_enhancer: AudioEnhancer | None = None
     detector: VoiceActivityDetector | None = None
     diarizer: Diarizer | None = None
     namer: SpeakerNamer | None = None
+    refiner: SpeechCoverageRefiner | None = None
     segmentation: SegmentationPolicy = field(default_factory=SegmentationPolicy)
     max_speakers: int = 8
     min_speakers: int = 1
@@ -72,14 +75,20 @@ class TranscriptionPipeline:
         diarization = Diarization()
         if self.diarizer is not None:
             with _timed(timings, "diarise"):
+                acoustic = (
+                    self.diarization_enhancer.enhance(clip) if self.diarization_enhancer else clip
+                )
                 diarization = self.diarizer.diarize(
-                    prepared,
+                    acoustic,
                     DiarizationRequest(
                         max_speakers=min(self.max_speakers, self.diarizer.max_supported_speakers),
                         min_speakers=self.min_speakers,
                         known_speaker_count=_known_speaker_count(request, roster),
                     ),
                 )
+        if self.refiner is not None and diarization.turns and speech:
+            with _timed(timings, "refine"):
+                diarization = self.refiner.refine(diarization, speech)
         with _timed(timings, "attribute"):
             attributed = self.attributor.attribute(transcript, diarization)
         names: dict[str, str] = {}

@@ -34,11 +34,11 @@ comma               := ,
 BUILD_CA_BUNDLE     ?=
 CA_SECRET           := $(if $(BUILD_CA_BUNDLE),--secret id=ca_bundle$(comma)src=$(BUILD_CA_BUNDLE),)
 
-# Diarization runs on sherpa-onnx (pyannote segmentation 3.0 int8 + CAM++
-# embeddings). `pyproject.toml` does not declare it in the `diarization` extra
-# yet, so it is added here. Once the extra declares it this becomes a no-op and
-# can be emptied. `hansard doctor` inside the built image tells you which it is.
-EXTRA_PIP_PACKAGES ?= sherpa-onnx>=1.13
+# Packages the project's extras do not declare. Empty by design: sherpa-onnx
+# now ships in pyproject's `diarization` extra, so nothing extra is needed.
+# Kept as a knob for pinning or patching a dependency without editing
+# pyproject.toml. `hansard doctor` inside the built image confirms the result.
+EXTRA_PIP_PACKAGES ?=
 
 # Browser capture bot. Owned by src/hansard/adapters/capture/docker/ - built
 # here only so that one command produces a complete, mirrorable image set.

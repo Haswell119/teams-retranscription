@@ -81,16 +81,49 @@ image; both are produced from the same verified bytes.
                                    encoder-model.int8.onnx,
                                    decoder_joint-model.int8.onnx}   ASR, CC-BY-4.0
 /models/silero/silero_vad.onnx                                      VAD, MIT
-/models/sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx       diarization, MIT
-/models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx           embeddings, Apache-2.0
+/models/sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx       segmentation, MIT
+/models/nemo_en_titanet_small.onnx                                  embeddings, CC-BY-4.0
 /models/NOTICE                                                      attribution
 /models/SHA256SUMS                                                  integrity
 ```
 
-Roughly 0.71 GB in total, 11 files. The paths are not decorative: they are
+Roughly 0.72 GB in total, 11 files. The paths are not decorative: they are
 exactly what `hansard.adapters.asr.registry`, `onnx_asr.models.silero` and
 `hansard.adapters.diarization.sherpa` resolve. Change one and the runtime
 stops finding its models.
+
+### The embedding model was chosen on measurement
+
+Speaker diarization has two models: one segments the audio into speech turns,
+the other turns each turn into an embedding that gets clustered. The **embedding
+model is where diarization quality actually lives**, and the difference between
+candidates is not marginal.
+
+Benchmarked end to end on synthetic multi-speaker meetings with exact ground
+truth:
+
+| Embedding model | Speaker confusion | DER |
+|---|---|---|
+| `nemo_en_titanet_small.onnx` (39 MB, CC-BY-4.0) | **0.01 %** | **14.96 %** |
+| `3dspeaker_..._campplus_..._voxceleb_16k.onnx` (29 MB, Apache-2.0) | 47 % | 62.77 % |
+
+CAM++ failed **even when handed the correct number of clusters**, so this is not
+a clustering-hyperparameter problem - the embedding space itself does not
+separate these speakers. The bundle therefore ships TitaNet, and CAM++ was
+removed.
+
+Two consequences worth internalising:
+
+* **Do not swap the embedding model on reputation.** Re-run the benchmark. A
+  model that tops a speaker-verification leaderboard can still be useless on
+  meeting audio, which is short-turn, overlapped and far-field.
+* **You can test a candidate without rebuilding the bundle.** The chart exposes
+  `diarization.embeddingModel`, `diarization.clusteringThreshold` and
+  `diarization.minimumSpeakerSeconds` as values (env
+  `HANSARD_DIARIZATION__EMBEDDING_MODEL`, `..._CLUSTERING_THRESHOLD`,
+  `..._MINIMUM_SPEAKER_SECONDS`). Add the candidate to `models.manifest`, ship
+  both, and switch with a value. `clusteringThreshold: 0.95` is calibrated for
+  TitaNet and is not transferable to a different embedding space.
 
 ### Changing models
 
@@ -155,10 +188,12 @@ The CA secret is installed into the system trust store and pointed at from
 > cached, adding the secret later changes nothing. Force it with
 > `--no-cache-filter builder`.
 
-`EXTRA_PIP_PACKAGES` adds packages the project's extras do not declare yet
-(currently `sherpa-onnx`, needed by the diarization adapter). Run
-`docker run --rm <image> doctor` after a build: it prints whether ffmpeg,
-`/models`, ONNX Runtime and the diarization runtime are all present.
+`EXTRA_PIP_PACKAGES` adds packages the project's extras do not declare. It is
+empty by default - `sherpa-onnx` now ships in pyproject's `diarization` extra -
+and remains available for pinning or patching a dependency without editing
+project metadata. Run `docker run --rm <image> doctor` after any build: it
+prints whether ffmpeg, `/models`, ONNX Runtime and the diarization runtime are
+all present.
 
 ## Air-gap procedure
 
@@ -237,7 +272,7 @@ verifies chart signatures through the `verify:` block in
 | `hansard-api` | ~1.26 GB (budget 1.5 GB) |
 | `hansard-worker` | slightly smaller: no `api` or `delivery` extras |
 | `hansard-worker-gpu` | several GB; the CUDA runtime base dominates |
-| `hansard-models-init` | ~0.71 GB of weights on a 4 MB busybox |
+| `hansard-models-init` | ~0.72 GB of weights on a 4 MB busybox |
 
 `make -C deploy/docker size` prints the current numbers. The largest single
 contributor to the app images is `ffmpeg` plus its codec dependencies, and it is
