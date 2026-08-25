@@ -183,12 +183,34 @@ neighbour:
 HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS=6.0
 ```
 
-### `--speakers 6` changed nothing
+### One person split across several speakers
 
-That is correct behaviour today, and it is a gap rather than a setting you have
-misused. `--speakers` lowers `diarization.max_speakers`, and the sherpa-onnx
-diarizer does not read that field — the speaker count is inferred from the audio.
-`HANSARD_DIARIZATION__CLUSTERING_THRESHOLD` is the knob that changes the outcome.
+**Cause.** Short, spontaneous turns give the embedding model little to work with,
+so clustering fragments a person into several clusters. Spontaneous meetings do
+this far more than prepared speech.
+
+**Fix.** Cluster consolidation is on by default and merges clusters whose speaker
+centroids are too close to be different people. If fragments survive, lower the
+similarity a person must exceed to be considered the same person:
+
+```bash
+HANSARD_DIARIZATION__MERGE_SIMILARITY=0.50   # default 0.60
+```
+
+Lower it too far and genuinely different speakers merge, so move in steps of
+0.05 and check the result. To turn the stage off entirely:
+
+```bash
+HANSARD_DIARIZATION__CLUSTER_CONSOLIDATION=false
+```
+
+### Telling it how many people are in the meeting
+
+`--speakers 6` on the command line, `speaker_count` in the API, or a Teams
+roster with six participants all pin the number of clusters. This is the single
+most effective thing you can do for attribution quality, and it is why the
+browser bot reads the participant list: in a real meeting the answer is known,
+so nothing has to be inferred from the audio.
 
 ---
 
