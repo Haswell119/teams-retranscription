@@ -1,0 +1,201 @@
+{
+  "benchmark": "diarization-sweep",
+  "profile": "sweep",
+  "corpus": "AMI Mix-Headset",
+  "meetings": [
+    "ES2004a",
+    "IS1009a",
+    "TS3003a"
+  ],
+  "raw_clusters": {
+    "ES2004a": 10,
+    "IS1009a": 16,
+    "TS3003a": 16
+  },
+  "shipped_default": {
+    "minimum_speaker_seconds": 10.0,
+    "merge_similarity": 0.7
+  },
+  "previous_default": {
+    "minimum_speaker_seconds": 3.0,
+    "merge_similarity": 0.6
+  },
+  "rows": [
+    {
+      "minimum_speaker_seconds": 0.0,
+      "merge_similarity": null,
+      "macro_der_percent": 33.14,
+      "detected_speakers": [
+        10,
+        16,
+        16
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 0.0,
+      "merge_similarity": 0.7,
+      "macro_der_percent": 30.44,
+      "detected_speakers": [
+        9,
+        14,
+        13
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 0.0,
+      "merge_similarity": 0.6,
+      "macro_der_percent": 33.3,
+      "detected_speakers": [
+        6,
+        12,
+        12
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 0.0,
+      "merge_similarity": 0.5,
+      "macro_der_percent": 36.03,
+      "detected_speakers": [
+        4,
+        8,
+        10
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 3.0,
+      "merge_similarity": null,
+      "macro_der_percent": 32.92,
+      "detected_speakers": [
+        10,
+        10,
+        10
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 3.0,
+      "merge_similarity": 0.7,
+      "macro_der_percent": 30.2,
+      "detected_speakers": [
+        9,
+        8,
+        7
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 3.0,
+      "merge_similarity": 0.6,
+      "macro_der_percent": 33.03,
+      "detected_speakers": [
+        6,
+        6,
+        6
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 3.0,
+      "merge_similarity": 0.5,
+      "macro_der_percent": 35.88,
+      "detected_speakers": [
+        4,
+        3,
+        4
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": null,
+      "macro_der_percent": 32.35,
+      "detected_speakers": [
+        6,
+        6,
+        6
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.7,
+      "macro_der_percent": 29.49,
+      "detected_speakers": [
+        5,
+        4,
+        5
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.6,
+      "macro_der_percent": 32.89,
+      "detected_speakers": [
+        4,
+        3,
+        3
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.5,
+      "macro_der_percent": 37.91,
+      "detected_speakers": [
+        3,
+        1,
+        3
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 20.0,
+      "merge_similarity": null,
+      "macro_der_percent": 32.52,
+      "detected_speakers": [
+        6,
+        6,
+        4
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 20.0,
+      "merge_similarity": 0.7,
+      "macro_der_percent": 29.62,
+      "detected_speakers": [
+        5,
+        4,
+        2
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 20.0,
+      "merge_similarity": 0.6,
+      "macro_der_percent": 33.07,
+      "detected_speakers": [
+        4,
+        3,
+        2
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 20.0,
+      "merge_similarity": 0.5,
+      "macro_der_percent": 39.67,
+      "detected_speakers": [
+        3,
+        1,
+        1
+      ],
+      "reference_speakers": 4
+    }
+  ]
+}
