@@ -25,8 +25,17 @@
 # ---------------------------------------------------------------------------
 # NVIDIA Parakeet TDT 0.6b v3 is natively multilingual (25 European languages,
 # fr and en among them) and needs no language tag at inference time. That is
-# why it was chosen: one 0.67 GB int8 artifact, one deployment, no per-language
-# worker pool, ~2 GB RSS on CPU. Licence CC-BY-4.0 - see models.NOTICE.
+# why it was chosen: one model, one deployment, no per-language worker pool.
+#
+# BOTH precisions ship. float32 is the default because int8 measured no faster
+# on CPU (0.645 vs 0.650 CPU-seconds per audio-second) while costing 2.0 WER
+# points in French. int8 stays for memory-constrained nodes and is selected
+# with HANSARD_ASR__QUANTIZATION=int8; it needs no separate image.
+#
+#   float32   2.5 GB on disk   encoder-model.onnx + .onnx.data + decoder_joint
+#   int8      640 MB on disk   encoder-model.int8.onnx + decoder_joint .int8
+#
+# Licence CC-BY-4.0 - see models.NOTICE.
 nemo-parakeet-tdt-0.6b-v3/config.json|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/config.json|666903c76b9798caf2c210afd4f6cd60b08a8dbf9800ec8d7a3bc0d2148ac466|
 nemo-parakeet-tdt-0.6b-v3/vocab.txt|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/vocab.txt|d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d|
 nemo-parakeet-tdt-0.6b-v3/nemo128.onnx|https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce/nemo128.onnx|a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f|
