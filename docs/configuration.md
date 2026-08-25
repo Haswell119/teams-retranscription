@@ -311,11 +311,30 @@ speaker rather than appearing as their own. That is the trade the default makes:
 a phantom speaker is a more common and more damaging failure than a lost
 ten-second contributor.
 
-**The floor is skipped whenever the speaker count is known.** A Teams roster,
-`--speakers`, or `speaker_count` in the API pins the number of clusters, and
-absorption is then disabled entirely, so it can never push the count below the
-number of people actually in the meeting. In practice this setting only affects
-**file-based transcription**, not meetings the bot joins with a roster.
+**The floor is skipped when you assert the speaker count.** `--speakers` on the
+command line, or `speaker_count` in the API, is read as a statement of fact: the
+clusterer is pinned to exactly that many speakers and absorption is disabled, so
+it can never push the count below the number you gave.
+
+**A Teams roster is not an assertion.** The roster lists everyone in the meeting,
+including the people who never say a word, so it is treated as a *ceiling*
+instead: clustering runs on its own threshold, and the most similar clusters are
+merged until the count fits underneath. A ceiling can bring an over-estimate down
+but can never inflate a correct one, and the floor still applies underneath it.
+
+That distinction is worth more than it sounds. Handing an over-stated roster to
+the clusterer as an exact count forces it to split real speakers apart until it
+reaches that number. Measured on the three-speaker fixture, with the roster
+over-stating how many people actually speak:
+
+| Roster says | As an exact count | As a ceiling |
+| --- | --- | --- |
+| 3 (correct) | 3 speakers, DER 14.75 % | 3 speakers, DER 14.75 % |
+| 5 | 4 speakers, DER 27.40 % | 3 speakers, DER 14.75 % |
+| 8 | 5 speakers, DER 38.39 % | 3 speakers, DER 14.75 % |
+
+A ten-person meeting in which four people speak is the ordinary case, so only
+give `--speakers` when you genuinely know the number of people who *spoke*.
 
 ---
 
