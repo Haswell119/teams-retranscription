@@ -19,6 +19,11 @@ LIBRISPEECH_DUMMY_PARQUET = (
     "resolve/main/clean/validation-00000-of-00001.parquet"
 )
 FLEURS_PARQUET_INDEX = "https://huggingface.co/api/datasets/google/fleurs/parquet/{config}/test"
+AMI_AUDIO = (
+    "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/{meeting}/audio/{meeting}.Mix-Headset.wav"
+)
+AMI_ANNOTATIONS = "https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip"
+AMI_TEST_MEETINGS: tuple[str, ...] = ("ES2004a", "IS1009a", "TS3003a")
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,11 +232,29 @@ def synthesise_meeting(
     return audio_path
 
 
+def prepare_ami(output: Path, meetings: tuple[str, ...] = AMI_TEST_MEETINGS) -> Path:
+    import zipfile
+
+    root = output / "ami"
+    root.mkdir(parents=True, exist_ok=True)
+    annotations = root / "annotations"
+    if not (annotations / "words").is_dir():
+        archive = _download(AMI_ANNOTATIONS, output / "ami_annotations.zip")
+        annotations.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive) as bundle:
+            bundle.extractall(annotations)
+        archive.unlink(missing_ok=True)
+    for meeting in meetings:
+        _download(AMI_AUDIO.format(meeting=meeting), root / f"{meeting}.Mix-Headset.wav")
+    return root
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="hansard-prepare")
     parser.add_argument("--output", type=Path, default=Path("bench/data"))
     parser.add_argument("--skip-fleurs", action="store_true")
     parser.add_argument("--skip-meetings", action="store_true")
+    parser.add_argument("--ami", action="store_true", help="also fetch the AMI test meetings")
     arguments = parser.parse_args(argv)
     output = arguments.output
     output.mkdir(parents=True, exist_ok=True)
@@ -246,6 +269,13 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{name} -> {path}")
             except Exception as error:
                 print(f"{name} failed: {type(error).__name__}: {error}")
+
+    if arguments.ami:
+        try:
+            root = prepare_ami(output)
+            print(f"ami -> {root}")
+        except Exception as error:
+            print(f"ami failed: {type(error).__name__}: {error}")
 
     if not arguments.skip_meetings:
         root = prepare_librispeech_corpus(output)

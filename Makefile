@@ -4,7 +4,7 @@ MODELS_DIR ?= $(CURDIR)/models
 EVAL_DIR ?= $(CURDIR)/bench/data
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev models bench bench-all bench-ami gates bench-asr bench-meetings bench-data test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
+.PHONY: help install install-dev models bench bench-all bench-ami gates bench-asr bench-meetings bench-data bench-data-ami test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
 
 help:
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -23,6 +23,9 @@ models: ## Fetch and verify the model bundle into $(MODELS_DIR)
 
 bench-data: ## Fetch the evaluation corpora
 	$(PYTHON) -m hansard.evaluation.prepare --output $(EVAL_DIR)
+
+bench-data-ami: ## Fetch the AMI meeting corpus as well
+	$(PYTHON) -m hansard.evaluation.prepare --output $(EVAL_DIR) --ami --skip-fleurs --skip-meetings
 
 bench-asr: ## Benchmark speech recognition in French and English
 	$(PYTHON) -m hansard.evaluation.run asr --output bench/results/asr_bilingual.json
