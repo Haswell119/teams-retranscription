@@ -239,11 +239,25 @@ docker compose run --rm cli transcribe /inbox/meeting.m4a --output /artifacts
 Artefacts land in `deploy/compose/artifacts/` on the host. The compose stack runs
 every service read-only, non-root, with all capabilities dropped.
 
-Two caveats worth stating plainly. There is **no browser bot in compose** — a
-Teams bot needs its own `/dev/shm` budget and egress policy, which compose cannot
-model honestly. And the `worker` service invokes `hansard worker`, which is not a
-CLI subcommand; the `models`, `api` and `cli` services are the parts that work
-today. The full walkthrough is in [deployment](deployment.md).
+The `worker` service watches `deploy/compose/inbox/` and turns anything you drop
+there into a transcript and minutes:
+
+```bash
+cp ~/meeting.m4a deploy/compose/inbox/
+# optionally, alongside it:
+cat > deploy/compose/inbox/meeting.json <<'JSON'
+{"title": "Comité de lancement", "language": "fr", "speakers": 4,
+ "vocabulary": ["Aurélie Fontaine", "SecNumCloud"]}
+JSON
+```
+
+Results appear in `deploy/compose/artifacts/<id>/`. The sidecar is optional;
+without it the filename becomes the title and the language is detected.
+
+One caveat worth stating plainly: there is **no browser bot in compose**. A Teams
+bot needs its own `/dev/shm` budget and egress policy, which compose cannot model
+honestly — use Kubernetes for that. The full walkthrough is in
+[deployment](deployment.md).
 
 For Kubernetes, air-gapped installation, GPU node pools and network policy, go
 to [deployment](deployment.md) and [deployment on NKP](deployment-nkp.md).
