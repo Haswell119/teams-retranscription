@@ -68,6 +68,7 @@ class AttributionSettings(BaseModel):
 
 class MinutesSettings(BaseModel):
     enabled: bool = True
+    engine: Literal["auto", "llm", "extractive"] = "auto"
     endpoint: str = "http://localhost:8080/v1"
     model_id: str = "qwen3-8b-instruct"
     api_key: SecretStr | None = None
@@ -93,6 +94,7 @@ class CaptureSettings(BaseModel):
     alone_timeout_seconds: int = 120
     max_duration_seconds: int = 4 * 3600
     headless: bool = True
+    ui_locale: str = "en-US"
     browser_binary: Path | None = None
     pulse_sink_name: str = "hansard_sink"
     roster_poll_seconds: float = 1.0
@@ -118,10 +120,14 @@ class GraphSettings(BaseModel):
 
 
 class DeliverySettings(BaseModel):
+    default_channels: tuple[str, ...] = ("filesystem",)
     formats: tuple[str, ...] = ("markdown", "html")
     smtp: SmtpSettings = Field(default_factory=SmtpSettings)
     graph: GraphSettings = Field(default_factory=GraphSettings)
     webhook_url: str | None = None
+    webhook_secret: SecretStr | None = None
+    webhook_format: Literal["json", "message_card", "adaptive_card"] | None = None
+    bot_tenant_id: str | None = None
     output_dir: Path = Path("artifacts")
 
 
@@ -145,6 +151,7 @@ class ApiSettings(BaseModel):
     api_key: SecretStr | None = None
     cors_origins: tuple[str, ...] = ()
     metrics_enabled: bool = True
+    metrics_path: str = "/metrics"
 
 
 class RuntimeSettings(BaseModel):

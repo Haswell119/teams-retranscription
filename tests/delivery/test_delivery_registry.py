@@ -16,7 +16,7 @@ from hansard.adapters.delivery.registry import (
 from hansard.adapters.delivery.routing import AddressRoutedPublisher, address_scheme
 from hansard.adapters.delivery.smtp import EmailPublisher
 from hansard.adapters.delivery.webhook import WebhookBodyFormat, WebhookPublisher
-from hansard.config import DeliverySettings, GraphSettings, SmtpSettings
+from hansard.config import DeliverySettings, GraphSettings, Settings, SmtpSettings
 from hansard.domain.errors import ConfigurationError, DeliveryError
 from hansard.domain.meeting import DeliveryChannel
 from hansard.ports.delivery import MinutesPublisher
@@ -74,11 +74,10 @@ def test_webhook_publisher_defaults_to_plain_json() -> None:
     assert publisher.secret is None
 
 
-def test_webhook_secret_and_format_come_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HANSARD_DELIVERY__WEBHOOK_SECRET", "topsecret")
-    monkeypatch.setenv("HANSARD_DELIVERY__WEBHOOK_FORMAT", "message_card")
+def test_webhook_secret_and_format_are_configurable() -> None:
+    settings = DeliverySettings(webhook_secret=SecretStr("topsecret"), webhook_format="message_card")
 
-    publisher = build_publisher(DeliveryChannel.WEBHOOK, DeliverySettings())
+    publisher = build_publisher(DeliveryChannel.WEBHOOK, settings)
 
     assert isinstance(publisher, WebhookPublisher)
     assert publisher.secret is not None
@@ -87,11 +86,24 @@ def test_webhook_secret_and_format_come_from_the_environment(monkeypatch: pytest
     assert "topsecret" not in repr(publisher)
 
 
-def test_unknown_webhook_format_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HANSARD_DELIVERY__WEBHOOK_FORMAT", "smoke-signal")
+def test_unknown_webhook_format_is_refused() -> None:
+    settings = DeliverySettings.model_construct(
+        **{**DeliverySettings().model_dump(), "webhook_format": "smoke-signal"}
+    )
 
     with pytest.raises(ConfigurationError, match="unknown webhook body format"):
-        build_publisher(DeliveryChannel.WEBHOOK, DeliverySettings())
+        build_publisher(DeliveryChannel.WEBHOOK, settings)
+
+
+def test_the_environment_reaches_delivery_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HANSARD_DELIVERY__WEBHOOK_FORMAT", "message_card")
+    monkeypatch.setenv("HANSARD_DELIVERY__WEBHOOK_SECRET", "topsecret")
+
+    settings = Settings().delivery
+
+    assert settings.webhook_format == "message_card"
+    assert settings.webhook_secret is not None
+    assert settings.webhook_secret.get_secret_value() == "topsecret"
 
 
 def test_teams_channel_without_graph_credentials_only_routes_webhooks() -> None:

@@ -17,9 +17,7 @@ def diarization_of(turns):
 
 def roster_of(observations, participants=()):
     return Roster(
-        participants=tuple(
-            Participant(identifier=name, display_name=name) for name in participants
-        ),
+        participants=tuple(Participant(identifier=name, display_name=name) for name in participants),
         observations=tuple(
             ActiveSpeakerObservation(TimeSpan(start, end), name) for start, end, name in observations
         ),
@@ -29,8 +27,7 @@ def roster_of(observations, participants=()):
 def transcript_of(utterances):
     return Transcript(
         utterances=tuple(
-            Utterance(TimeSpan(start, end), text, speaker=speaker)
-            for start, end, speaker, text in utterances
+            Utterance(TimeSpan(start, end), text, speaker=speaker) for start, end, speaker, text in utterances
         )
     )
 
@@ -48,9 +45,7 @@ def test_clusters_take_the_participant_names():
 def test_a_transcript_can_be_renamed_with_the_result():
     diarization = diarization_of([(0, 10, "speaker_00"), (12, 20, "speaker_01")])
     roster = roster_of([(0, 10, "Aurélie Fontaine"), (12, 20, "Jean-Luc Mercier")])
-    transcript = transcript_of(
-        [(1, 4, "speaker_00", "bonjour"), (13, 16, "speaker_01", "bonjour à toi")]
-    )
+    transcript = transcript_of([(1, 4, "speaker_00", "bonjour"), (13, 16, "speaker_01", "bonjour à toi")])
     names = RosterSpeakerNamer().resolve_names(transcript, diarization, roster)
     assert transcript.renamed(names).speakers == ("Aurélie Fontaine", "Jean-Luc Mercier")
 
@@ -87,7 +82,5 @@ def test_the_fallback_prefix_is_configurable():
 def test_observation_lag_is_compensated():
     diarization = diarization_of([(0, 10, "speaker_00")])
     roster = roster_of([(1.5, 11.5, "Aurélie Fontaine")])
-    named = RosterSpeakerNamer(observation_lag=1.5).resolve_names(
-        Transcript(), diarization, roster
-    )
+    named = RosterSpeakerNamer(observation_lag=1.5).resolve_names(Transcript(), diarization, roster)
     assert named["speaker_00"] == "Aurélie Fontaine"

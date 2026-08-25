@@ -60,7 +60,7 @@ CDP_PERMISSIONS: Final[tuple[str, ...]] = (
 
 CONTEXT_PERMISSIONS: Final[tuple[str, ...]] = ("microphone", "camera")
 
-UI_LOCALE_VARIABLE: Final[str] = "HANSARD_CAPTURE_UI_LOCALE"
+UI_LOCALE_VARIABLE: Final[str] = "HANSARD_CAPTURE__UI_LOCALE"
 FALLBACK_UI_LOCALE: Final[str] = "en-US"
 DEFAULT_UI_LOCALE: Final[str] = os.environ.get(UI_LOCALE_VARIABLE, FALLBACK_UI_LOCALE)
 

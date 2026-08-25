@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Callable, MutableMapping
 
 from hansard.adapters.summarization.chunking import ChunkOptions
@@ -33,11 +32,8 @@ def available_minutes_writers() -> tuple[str, ...]:
 def resolve_engine(settings: MinutesSettings) -> str:
     if not settings.enabled:
         return DISABLED_ENGINE
-    configured = getattr(settings, "engine", None)
-    if isinstance(configured, str) and configured.strip():
-        return configured.strip().lower()
-    from_environment = os.environ.get(ENGINE_ENVIRONMENT_VARIABLE, "")
-    return from_environment.strip().lower() or DEFAULT_ENGINE
+    configured = settings.engine.strip().lower()
+    return configured or DEFAULT_ENGINE
 
 
 def chunk_budget(settings: MinutesSettings) -> int:

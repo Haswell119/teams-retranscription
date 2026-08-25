@@ -141,7 +141,7 @@ If `prometheus-client` is not installed, every metric call in Hansard is a no-op
 also absent. Nothing else changes: measurement is optional, and its absence is not an error.
 
 For a process that does not serve the API, `hansard.observability.metrics.start_metrics_server()`
-starts a standalone exporter over the same registry, on `HANSARD_METRICS_PORT` (default `9095`).
+starts a standalone exporter over the same registry, on `HANSARD_API__PORT` (default `9095`).
 
 ### What is exposed
 

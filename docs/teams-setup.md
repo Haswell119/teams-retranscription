@@ -116,8 +116,8 @@ Because Teams renders in the viewer's locale, Hansard forces the browser locale 
 predictable:
 
 ```bash
-export HANSARD_CAPTURE_UI_LOCALE=en-US   # default; sets Chromium --lang and the Playwright locale
-export HANSARD_CAPTURE_UI_LOCALE=fr-FR   # French Teams UI - fully supported
+export HANSARD_CAPTURE__UI_LOCALE=en-US   # default; sets Chromium --lang and the Playwright locale
+export HANSARD_CAPTURE__UI_LOCALE=fr-FR   # French Teams UI - fully supported
 ```
 
 Trade-off: `en-US` is the language the selectors were written and tested against first, so it is the

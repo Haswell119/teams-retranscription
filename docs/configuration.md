@@ -383,7 +383,7 @@ Prefix `HANSARD_API__`.
 | `ROOT_PATH` | str | `""` | Path prefix behind a reverse proxy. |
 | `API_KEY` | SecretStr \| null | unset | Never logged. |
 | `CORS_ORIGINS` | tuple | `()` | |
-| `METRICS_ENABLED` | bool | `true` | Serves the Prometheus exposition on `GET /metrics`, unauthenticated, when `prometheus-client` is installed. Set it to `false` and the route is not registered at all. The standalone exporter for workers is separate and reads `HANSARD_METRICS_PORT`, defaulting to `9095`. See [observability](observability.md). |
+| `METRICS_ENABLED` | bool | `true` | Serves the Prometheus exposition on `GET /metrics`, unauthenticated, when `prometheus-client` is installed. Set it to `false` and the route is not registered at all. The standalone exporter for workers is separate and reads `HANSARD_API__PORT`, defaulting to `9095`. See [observability](observability.md). |
 
 These settings drive `hansard serve`, which runs the FastAPI application in
 `hansard.interfaces.api.app`. It needs the `api` extra.

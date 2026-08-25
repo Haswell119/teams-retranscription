@@ -36,22 +36,27 @@ def test_disabled_minutes_never_reach_the_network():
     assert isinstance(writer, ExtractiveMinutesWriter)
 
 
-def test_engine_can_be_selected_by_environment(monkeypatch):
-    monkeypatch.setenv(ENGINE_ENVIRONMENT_VARIABLE, "llm")
-    writer = build_minutes_writer(MinutesSettings())
+def test_engine_can_be_selected_explicitly():
+    writer = build_minutes_writer(MinutesSettings(engine="llm"))
     assert isinstance(writer, LlmMinutesWriter)
     assert isinstance(writer, MinutesWriter)
 
 
-def test_extractive_engine_is_selectable(monkeypatch):
-    monkeypatch.setenv(ENGINE_ENVIRONMENT_VARIABLE, "extractive")
-    assert build_minutes_writer(MinutesSettings()).name == "extractive"
+def test_the_environment_reaches_minutes_settings(monkeypatch):
+    from hansard.config import Settings
+
+    monkeypatch.setenv("HANSARD_MINUTES__ENGINE", "extractive")
+    assert Settings().minutes.engine == "extractive"
 
 
-def test_unknown_engine_is_refused(monkeypatch):
-    monkeypatch.setenv(ENGINE_ENVIRONMENT_VARIABLE, "gpt5")
+def test_extractive_engine_is_selectable():
+    assert build_minutes_writer(MinutesSettings(engine="extractive")).name == "extractive"
+
+
+def test_unknown_engine_is_refused():
+    settings = MinutesSettings.model_construct(**{**MinutesSettings().model_dump(), "engine": "gpt5"})
     with pytest.raises(ConfigurationError, match="unknown minutes engine"):
-        build_minutes_writer(MinutesSettings())
+        build_minutes_writer(settings)
 
 
 def test_auto_uses_the_llm_when_the_endpoint_answers(monkeypatch):

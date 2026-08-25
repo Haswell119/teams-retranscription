@@ -144,8 +144,8 @@ leaves the machine, because there is nowhere for it to go.
 
 | Variable | Effect |
 |---|---|
-| `HANSARD_WORKER_THREADS` | ONNX Runtime threads per worker. Default 4. Set to your core count minus two. |
-| `HANSARD_WORKER_REPLICAS` | Parallel workers. One per ~4 GB RAM. |
+| `OMP_NUM_THREADS` | ONNX Runtime threads per worker. Default 4. Set to your core count minus two. |
+| `WORKER_REPLICAS` | Parallel workers. One per ~4 GB RAM. |
 | `HANSARD_ASR__QUANTIZATION` | `int8` (default, ~2 GB RSS) or `none` (better accuracy, ~4.5 GB) |
 | `HANSARD_ASR__BATCH_SIZE` | Segments per ONNX call. Higher = faster and hungrier. |
 

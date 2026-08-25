@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Callable, MutableMapping
 from dataclasses import dataclass
 
@@ -58,9 +57,9 @@ class WebhookOptions:
 
 
 def webhook_options(settings: DeliverySettings, default_format: WebhookBodyFormat) -> WebhookOptions:
-    raw_secret = getattr(settings, "webhook_secret", None) or os.environ.get(WEBHOOK_SECRET_ENV)
+    raw_secret = settings.webhook_secret
     secret = raw_secret if isinstance(raw_secret, SecretStr) else _optional_secret(raw_secret)
-    raw_format = getattr(settings, "webhook_format", None) or os.environ.get(WEBHOOK_FORMAT_ENV)
+    raw_format = settings.webhook_format
     return WebhookOptions(secret=secret, body_format=_parse_format(raw_format, default_format))
 
 
@@ -99,7 +98,7 @@ def _graph_token_provider(credentials: ClientCredentials) -> CachedTokenProvider
 
 def _bot_credentials(settings: DeliverySettings, graph: ClientCredentials) -> ClientCredentials:
     connector = graph.with_scope(BOT_CONNECTOR_SCOPE)
-    tenant = getattr(settings, "bot_tenant_id", None) or os.environ.get(BOT_TENANT_ENV)
+    tenant = settings.bot_tenant_id
     if isinstance(tenant, str) and tenant:
         return connector.with_tenant(tenant)
     return connector

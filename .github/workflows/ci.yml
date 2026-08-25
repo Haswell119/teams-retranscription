@@ -64,6 +64,19 @@ jobs:
       - name: Assert the convention holds
         run: python scripts/check_no_comments.py src/hansard
 
+  documented-settings:
+    name: Documentation matches the settings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Create environment
+        run: |
+          uv venv --python 3.11 .venv
+          uv pip install --python .venv/bin/python -e .
+      - name: Assert every documented setting exists
+        run: .venv/bin/python scripts/check_documented_settings.py
+
   sovereignty:
     name: No network in the inference path
     runs-on: ubuntu-latest

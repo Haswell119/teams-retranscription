@@ -4,7 +4,7 @@ MODELS_DIR ?= $(CURDIR)/models
 EVAL_DIR ?= $(CURDIR)/bench/data
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev models bench bench-all bench-ami bench-asr bench-meetings bench-data test test-fast lint format typecheck check clean docker-api docker-worker docker-models helm-lint
+.PHONY: help install install-dev models bench bench-all bench-ami bench-asr bench-meetings bench-data test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
 
 help:
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -54,7 +54,11 @@ format: ## Apply formatting
 typecheck: ## Run the type checker
 	$(PYTHON) -m mypy src/hansard
 
-check: lint typecheck test ## Everything CI runs
+docs-check: ## Assert the documentation matches the settings
+	$(PYTHON) scripts/check_documented_settings.py
+	$(PYTHON) scripts/check_no_comments.py src/hansard
+
+check: lint typecheck test docs-check ## Everything CI runs
 
 docker-api: ## Build the API image
 	docker build -f deploy/docker/Dockerfile.api -t hansard-api:dev .
