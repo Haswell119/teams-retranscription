@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
+from hansard.adapters.diarization.consolidation import EmbeddingClusterConsolidator
 from hansard.adapters.diarization.refinement import SpeechCoverageRefiner
 from hansard.adapters.enhancement.segmentation import SegmentationPolicy, plan_segments
 from hansard.domain.audio import AudioClip
@@ -56,6 +57,7 @@ class TranscriptionPipeline:
     diarizer: Diarizer | None = None
     namer: SpeakerNamer | None = None
     refiner: SpeechCoverageRefiner | None = None
+    consolidator: EmbeddingClusterConsolidator | None = None
     segmentation: SegmentationPolicy = field(default_factory=SegmentationPolicy)
     max_speakers: int = 8
     min_speakers: int = 1
@@ -87,6 +89,7 @@ class TranscriptionPipeline:
             measured["words"] = float(transcript.word_count)
         self._record_recognition(transcript, prepared.duration, timings["recognise"], request)
         diarization = Diarization()
+        acoustic = clip
         if self.diarizer is not None:
             with _timed(timings, "diarise", logger) as measured:
                 acoustic = self.diarization_enhancer.enhance(clip) if self.diarization_enhancer else clip
@@ -100,6 +103,10 @@ class TranscriptionPipeline:
                 )
                 measured["speakers"] = float(diarization.speaker_count)
             record_diarization(diarization.speaker_count)
+        if self.consolidator is not None and diarization.speaker_count > 1:
+            with _timed(timings, "consolidate", logger) as measured:
+                diarization = self.consolidator.consolidate(diarization, acoustic)
+                measured["speakers"] = float(diarization.speaker_count)
         if self.refiner is not None and diarization.turns and speech:
             with _timed(timings, "refine", logger):
                 diarization = self.refiner.refine(diarization, speech)

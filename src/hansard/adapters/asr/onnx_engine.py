@@ -6,12 +6,15 @@ from typing import Any
 
 import numpy as np
 
+from hansard.adapters.asr.seams import trim_to_regions
 from hansard.adapters.asr.tokens import TokenStream, tokens_to_words, words_to_text
 from hansard.domain.audio import AudioClip
 from hansard.domain.errors import RecognitionError
 from hansard.domain.timespan import TimeSpan
 from hansard.domain.transcript import Transcript, Utterance
 from hansard.ports.asr import EngineProfile, RecognitionHints
+
+_FLOAT32_MEMORY_FACTOR = 2.0
 
 _KNOWN_PROFILES: dict[str, tuple[tuple[str, ...], int, str]] = {
     "nemo-parakeet-tdt-0.6b-v3": (
@@ -71,7 +74,9 @@ class OnnxRecognizer:
             languages=languages,
             emits_word_timestamps=True,
             emits_punctuation=True,
-            resident_memory_mb=memory if self.quantization == "int8" else int(memory * 2.2),
+            resident_memory_mb=memory
+            if self.quantization == "int8"
+            else int(memory * _FLOAT32_MEMORY_FACTOR),
             license_identifier=licence,
             supports_vocabulary_biasing=False,
             metadata={"quantization": self.quantization or "none"},
@@ -163,6 +168,7 @@ class OnnxRecognizer:
             covered = [span for _, span in usable]
             utterances.extend(self._decode_batch(model, waves, covered, language))
         utterances.sort(key=lambda utterance: utterance.span.start)
+        utterances = trim_to_regions(utterances, [utterance.span for utterance in utterances])
         return Transcript(
             utterances=tuple(utterances),
             language=language,

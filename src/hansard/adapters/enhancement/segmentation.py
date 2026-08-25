@@ -8,17 +8,26 @@ from hansard.domain.timespan import TimeSpan
 @dataclass(frozen=True, slots=True)
 class SegmentationPolicy:
     max_seconds: float = 30.0
-    min_seconds: float = 1.0
+    min_seconds: float = 0.15
     merge_gap_seconds: float = 0.4
     padding_seconds: float = 0.2
+    split_overlap_seconds: float = 2.0
 
 
-def _split_long(span: TimeSpan, max_seconds: float) -> list[TimeSpan]:
-    if span.duration <= max_seconds:
+def _split_long(span: TimeSpan, policy: SegmentationPolicy) -> list[TimeSpan]:
+    if span.duration <= policy.max_seconds:
         return [span]
-    parts = int(span.duration // max_seconds) + 1
-    step = span.duration / parts
-    return [TimeSpan(span.start + index * step, span.start + (index + 1) * step) for index in range(parts)]
+    overlap = min(policy.split_overlap_seconds, policy.max_seconds / 3.0)
+    stride = policy.max_seconds - overlap
+    parts: list[TimeSpan] = []
+    cursor = span.start
+    while cursor < span.end:
+        finish = min(cursor + policy.max_seconds, span.end)
+        parts.append(TimeSpan(cursor, finish))
+        if finish >= span.end:
+            break
+        cursor += stride
+    return parts
 
 
 def plan_segments(
@@ -27,7 +36,9 @@ def plan_segments(
     total_duration: float,
 ) -> tuple[TimeSpan, ...]:
     if not speech:
-        return tuple(_split_long(TimeSpan(0.0, total_duration), policy.max_seconds)) if total_duration else ()
+        if total_duration <= 0.0:
+            return ()
+        return tuple(_split_long(TimeSpan(0.0, total_duration), policy))
     grouped: list[TimeSpan] = [speech[0]]
     for span in speech[1:]:
         current = grouped[-1]
@@ -36,14 +47,13 @@ def plan_segments(
             grouped[-1] = TimeSpan(current.start, span.end)
         else:
             grouped.append(span)
-    expanded: list[TimeSpan] = []
+    planned: list[TimeSpan] = []
     for span in grouped:
-        expanded.extend(_split_long(span, policy.max_seconds))
-    padded = [
-        TimeSpan(
+        padded = TimeSpan(
             max(0.0, span.start - policy.padding_seconds),
             min(total_duration, span.end + policy.padding_seconds),
         )
-        for span in expanded
-    ]
-    return tuple(span for span in padded if span.duration >= policy.min_seconds)
+        if span.duration < policy.min_seconds:
+            continue
+        planned.extend(_split_long(padded, policy))
+    return tuple(planned)

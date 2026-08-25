@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from hansard.adapters.asr.registry import build_recognizer
 from hansard.adapters.attribution.fusion import WordLevelAttributor
 from hansard.adapters.attribution.naming import RosterSpeakerNamer
+from hansard.adapters.diarization.consolidation import EmbeddingClusterConsolidator
 from hansard.adapters.diarization.refinement import SpeechCoverageRefiner
 from hansard.adapters.diarization.registry import build_diarizer
 from hansard.adapters.enhancement.ffmpeg_chain import FfmpegEnhancer
@@ -97,6 +98,15 @@ class Composition:
                     minimum_coverage=settings.attribution.min_observation_overlap,
                     fallback_prefix=settings.attribution.fallback_label_prefix,
                 )
+            ),
+            consolidator=(
+                EmbeddingClusterConsolidator(
+                    models_dir=settings.runtime.models_dir,
+                    embedding_model=diarization.embedding_model,
+                    merge_similarity=diarization.merge_similarity,
+                )
+                if diarization.cluster_consolidation and diarization.engine != "null"
+                else None
             ),
             refiner=(
                 SpeechCoverageRefiner(maximum_extension=diarization.maximum_turn_extension)
