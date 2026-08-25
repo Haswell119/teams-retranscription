@@ -345,6 +345,30 @@ recognition weights. The gap is transcription, and it widens with the number of
 speakers. The INT8 meeting run predates CER reporting for meetings, so those
 cells do not exist and are not guessed at here.
 
+**Real meeting audio, where the difference stops being a rounding error.** The
+synthetic fixtures are clean close-talk recordings mixed together. AMI is not.
+Measured on ES2004a with everything else held fixed — same audio, same
+enhancement, the same 107 Silero spans covering 766 seconds, the same 93 planned
+segments, the same batching — and only the weights changed:
+
+| Weights | Hypothesis words | WER | Substitutions | Deletions | Insertions | Segments returning no text |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| float32 | **2239** | **18.87 %** | 82 | 386 | 37 | 2 of 93 |
+| INT8 | 1410 | 47.23 % | 47 | **1210** | 7 | 11 of 93 |
+
+INT8 does not mostly get words *wrong* on this audio. It stops producing them.
+Substitutions actually fall — there is less text left to be wrong about — while
+deletions more than triple and eleven whole segments come back as empty strings.
+Reference words missing from the transcript go from 14 % to 46 %.
+
+Read speech does not show this, and that is the trap: on FLEURS and LibriSpeech
+the same weights cost between 0.1 and 2.0 points, so a read-speech benchmark
+signs INT8 off as a cheap trade. The difference is the audio. Read speech is one
+close talker at a steady level in a quiet room; a meeting is several people at
+conversational level with crosstalk, room noise and a moving noise floor, and
+that is where the quantized encoder's dynamic range runs out. **Never qualify a
+quantized recogniser on read speech alone.**
+
 **Cost and benefit.**
 
 | | float32 (default) | INT8 (opt-in) |
@@ -366,10 +390,12 @@ resident set and 1.9 GB of disk — and it pays for that memory in accuracy.
 
 - **Use the default (float32)** unless something forces you not to — and
   especially for French meetings.
-- **Use INT8** when the recogniser has less than about 4 GB of memory to live in:
-  a small container, a shared node, or several concurrent meetings per worker.
-  Expect roughly two points of French word error rate as the price, and say so in
-  your own reporting.
+- **Use INT8** only when the recogniser has less than about 4 GB of memory to
+  live in and the recording is close-talk and clean — dictation, a single
+  presenter, a phone interview. On real multi-party meeting audio it costs 28
+  points of word error rate and loses nearly half the words, which is not a
+  trade any transcript should make. If a meeting worker cannot fit float32,
+  give it more memory rather than fewer words.
 
 ## 6. Engineering findings worth knowing
 
