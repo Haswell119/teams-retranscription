@@ -130,6 +130,7 @@ Prefix `HANSARD_ASR__`.
 | `LANGUAGE` | str \| null | unset | `fr`, `en`, … Leave it unset. Parakeet TDT 0.6b v3 is natively multilingual across 25 European languages and detects the language itself, which is what lets a French/English meeting transcribe in one pass. Pin it only for very short or very noisy audio, and accept that a language switch will then be mis-transcribed. |
 | `INTRA_OP_THREADS` | int | `0` | ONNX Runtime threads **within** one operator. `0` means "let ONNX Runtime decide", which usually means every core. **Set it to your core count** on a dedicated box, or to a smaller number on a shared one — otherwise one transcription starves everything else on the machine. |
 | `INTER_OP_THREADS` | int | `0` | Threads **across** independent operators. `0` leaves it to ONNX Runtime. Raising it rarely helps for this graph; prefer `INTRA_OP_THREADS` and `BATCH_SIZE`. |
+| `MEMORY_PROFILE` | `default` \| `compact` | `default` | `compact` turns off the ONNX Runtime pooling allocator, which reserves memory in large blocks and never returns it. Try it if a worker is being killed for memory on long meetings; it trades a little speed for a lower peak. It deliberately leaves memory-pattern planning alone — turning that off makes the recogniser fail outright on a batch whose segments differ in length. |
 
 ### Choosing a quantization: the accuracy profile
 
