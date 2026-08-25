@@ -202,7 +202,6 @@
       "reference_speakers": 4
     }
   ],
-  "ami_caveat": "this sweep only tested merge similarity at and below 0.70",
   "summ_re_rows": [
     {
       "minimum_speaker_seconds": 0.0,
@@ -320,5 +319,51 @@
     "053": 326,
     "057": 380,
     "063": 12
-  }
+  },
+  "ami_similarity_rows": [
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.85,
+      "macro_der_percent": 31.97,
+      "detected_speakers": [
+        5,
+        6,
+        6
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.8,
+      "macro_der_percent": 30.99,
+      "detected_speakers": [
+        5,
+        6,
+        5
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.75,
+      "macro_der_percent": 29.49,
+      "detected_speakers": [
+        5,
+        4,
+        5
+      ],
+      "reference_speakers": 4
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.7,
+      "macro_der_percent": 29.49,
+      "detected_speakers": [
+        5,
+        4,
+        5
+      ],
+      "reference_speakers": 4
+    }
+  ]
 }
