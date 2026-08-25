@@ -7,10 +7,12 @@ def options_for(profile):
     return OnnxRecognizer(memory_profile=profile, intra_op_threads=2)._session_options()
 
 
-def test_the_compact_profile_turns_off_the_allocations_that_grow_with_input_length():
-    options = options_for("compact")
-    assert options.enable_cpu_mem_arena is False
-    assert options.enable_mem_pattern is False
+def test_the_compact_profile_turns_off_the_pooling_allocator():
+    assert options_for("compact").enable_cpu_mem_arena is False
+
+
+def test_the_compact_profile_leaves_memory_pattern_planning_on():
+    assert options_for("compact").enable_mem_pattern is True
 
 
 def test_the_default_profile_leaves_the_runtime_defaults_alone():

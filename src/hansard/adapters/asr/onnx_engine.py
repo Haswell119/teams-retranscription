@@ -95,7 +95,6 @@ class OnnxRecognizer:
         options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         if self.memory_profile == "compact":
             options.enable_cpu_mem_arena = False
-            options.enable_mem_pattern = False
         return options
 
     def _load(self) -> Any:
