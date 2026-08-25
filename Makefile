@@ -4,7 +4,7 @@ MODELS_DIR ?= $(CURDIR)/models
 EVAL_DIR ?= $(CURDIR)/bench/data
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev models bench bench-all bench-ami gates bench-asr bench-meetings bench-data bench-data-ami test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
+.PHONY: help install install-dev models bench bench-all bench-ami bench-summre bench-data-summre gates bench-asr bench-meetings bench-data bench-data-ami test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
 
 help:
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -33,6 +33,12 @@ bench-asr: ## Benchmark speech recognition in French and English
 bench-meetings: ## Benchmark meeting transcription with speaker attribution
 	$(PYTHON) -m hansard.evaluation.run meetings --output bench/results/synthetic_meetings.json
 
+bench-data-summre: ## Fetch a real French meeting from the SUMM-RE corpus
+	$(PYTHON) -m hansard.evaluation.prepare --output $(EVAL_DIR) --summ-re --skip-fleurs --skip-meetings
+
+bench-summre: ## Benchmark on a real French meeting
+	$(PYTHON) -m hansard.evaluation.run summ-re --output bench/results/summ_re.json
+
 bench-ami: ## Benchmark on the AMI meeting corpus
 	$(PYTHON) -m hansard.evaluation.run ami --output bench/results/ami_mix_headset.json
 
@@ -41,7 +47,7 @@ gates: ## Check the measured results against the quality gates
 
 bench: bench-asr bench-meetings ## Run the fast benchmarks
 
-bench-all: bench bench-ami ## Run every benchmark including AMI
+bench-all: bench bench-ami bench-summre ## Run every benchmark including the real meeting corpora
 
 test: ## Run the test suite
 	$(PYTHON) -m pytest tests -q

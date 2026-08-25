@@ -8,6 +8,7 @@ import tarfile
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import soundfile as sf
@@ -27,6 +28,11 @@ AMI_TEST_MEETINGS: tuple[str, ...] = ("ES2004a", "IS1009a", "TS3003a")
 MLS_FRENCH_BASE = (
     "https://huggingface.co/datasets/facebook/multilingual_librispeech/resolve/main/data/mls_french/dev"
 )
+SUMM_RE_REVISION = "47cb4ec3437ef5497b6092b8c6d1e0b5b1d86dc0"
+SUMM_RE_SHARD = (
+    "https://huggingface.co/datasets/linagora/SUMM-RE/resolve/{revision}/data/dev/dev-00006-of-00029.parquet"
+)
+SUMM_RE_MEETINGS: tuple[str, ...] = ("020c_EBPZ",)
 MLS_FRENCH_SPEAKERS: tuple[str, ...] = (
     "10087_11650_000",
     "10177_10625_000",
@@ -207,6 +213,70 @@ def _collect_mls_speakers(root: Path) -> dict[str, list[tuple[Path, str]]]:
     return speakers
 
 
+def prepare_summ_re_corpus(output: Path, meetings: tuple[str, ...] = SUMM_RE_MEETINGS) -> Path:
+    import pyarrow.parquet as pq
+
+    root = output / "summ-re"
+    root.mkdir(parents=True, exist_ok=True)
+    if all((root / name / "mixed.wav").exists() for name in meetings):
+        return root
+    archive = _download(SUMM_RE_SHARD.format(revision=SUMM_RE_REVISION), output / "summ_re.parquet")
+    table = pq.read_table(archive)
+    tracks: dict[str, list[dict[str, Any]]] = {}
+    for row in table.to_pylist():
+        identifier = str(row.get("meeting_id"))
+        if identifier in meetings:
+            tracks.setdefault(identifier, []).append(row)
+    for identifier, rows in tracks.items():
+        _write_summ_re_meeting(root / identifier, rows)
+    archive.unlink(missing_ok=True)
+    return root
+
+
+def _write_summ_re_meeting(directory: Path, rows: list[dict[str, Any]]) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    mixture: np.ndarray | None = None
+    for row in rows:
+        speaker = str(row.get("speaker_id"))
+        payload = row.get("audio")
+        raw = payload["bytes"] if isinstance(payload, dict) else payload
+        samples = _resampled_mono(raw)
+        if mixture is None or len(samples) > len(mixture):
+            grown = np.zeros(len(samples), dtype=np.float32)
+            if mixture is not None:
+                grown[: len(mixture)] = mixture
+            mixture = grown
+        mixture[: len(samples)] += samples
+        records = [
+            {
+                "start": float(segment["start"]),
+                "end": float(segment["end"]),
+                "text": str(segment["transcript"]).strip(),
+            }
+            for segment in row.get("segments") or []
+            if str(segment["transcript"]).strip()
+        ]
+        (directory / f"{speaker}.json").write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
+    if mixture is None:
+        return
+    peak = float(np.max(np.abs(mixture)))
+    if peak > 0:
+        mixture = (mixture / peak * 0.85).astype(np.float32)
+    sf.write(str(directory / "mixed.wav"), mixture, TARGET_SAMPLE_RATE, subtype="PCM_16")
+
+
+def _resampled_mono(raw: Any) -> np.ndarray:
+    samples, rate = sf.read(io.BytesIO(raw), dtype="float32")
+    if samples.ndim > 1:
+        samples = samples.mean(axis=1)
+    if rate == TARGET_SAMPLE_RATE:
+        return np.asarray(samples, dtype=np.float32)
+    count = round(len(samples) * TARGET_SAMPLE_RATE / rate)
+    source = np.linspace(0.0, 1.0, num=len(samples), endpoint=False)
+    target = np.linspace(0.0, 1.0, num=count, endpoint=False)
+    return np.asarray(np.interp(target, source, samples), dtype=np.float32)
+
+
 def synthesise_meeting(
     recipe: MeetingRecipe, speakers: dict[str, list[tuple[Path, str]]], output: Path
 ) -> Path:
@@ -306,6 +376,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skip-meetings", action="store_true")
     parser.add_argument("--skip-french-meetings", action="store_true")
     parser.add_argument("--ami", action="store_true", help="also fetch the AMI test meetings")
+    parser.add_argument(
+        "--summ-re", action="store_true", help="also fetch a real French meeting from SUMM-RE"
+    )
     arguments = parser.parse_args(argv)
     output = arguments.output
     output.mkdir(parents=True, exist_ok=True)
@@ -327,6 +400,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ami -> {root}")
         except Exception as error:
             print(f"ami failed: {type(error).__name__}: {error}")
+
+    if arguments.summ_re:
+        try:
+            root = prepare_summ_re_corpus(output)
+            print(f"summ-re -> {root}")
+        except Exception as error:
+            print(f"summ-re failed: {type(error).__name__}: {error}")
 
     if not arguments.skip_meetings:
         root = prepare_librispeech_corpus(output)
