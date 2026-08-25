@@ -125,6 +125,21 @@ precisely the signal a speaker-embedding model relies on. Hansard therefore runs
 two audio chains: recognition receives the fully normalised audio, diarization
 receives a dynamics-preserving clip.
 
+**Segment length trades memory for accuracy, and the exchange rate is steep.**
+On a fourteen-minute AMI meeting, raising the recognition segment ceiling from
+28 to 120 seconds recovered 70 words and 4.1 points of word error rate, because
+the recognizer sees more context around each turn:
+
+| `audio.max_segment_seconds` | Segments | Words recovered | WER | Peak RAM |
+| ---: | ---: | ---: | ---: | ---: |
+| 28 | 63 | 65.4 % | 40.7 % | 2.3 GB |
+| 60 | 52 | 65.5 % | 40.7 % | 2.9 GB |
+| **120** | **50** | **68.9 %** | **36.6 %** | **4.2 GB** |
+
+Transcribing the same audio with no segmentation at all scored better still, so
+segmentation is a memory concession rather than an optimisation. The default is
+120 seconds; lower it if your nodes are small, and expect to pay for it.
+
 **The speaker-embedding model matters more than the clustering algorithm.**
 Swapping 3D-Speaker CAM++ for NVIDIA TitaNet, changing nothing else, moved
 speaker confusion from **47 %** to **0.01 %** on the same audio. CAM++ failed
