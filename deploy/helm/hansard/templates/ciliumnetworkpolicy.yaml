@@ -1,0 +1,145 @@
+{{- if include "hansard.capabilities.cilium" . }}
+{{- $ns := include "hansard.namespace" . }}
+{{- $cnp := .Values.cilium.networkPolicy }}
+{{- /*
+NKP on Nutanix/AHV runs Cilium (eBPF baseline since 2.17), so this is the
+optimal posture there. Elsewhere the CRD is absent, `enabled: auto` resolves to
+false, and only networkpolicy.yaml applies.
+
+READ THIS BEFORE DELETING THE toCIDRSet RULE:
+toFQDNs works by having Cilium's DNS proxy observe the pod's DNS answers and
+then allow the returned IPs. Teams REAL-TIME MEDIA does not work that way - the
+client learns media relay addresses through ICE/TURN signalling, not DNS, and
+then sends UDP straight at them. No DNS answer is ever seen for those IPs, so
+toFQDNs alone silently drops all media and you get a bot that joins and hears
+nothing. The toCIDRSet rule below is NOT redundant with toFQDNs.
+*/}}
+{{- if .Values.bot.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "bot") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels:
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "bot") | nindent 6 }}
+  egress:
+    {{- if $cnp.enableDnsProxy }}
+    # Mandatory companion to toFQDNs: without a DNS visibility rule Cilium
+    # never learns the name->IP mapping and every toFQDNs rule stays empty.
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    {{- end }}
+    - toFQDNs:
+        {{- range $cnp.botFqdns }}
+        - matchPattern: {{ . | quote }}
+        {{- end }}
+        {{- range $cnp.crlFqdns }}
+        # CRL/OCSP. A blocked revocation check looks like a hung TLS handshake.
+        - matchName: {{ . | quote }}
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "80"
+              protocol: TCP
+    - toCIDRSet:
+        {{- range .Values.networkPolicy.egress.teamsMedia.cidrs }}
+        - cidr: {{ . }}
+        {{- end }}
+        {{- range .Values.networkPolicy.egress.teamsMedia.cidrsV6 }}
+        - cidr: {{ . }}
+        {{- end }}
+      toPorts:
+        - ports:
+            {{- range .Values.networkPolicy.egress.teamsMedia.udpPorts }}
+            - port: {{ . | quote }}
+              protocol: UDP
+            {{- end }}
+            {{- range .Values.networkPolicy.egress.teamsMedia.tcpPorts }}
+            - port: {{ . | quote }}
+              protocol: TCP
+            {{- end }}
+    - toEndpoints:
+        - matchLabels:
+            {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "orchestrator") | nindent 12 }}
+{{- end }}
+{{- if .Values.orchestrator.enabled }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels:
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "orchestrator") | nindent 6 }}
+  egress:
+    {{- if $cnp.enableDnsProxy }}
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    {{- end }}
+    - toFQDNs:
+        {{- range $cnp.orchestratorFqdns }}
+        {{- if hasPrefix "*" . }}
+        - matchPattern: {{ . | quote }}
+        {{- else }}
+        - matchName: {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        {{- range $cnp.crlFqdns }}
+        - matchName: {{ . | quote }}
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "80"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "redis") | nindent 12 }}
+    - toEndpoints:
+        - matchLabels:
+            {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "bot") | nindent 12 }}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            {{- include "hansard.selectorLabels" . | nindent 12 }}
+    - fromEntities:
+        - cluster
+      toPorts:
+        - ports:
+            - port: {{ .Values.orchestrator.containerPort | quote }}
+              protocol: TCP
+{{- end }}
+{{- end }}

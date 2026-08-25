@@ -1,0 +1,147 @@
+{% extends "base.html.j2" %}
+{% block masthead_extra %}
+<nav class="toc" aria-labelledby="contents-heading">
+<h2 id="contents-heading">{{ labels.contents }}</h2>
+<ol>
+{% for section in sections %}
+<li><a href="#{{ section.anchor }}">{{ section.label }}</a></li>
+{% endfor %}
+</ol>
+</nav>
+{% endblock %}
+{% block content %}
+<main id="content">
+
+<section aria-labelledby="summary">
+<h2 id="summary">{{ headings.summary }}</h2>
+{% if document.summary %}
+<p class="lede">{{ document.summary }}</p>
+{% else %}
+<p class="empty">{{ labels.no_speech }}</p>
+{% endif %}
+</section>
+
+<section aria-labelledby="decisions">
+<h2 id="decisions">{{ headings.decisions }}</h2>
+{% if document.decisions %}
+<ol class="decisions">
+{% for decision in document.decisions %}
+<li>
+<p class="statement">{{ decision.statement }}</p>
+{% if decision.rationale %}
+<p class="rationale"><span class="label">{{ labels.rationale }}</span> {{ decision.rationale }}</p>
+{% endif %}
+{% if decision.timecodes %}
+<p class="sources"><span class="label">{{ labels.source }}</span> <span class="timecode">{{ decision.timecodes | join(', ') }}</span></p>
+{% endif %}
+</li>
+{% endfor %}
+</ol>
+{% else %}
+<p class="empty">{{ labels.no_decisions }}</p>
+{% endif %}
+</section>
+
+<section aria-labelledby="actions">
+<h2 id="actions">{{ headings.actions }}</h2>
+{% if document.actions %}
+<div class="table-wrap">
+<table aria-labelledby="actions">
+<thead>
+<tr>
+<th scope="col">{{ labels.owner }}</th>
+<th scope="col">{{ labels.action }}</th>
+<th scope="col">{{ labels.due }}</th>
+<th scope="col">{{ labels.source }}</th>
+</tr>
+</thead>
+<tbody>
+{% for action in document.actions %}
+<tr>
+<th scope="row">{{ action.owner }}</th>
+<td>{{ action.description }}</td>
+<td>{{ action.due }}</td>
+<td><span class="timecode">{{ action.timecodes | join(', ') if action.timecodes else '—' }}</span></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p class="empty">{{ labels.no_actions }}</p>
+{% endif %}
+</section>
+
+<section aria-labelledby="topics">
+<h2 id="topics">{{ headings.topics }}</h2>
+{% if document.topics %}
+{% for topic in document.topics %}
+<article class="topic">
+<h3 id="topic-{{ topic.position }}">{{ topic.position }}. {{ topic.title }} <span class="timecode">{{ topic.period }}</span></h3>
+<p>{{ topic.summary }}</p>
+{% if topic.key_points %}
+<ul>
+{% for point in topic.key_points %}
+<li>{{ point }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+</article>
+{% endfor %}
+{% else %}
+<p class="empty">{{ labels.no_topics }}</p>
+{% endif %}
+</section>
+
+<section aria-labelledby="questions">
+<h2 id="questions">{{ headings.questions }}</h2>
+{% if document.questions %}
+<ul class="questions">
+{% for question in document.questions %}
+<li>{{ question.question }}
+{%- if question.attribution %} <span class="attribution">{{ question.attribution }}</span>{% endif %}
+{%- if question.timecodes %} <span class="timecode">{{ question.timecodes | join(', ') }}</span>{% endif %}
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="empty">{{ labels.no_questions }}</p>
+{% endif %}
+</section>
+
+<section aria-labelledby="speaking">
+<h2 id="speaking">{{ headings.speaking }}</h2>
+{% if document.speaking %}
+<div class="table-wrap">
+<table aria-labelledby="speaking">
+<thead>
+<tr>
+<th scope="col">{{ labels.speaker }}</th>
+<th scope="col">{{ labels.duration }}</th>
+<th scope="col">{{ labels.share }}</th>
+</tr>
+</thead>
+<tbody>
+{% for entry in document.speaking %}
+<tr>
+<th scope="row">{{ entry.speaker }}</th>
+<td>{{ entry.duration_label }}</td>
+<td class="share-cell">
+<span class="share-value">{{ entry.share_label }}</span>
+<span class="bar-track" aria-hidden="true"><span class="bar" style="width: {{ entry.percentage }}%"></span></span>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p class="empty">{{ labels.no_speaking_time }}</p>
+{% endif %}
+</section>
+
+</main>
+{% endblock %}
+{% block colophon_extra %}
+<p>{{ document.generated_at }}</p>
+{% endblock %}

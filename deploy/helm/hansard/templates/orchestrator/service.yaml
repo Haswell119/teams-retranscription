@@ -1,0 +1,33 @@
+{{- if .Values.orchestrator.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "orchestrator") | nindent 4 }}
+  {{- with (mergeOverwrite (deepCopy .Values.commonAnnotations) .Values.orchestrator.service.annotations) }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.orchestrator.service.type }}
+  {{- if eq .Values.orchestrator.service.type "LoadBalancer" }}
+  {{- with .Values.orchestrator.service.loadBalancerIP }}
+  # MetalLB is the NKP load-balancer implementation; the address must be inside
+  # a configured IPAddressPool.
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- with .Values.orchestrator.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  ports:
+    - name: http
+      port: {{ .Values.orchestrator.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "orchestrator") | nindent 4 }}
+{{- end }}

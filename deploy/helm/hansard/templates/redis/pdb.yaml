@@ -1,0 +1,19 @@
+{{- if and .Values.redis.enabled .Values.redis.pdb.enabled }}
+{{- /*
+A single-replica Redis with minAvailable: 1 blocks every voluntary node drain.
+Leave this disabled unless you have replaced redis with an HA deployment via
+redis.args / redis.external.
+*/}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "redis") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "redis") | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.redis.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "redis") | nindent 6 }}
+{{- end }}

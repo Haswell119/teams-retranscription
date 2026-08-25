@@ -1,0 +1,162 @@
+{{- if .Values.bot.enabled }}
+{{- $chromiumArgs := list }}
+{{- if .Values.bot.chromium.noSandbox }}{{ $chromiumArgs = append $chromiumArgs "--no-sandbox" }}{{ end }}
+{{- if .Values.bot.chromium.disableDevShmUsage }}{{ $chromiumArgs = append $chromiumArgs "--disable-dev-shm-usage" }}{{ end }}
+{{- $chromiumArgs = concat $chromiumArgs .Values.bot.chromium.extraArgs }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "bot") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "bot") | nindent 4 }}
+data:
+  # The orchestrator loads this manifest and substitutes the ${...} placeholders
+  # once per meeting. Placeholders, all of them short-lived:
+  #   ${HANSARD_JOB_NAME}   generated, DNS-1123, carries no meeting identity
+  #   ${HANSARD_MEETING_REF} opaque correlation id (never a metric label)
+  #   ${HANSARD_JOIN_URL}   single-meeting join URL
+  #   ${HANSARD_UPLOAD_URL} pre-signed, single-object, short-TTL upload URL
+  # The bot NEVER receives a long-lived credential, a service-account token, or
+  # any Kubernetes API access.
+  {{ .Values.bot.configMapKey }}: |
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: ${HANSARD_JOB_NAME}
+      namespace: {{ include "hansard.namespace" . }}
+      labels:
+        {{- include "hansard.componentLabels" (dict "ctx" . "component" "bot") | nindent 8 }}
+      annotations:
+        hansard.io/meeting-ref: ${HANSARD_MEETING_REF}
+    spec:
+      backoffLimit: {{ .Values.bot.backoffLimit }}
+      ttlSecondsAfterFinished: {{ .Values.bot.ttlSecondsAfterFinished }}
+      activeDeadlineSeconds: {{ .Values.bot.activeDeadlineSeconds }}
+      completions: 1
+      parallelism: 1
+      template:
+        metadata:
+          labels:
+            {{- include "hansard.componentLabels" (dict "ctx" . "component" "bot") | nindent 12 }}
+          annotations:
+            # Evicting a bot mid-meeting loses the meeting. Never let the
+            # cluster autoscaler reclaim its node while it is recording.
+            cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+            {{- with .Values.bot.podAnnotations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        spec:
+          restartPolicy: Never
+          {{- include "hansard.imagePullSecrets" . | trim | nindent 10 }}
+          serviceAccountName: {{ include "hansard.serviceAccountName.bot" . }}
+          # Zero Kubernetes API surface.
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          {{- if not .Values.bot.hostUsers }}
+          # Opt-in user namespace. Needs the UserNamespacesSupport feature gate
+          # and a runtime that supports idmapped mounts.
+          hostUsers: false
+          {{- end }}
+          # >= 60 s so the bot can announce its departure, leave the meeting and
+          # flush its last audio buffer before SIGKILL.
+          terminationGracePeriodSeconds: {{ .Values.bot.terminationGracePeriodSeconds }}
+          securityContext:
+            {{- include "hansard.podSecurityContext" . | nindent 12 }}
+          {{- with .Values.bot.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.bot.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.bot.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.bot.priorityClassName }}
+          priorityClassName: {{ . }}
+          {{- end }}
+          containers:
+            - name: bot
+              image: {{ include "hansard.image" (dict "ctx" . "image" .Values.images.bot) }}
+              imagePullPolicy: {{ .Values.images.bot.pullPolicy }}
+              env:
+                - name: HANSARD_JOIN_URL
+                  value: ${HANSARD_JOIN_URL}
+                - name: HANSARD_UPLOAD_URL
+                  value: ${HANSARD_UPLOAD_URL}
+                - name: HANSARD_MEETING_REF
+                  value: ${HANSARD_MEETING_REF}
+                - name: HANSARD_CAPTURE__DISPLAY_NAME
+                  value: {{ .Values.capture.displayName | quote }}
+                - name: HANSARD_CAPTURE__ANNOUNCE_RECORDING
+                  value: {{ .Values.capture.announceRecording | quote }}
+                - name: HANSARD_CAPTURE__ANNOUNCEMENT_TEXT
+                  value: {{ .Values.capture.announcementText | quote }}
+                - name: HANSARD_CAPTURE__JOIN_TIMEOUT_SECONDS
+                  value: {{ .Values.capture.joinTimeoutSeconds | quote }}
+                - name: HANSARD_CAPTURE__LOBBY_TIMEOUT_SECONDS
+                  value: {{ .Values.capture.lobbyTimeoutSeconds | quote }}
+                - name: HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS
+                  value: {{ .Values.capture.silenceTimeoutSeconds | quote }}
+                - name: HANSARD_CAPTURE__ALONE_TIMEOUT_SECONDS
+                  value: {{ .Values.capture.aloneTimeoutSeconds | quote }}
+                - name: HANSARD_CAPTURE__MAX_DURATION_SECONDS
+                  value: {{ .Values.capture.maxDurationSeconds | quote }}
+                - name: HANSARD_CAPTURE__HEADLESS
+                  value: "true"
+                - name: HANSARD_RUNTIME__TELEMETRY_ENABLED
+                  value: "false"
+                - name: HANSARD_BROWSER_ARGS
+                  value: {{ join " " $chromiumArgs | quote }}
+                - name: HOME
+                  value: /tmp
+                - name: XDG_RUNTIME_DIR
+                  value: /tmp/xdg
+                - name: PULSE_RUNTIME_PATH
+                  value: /tmp/pulse
+                {{- include "hansard.ca.env" . | trim | nindent 16 }}
+                {{- include "hansard.proxyEnv" . | trim | nindent 16 }}
+                {{- with .Values.bot.extraEnv }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              # Chromium's own sandbox needs user-namespace clone syscalls that
+              # RuntimeDefault seccomp blocks. Playwright's answer is a custom
+              # seccomp profile, but Pod Security Standards baseline/restricted
+              # forbid Unconfined, Localhost needs a per-node file no operator
+              # can guarantee, and SYS_ADMIN is not in the baseline allow-list.
+              # So: --no-sandbox inside a restricted pod. Acceptable because the
+              # bot renders exactly one origin, is a single-use Job, and holds
+              # no secrets.
+              securityContext:
+                {{- include "hansard.containerSecurityContext" . | nindent 16 }}
+              # /dev/shm bytes are charged to the container memory limit.
+              # bot.shm.sizeLimit {{ .Values.bot.shm.sizeLimit }} + working set
+              # must stay under limits.memory {{ .Values.bot.resources.limits.memory }}.
+              resources:
+                {{- toYaml .Values.bot.resources | nindent 16 }}
+              volumeMounts:
+                - name: dshm
+                  mountPath: /dev/shm
+                - name: tmp
+                  mountPath: /tmp
+                - name: capture
+                  mountPath: /var/lib/hansard
+                {{- include "hansard.ca.volumeMounts" . | trim | nindent 16 }}
+          volumes:
+            # hostIPC: true is forbidden by the baseline Pod Security Standard,
+            # so shared memory is an in-pod tmpfs.
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: {{ .Values.bot.shm.sizeLimit }}
+            - name: tmp
+              emptyDir:
+                sizeLimit: 2Gi
+            - name: capture
+              emptyDir:
+                sizeLimit: 20Gi
+            {{- include "hansard.ca.volumes" . | trim | nindent 12 }}
+{{- end }}

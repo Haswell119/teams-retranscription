@@ -1,0 +1,44 @@
+# Canonical build-context ignore list for every image under deploy/docker/.
+# BuildKit reads the .dockerignore at the context root, and every Hansard image
+# is built with the repository root as its context.
+.git
+.github
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+*.egg-info
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+coverage.xml
+dist
+build
+node_modules
+
+# Never ship weights, captured audio or rendered artifacts inside an app image.
+models
+models-cache
+data
+artifacts
+out
+*.wav
+*.ogg
+*.mp3
+*.m4a
+*.onnx
+*.bin
+*.safetensors
+
+# Deployment assets are not part of any application image.
+deploy/helm
+deploy/compose
+docs
+
+# Local operator state.
+.env
+.envrc
+*.log
+.DS_Store

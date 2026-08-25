@@ -1,0 +1,12 @@
+# Hansard model manifest - the ONLY place model provenance is declared.
+#
+# Format:  <target-dir>|<huggingface-repo-id>|<revision>|<comma-separated allow patterns>
+#
+# <target-dir> MUST match how hansard.adapters.asr.registry resolves a local
+# model: models_dir / model_id.replace("/", "__").  Keep them in sync.
+#
+# Revisions are pinned so a rebuild is reproducible and an air-gapped mirror is
+# auditable.  Replace `main` with a commit SHA before any production build.
+nemo-parakeet-tdt-0.6b-v3|istupakov/parakeet-tdt-0.6b-v3-onnx|main|*.onnx,*.json,*.txt,*.md,*.model
+silero|istupakov/silero-vad-onnx|main|*.onnx,*.json,*.md
+onnx-community__pyannote-segmentation-3.0|onnx-community/pyannote-segmentation-3.0|main|onnx/*.onnx,*.json,*.md

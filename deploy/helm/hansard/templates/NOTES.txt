@@ -1,0 +1,130 @@
+{{- $fullname := include "hansard.fullname" . -}}
+{{- $ns := include "hansard.namespace" . -}}
+Hansard {{ .Chart.AppVersion }} is installed as {{ .Release.Name }} in namespace {{ $ns }}.
+
+{{ if not .Values.capture.announceRecording }}
+################################################################################
+#                                                                              #
+#   RECORDING ANNOUNCEMENT IS DISABLED (capture.announceRecording=false)        #
+#                                                                              #
+#   The bot will now join meetings WITHOUT telling participants that they are  #
+#   being recorded and transcribed. In many jurisdictions - including the EU    #
+#   under GDPR Art. 6/13, and all-party-consent US states - that is unlawful    #
+#   without another documented legal basis and prior notice.                    #
+#                                                                              #
+#   This is a legal decision, not a technical one. Re-enable it with:           #
+#       --set capture.announceRecording=true                                    #
+#                                                                              #
+################################################################################
+{{ end }}
+WHAT IS RUNNING
+{{ if .Values.orchestrator.enabled -}}
+  orchestrator   {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }} ({{ if .Values.orchestrator.autoscaling.enabled }}HPA {{ .Values.orchestrator.autoscaling.minReplicas }}-{{ .Values.orchestrator.autoscaling.maxReplicas }}{{ else }}{{ .Values.orchestrator.replicaCount }} replicas{{ end }})
+{{- end }}
+{{ if include "hansard.cpuEnabled" . -}}
+  worker (cpu)   {{ include "hansard.componentName" (dict "ctx" . "component" "worker-cpu") }}
+{{- end }}
+{{ if include "hansard.gpuEnabled" . -}}
+  worker (gpu)   {{ include "hansard.componentName" (dict "ctx" . "component" "worker-gpu") }}  [{{ .Values.worker.gpu.count }} x {{ .Values.worker.gpu.resourceName }}]
+{{- end }}
+{{ if .Values.redis.enabled -}}
+  queue          {{ include "hansard.redis.serviceName" . }}:{{ .Values.redis.port }} (in-chart)
+{{- else -}}
+  queue          external
+{{- end }}
+{{ if .Values.bot.enabled -}}
+  capture bot    Job template in ConfigMap {{ include "hansard.componentName" (dict "ctx" . "component" "bot") }}
+{{- end }}
+  models         source={{ .Values.models.source }} mounted at {{ .Values.models.mountPath }}
+  storage        backend={{ .Values.storage.backend }}
+
+NEXT STEPS
+
+1. Wait for the orchestrator to become ready:
+
+     kubectl -n {{ $ns }} rollout status deploy/{{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+
+2. Reach the API:
+{{ if .Values.orchestrator.ingress.enabled }}
+{{- range .Values.orchestrator.ingress.hosts }}
+     http{{ if $.Values.orchestrator.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+     kubectl -n {{ $ns }} port-forward svc/{{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }} 8000:{{ .Values.orchestrator.service.port }}
+     curl http://127.0.0.1:8000/healthz
+{{- end }}
+
+3. Verify the install end to end:
+
+     helm test {{ .Release.Name }} -n {{ $ns }}
+
+WHAT THIS CLUSTER DID NOT GET
+
+{{ if not (include "hansard.capabilities.serviceMonitor" .) -}}
+  * No ServiceMonitor: monitoring.coreos.com/v1 is absent (this is normal on
+    NKP Starter, where kube-prometheus-stack is a Pro+ entitlement). Metrics are
+    still exposed on the orchestrator at /metrics and on workers at :{{ .Values.worker.metricsPort }}/metrics.
+{{ end -}}
+{{ if not (include "hansard.capabilities.prometheusRule" .) -}}
+  * No PrometheusRule: same reason. The alert definitions live in
+    deploy/helm/hansard/templates/prometheusrule.yaml if you run Prometheus elsewhere.
+{{ end -}}
+{{ if not (include "hansard.capabilities.grafanaDashboard" .) -}}
+  * No Grafana dashboard ConfigMap. Import deploy/helm/hansard/dashboards/hansard.json by hand.
+{{ end -}}
+{{ if not (include "hansard.capabilities.keda" .) -}}
+  * No KEDA ScaledObject: keda.sh/v1alpha1 is absent.
+{{ if .Values.worker.autoscaling.hpa.enabled -}}
+    Falling back to a CPU HorizontalPodAutoscaler.
+{{- else -}}
+    Workers run at fixed replica counts. Set worker.autoscaling.hpa.enabled=true
+    for CPU-based scaling, or install KEDA for queue-depth scaling.
+{{- end }}
+{{ end -}}
+{{ if not (include "hansard.capabilities.cilium" .) -}}
+  * No CiliumNetworkPolicy: cilium.io/v2 is absent, so only the portable
+    CIDR-based NetworkPolicy applies. Remember that several Teams endpoints are
+    published as FQDNs with no IP ranges, so a pure CIDR allowlist is incomplete
+    - see docs/deployment-nkp.md.
+{{ end -}}
+{{ if not (include "hansard.capabilities.externalSecret" .) -}}
+{{ if not .Values.secrets.existingSecret -}}
+  * No ExternalSecret: external-secrets.io is absent (Pro+ on NKP). Secrets come
+    from the in-chart Secret; move them to secrets.existingSecret for production.
+{{ end -}}
+{{ end -}}
+
+THINGS TO CHECK BEFORE PRODUCTION
+
+{{ if .Values.secrets.create -}}
+  ! secrets.create=true puts credentials in Helm release data. Switch to
+    secrets.existingSecret or secrets.externalSecret.
+{{ end -}}
+{{ if not .Values.global.requireImageDigests -}}
+  ! Images are pinned by tag, not digest. Run `make -C deploy/docker digests`
+    and set images.<name>.digest, then global.requireImageDigests=true.
+{{ end -}}
+{{ if eq .Values.networkPolicy.egress.mode "open" -}}
+  ! networkPolicy.egress.mode=open allows the whole internet minus RFC1918.
+    Evaluation only.
+{{ end -}}
+{{ if not .Values.networkPolicy.enabled -}}
+  ! networkPolicy.enabled=false: there is no egress control at all.
+{{ end -}}
+{{ if and (eq .Values.storage.backend "filesystem") (not .Values.orchestrator.persistence.enabled) -}}
+  ! Artifacts are written to an emptyDir and vanish with the pod. Set
+    orchestrator.persistence.enabled=true or storage.backend=s3.
+{{ end -}}
+{{ if .Values.webhook.enabled -}}
+  ! webhook.enabled=true requires a PUBLIC inbound HTTPS endpoint that answers
+    the Microsoft Graph validation handshake in under 10 s. This is incompatible
+    with an air gap; polling is the sovereign default.
+{{ end -}}
+{{ if and .Values.minutes.enabled (not .Values.minutes.endpoint) -}}
+  ! minutes.enabled=true but minutes.endpoint is empty, so summarisation is off.
+    Point it at an OpenAI-compatible endpoint you host yourself.
+{{ end -}}
+
+Sovereignty check: no telemetry is emitted, no model is downloaded at runtime
+(HF_HUB_OFFLINE=1, HANSARD_RUNTIME__ALLOW_MODEL_DOWNLOADS=false), and the only
+egress permitted is what you configured under networkPolicy.egress.

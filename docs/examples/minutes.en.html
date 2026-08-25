@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="generator" content="Hansard">
+<meta name="robots" content="noindex, nofollow">
+<title>Weekly platform sync — Minutes</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --page-width: 54rem;
+  --bg: #fbfbfd;
+  --panel: #ffffff;
+  --ink: #16181d;
+  --ink-soft: #575d69;
+  --line: #e2e5ea;
+  --accent: #1d4ed8;
+  --accent-soft: #e9eefc;
+  --shadow: 0 1px 2px rgba(18, 20, 25, 0.06), 0 10px 24px rgba(18, 20, 25, 0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1015;
+    --panel: #151a21;
+    --ink: #e7eaf0;
+    --ink-soft: #a3acbb;
+    --line: #262d38;
+    --accent: #86a9ff;
+    --accent-soft: #1b2333;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  font-feature-settings: "kern" 1;
+}
+.page { max-width: var(--page-width); margin: 0 auto; padding: 2.75rem 1.25rem 4rem; }
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 0 0 0.5rem 0;
+  z-index: 10;
+}
+.skip-link:focus { left: 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 0.25rem; }
+.eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+h1 { font-size: clamp(1.65rem, 1.2rem + 2vw, 2.35rem); line-height: 1.18; letter-spacing: -0.02em; margin: 0; }
+h2 { font-size: 1.22rem; margin: 2.6rem 0 0.9rem; padding-bottom: 0.45rem; border-bottom: 1px solid var(--line); }
+h3 { font-size: 1.02rem; margin: 1.6rem 0 0.35rem; }
+p { margin: 0 0 0.85rem; }
+ul, ol { margin: 0 0 0.9rem; padding-left: 1.25rem; }
+li { margin: 0.25rem 0; }
+.metadata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  gap: 0.9rem 1.5rem;
+  margin: 1.4rem 0 0;
+  padding: 1.1rem 1.3rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  box-shadow: var(--shadow);
+}
+.metadata dt {
+  margin: 0;
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.metadata dd { margin: 0.15rem 0 0; }
+.toc { margin: 2.2rem 0 0; }
+.toc h2 { font-size: 0.74rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-soft); border: 0; margin: 0 0 0.5rem; padding: 0; }
+.toc ol { list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; padding: 0; margin: 0; }
+.toc a {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  text-decoration: none;
+  font-size: 0.84rem;
+}
+.timecode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.lede { font-size: 1.05rem; }
+.empty { color: var(--ink-soft); font-style: italic; }
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+table { width: 100%; border-collapse: collapse; font-size: 0.94rem; }
+th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: var(--accent-soft);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: 0; }
+.decisions { list-style: decimal; padding-left: 1.3rem; }
+.decisions li { margin: 0 0 1rem; }
+.statement { margin: 0 0 0.2rem; font-weight: 600; }
+.rationale, .sources { margin: 0; color: var(--ink-soft); font-size: 0.93rem; }
+.label { font-weight: 600; color: var(--ink); }
+.topic { margin: 0 0 1.6rem; }
+.topic h3 { display: flex; flex-wrap: wrap; gap: 0.55rem; align-items: baseline; }
+.questions { list-style: disc; }
+.attribution { color: var(--ink-soft); font-style: italic; }
+.share-cell { min-width: 9rem; }
+.share-value { display: block; font-variant-numeric: tabular-nums; }
+.bar-track { display: block; height: 0.42rem; margin-top: 0.3rem; border-radius: 999px; background: var(--accent-soft); }
+.bar { display: block; height: 100%; min-width: 2px; border-radius: 999px; background: var(--accent); }
+.turn { margin: 0 0 1.4rem; }
+.turn-heading { display: flex; flex-wrap: wrap; gap: 0.55rem; align-items: baseline; margin: 0 0 0.15rem; }
+.speaker { font-weight: 650; }
+.turn p:last-child { margin: 0; }
+.colophon { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 0.87rem; }
+.colophon p { margin: 0 0 0.35rem; }
+@media (max-width: 30rem) {
+  .page { padding: 1.75rem 0.9rem 3rem; }
+  th, td { padding: 0.5rem 0.6rem; }
+}
+@media print {
+  :root {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --ink: #000000;
+    --ink-soft: #3a3a3a;
+    --line: #b8bcc4;
+    --accent: #000000;
+    --accent-soft: #eeeeee;
+    --shadow: none;
+  }
+  body { font-size: 10.5pt; line-height: 1.45; }
+  .page { max-width: none; padding: 0; }
+  .skip-link, .toc { display: none; }
+  a { color: inherit; text-decoration: none; }
+  h2 { break-after: avoid; }
+  section, article, tr, li, .metadata { break-inside: avoid; }
+  .table-wrap { overflow: visible; box-shadow: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<div class="page">
+<header class="masthead">
+<p class="eyebrow">Minutes</p>
+<h1>Weekly platform sync</h1>
+<dl class="metadata">
+<div>
+<dt>Date</dt>
+<dd><time datetime="2026-06-03T09:30:00+00:00">3 June 2026 at 09:30 (UTC)</time></dd>
+</div>
+<div>
+<dt>Duration</dt>
+<dd>25 min</dd>
+</div>
+<div>
+<dt>Attendees</dt>
+<dd>Amara Okafor, Léa Fontaine, Jonas Weber</dd>
+</div>
+<div>
+<dt>Language</dt>
+<dd>English (en)</dd>
+</div>
+<div>
+<dt>Produced with</dt>
+<dd>parakeet (nemo-parakeet-tdt-0.6b-v3), sortformer (diar_streaming_sortformer_4spk), qwen3 (qwen3-8b-instruct)</dd>
+</div>
+</dl>
+<nav class="toc" aria-labelledby="contents-heading">
+<h2 id="contents-heading">Contents</h2>
+<ol>
+<li><a href="#summary">Executive summary</a></li>
+<li><a href="#decisions">Key decisions</a></li>
+<li><a href="#actions">Action items</a></li>
+<li><a href="#topics">Discussion by topic</a></li>
+<li><a href="#questions">Open questions</a></li>
+<li><a href="#speaking">Speaking time</a></li>
+</ol>
+</nav>
+</header>
+<main id="content">
+
+<section aria-labelledby="summary">
+<h2 id="summary">Executive summary</h2>
+<p class="lede">The team confirmed that release 4.2 is ready apart from the German locale, agreed a two-week on-call rotation after last Tuesday&#39;s night incident, and approved two additional GPU nodes for the sovereign transcription cluster.</p>
+</section>
+
+<section aria-labelledby="decisions">
+<h2 id="decisions">Key decisions</h2>
+<ol class="decisions">
+<li>
+<p class="statement">Release 4.2 ships on 12 June with the German locale disabled.</p>
+<p class="rationale"><span class="label">Rationale</span> The billing strings are neither translated nor proof-read, and the release window is fixed.</p>
+<p class="sources"><span class="label">Source</span> <span class="timecode">00:06:11</span></p>
+</li>
+<li>
+<p class="statement">The on-call rotation moves to a two-week cycle from July.</p>
+<p class="rationale"><span class="label">Rationale</span> A weekly cycle concentrates night work on a single responder.</p>
+<p class="sources"><span class="label">Source</span> <span class="timecode">00:13:32</span></p>
+</li>
+<li>
+<p class="statement">Two additional GPU nodes are approved for the transcription cluster.</p>
+<p class="sources"><span class="label">Source</span> <span class="timecode">00:23:45</span></p>
+</li>
+</ol>
+</section>
+
+<section aria-labelledby="actions">
+<h2 id="actions">Action items</h2>
+<div class="table-wrap">
+<table aria-labelledby="actions">
+<thead>
+<tr>
+<th scope="col">Owner</th>
+<th scope="col">Action</th>
+<th scope="col">Due</th>
+<th scope="col">Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row">Léa Fontaine</th>
+<td>Disable the German locale in the 4.2 release branch and open a translation ticket.</td>
+<td>2026-06-10</td>
+<td><span class="timecode">00:06:20</span></td>
+</tr>
+<tr>
+<th scope="row">Jonas Weber</th>
+<td>Circulate the incident review notes and the new hand-over template.</td>
+<td>2026-06-05</td>
+<td><span class="timecode">00:10:52</span></td>
+</tr>
+<tr>
+<th scope="row">Unassigned</th>
+<td>Draft the procurement request for the two GPU nodes.</td>
+<td>—</td>
+<td><span class="timecode">—</span></td>
+</tr>
+<tr>
+<th scope="row">Amara Okafor</th>
+<td>Compare on-premises | cloud costs for the cluster before the board meeting.</td>
+<td>2026-06-18</td>
+<td><span class="timecode">—</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section aria-labelledby="topics">
+<h2 id="topics">Discussion by topic</h2>
+<article class="topic">
+<h3 id="topic-1">1. Release 4.2 readiness <span class="timecode">00:00:00 – 00:07:00</span></h3>
+<p>Every runner is green and the only blocker is the German locale, where 47 billing strings are still untranslated and unreviewed.</p>
+<ul>
+<li>Build and integration suites pass on all runners.</li>
+<li>47 untranslated strings remain, all in the billing screens.</li>
+<li>The release window on 12 June cannot be moved.</li>
+</ul>
+</article>
+<article class="topic">
+<h3 id="topic-2">2. On-call rotation and incident review <span class="timecode">00:07:00 – 00:17:00</span></h3>
+<p>Last Tuesday&#39;s night incident showed that the weekly rotation concentrates fatigue and that hand-over notes are not written down.</p>
+<ul>
+<li>The pager fired at 02:00 for a responder at the end of a full week.</li>
+<li>Hand-over notes were missing entirely.</li>
+</ul>
+</article>
+<article class="topic">
+<h3 id="topic-3">3. Transcription cluster capacity <span class="timecode">00:17:00 – 00:25:00</span></h3>
+<p>Peak queue time exceeds ten minutes; two additional GPU nodes bring it back within the service target without leaving the data centre.</p>
+<ul>
+<li>Queue time at peak is above the ten-minute target.</li>
+</ul>
+</article>
+</section>
+
+<section aria-labelledby="questions">
+<h2 id="questions">Open questions</h2>
+<ul class="questions">
+<li>Do we need a second reviewer for the German locale before the next release? <span class="attribution">raised by Léa Fontaine</span> <span class="timecode">00:07:35</span></li>
+<li>Who owns the monthly cost report once the cluster is live?</li>
+</ul>
+</section>
+
+<section aria-labelledby="speaking">
+<h2 id="speaking">Speaking time</h2>
+<div class="table-wrap">
+<table aria-labelledby="speaking">
+<thead>
+<tr>
+<th scope="col">Speaker</th>
+<th scope="col">Duration</th>
+<th scope="col">Share</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row">Amara Okafor</th>
+<td>10 min 12 s</td>
+<td class="share-cell">
+<span class="share-value">40.8%</span>
+<span class="bar-track" aria-hidden="true"><span class="bar" style="width: 40.8%"></span></span>
+</td>
+</tr>
+<tr>
+<th scope="row">Léa Fontaine</th>
+<td>8 min 18 s</td>
+<td class="share-cell">
+<span class="share-value">33.2%</span>
+<span class="bar-track" aria-hidden="true"><span class="bar" style="width: 33.2%"></span></span>
+</td>
+</tr>
+<tr>
+<th scope="row">Jonas Weber</th>
+<td>5 min 10 s</td>
+<td class="share-cell">
+<span class="share-value">20.7%</span>
+<span class="bar-track" aria-hidden="true"><span class="bar" style="width: 20.7%"></span></span>
+</td>
+</tr>
+<tr>
+<th scope="row">Unidentified speaker</th>
+<td>1 min 18 s</td>
+<td class="share-cell">
+<span class="share-value">5.3%</span>
+<span class="bar-track" aria-hidden="true"><span class="bar" style="width: 5.3%"></span></span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+</main>
+<footer class="colophon">
+<p>Transcribed and summarised locally by Hansard using parakeet (nemo-parakeet-tdt-0.6b-v3), sortformer (diar_streaming_sortformer_4spk), qwen3 (qwen3-8b-instruct). No audio, transcript or minutes left the organisation.</p>
+<p>Generated on 3 June 2026 at 10:02 (UTC)</p>
+</footer>
+</div>
+</body>
+</html>

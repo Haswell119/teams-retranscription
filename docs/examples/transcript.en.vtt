@@ -1,0 +1,71 @@
+WEBVTT - Weekly platform sync
+
+NOTE
+Transcribed locally by Hansard. No data left the organisation.
+
+1
+00:00:08.000 --> 00:00:14.600
+<v Amara Okafor>Good morning everyone, let us start with
+the release four point two readiness.</v>
+
+2
+00:00:15.200 --> 00:00:20.674
+<v Léa Fontaine>The build is green on every runner, but
+the German locale files still have forty</v>
+
+3
+00:00:20.674 --> 00:00:24.900
+<v Léa Fontaine>seven untranslated strings and nobody has
+proof-read them yet.</v>
+
+4
+00:00:25.400 --> 00:00:29.100
+Sorry, could you repeat the last figure?
+
+5
+00:00:29.600 --> 00:00:33.000
+<v Léa Fontaine>Forty seven strings, all of them in the
+billing screens.</v>
+
+6
+00:00:33.400 --> 00:00:34.400
+<v Amara Okafor>Understood.</v>
+
+7
+00:06:10.500 --> 00:06:16.234
+<v Amara Okafor>Then we ship four point two on the twelfth
+of June with the German locale disabled,</v>
+
+8
+00:06:16.234 --> 00:06:19.800
+<v Amara Okafor>and we open a follow-up ticket for the
+translations.</v>
+
+9
+00:10:40.000 --> 00:10:46.355
+<v Jonas Weber>On the incident of last Tuesday: the pager
+fired at two in the morning, the responder</v>
+
+10
+00:10:46.355 --> 00:10:51.500
+<v Jonas Weber>had already worked a full week, and the
+hand-over notes were missing.</v>
+
+11
+00:13:32.000 --> 00:13:38.400
+<v Amara Okafor>Agreed, we move the rotation to a two-week
+cycle starting in July.</v>
+
+12
+00:19:40.000 --> 00:19:47.000
+<v Léa Fontaine>For the transcription cluster we need two
+more GPU nodes to keep the queue under ten</v>
+
+13
+00:19:47.713 --> 00:19:49.200
+<v Léa Fontaine>minutes at peak.</v>
+
+14
+00:23:45.000 --> 00:23:51.800
+<v Amara Okafor>Approved. Please draft the procurement
+request before the board meeting.</v>

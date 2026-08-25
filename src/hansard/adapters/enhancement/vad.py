@@ -17,6 +17,7 @@ class SileroVoiceActivityDetector:
     min_speech_seconds: float = 0.25
     min_silence_seconds: float = 0.35
     speech_pad_seconds: float = 0.15
+    max_speech_seconds: float = 28.0
     model_path: str | None = None
     _detector: Any | None = field(default=None, init=False, repr=False)
 
@@ -34,19 +35,26 @@ class SileroVoiceActivityDetector:
     def detect(self, clip: AudioClip) -> tuple[TimeSpan, ...]:
         if clip.frame_count == 0:
             return ()
+        import numpy as np
+
         detector = self._load()
-        segments = detector.segment(
-            [clip.samples],
-            sample_rate=clip.sample_rate,
+        waveforms = clip.samples.reshape(1, -1).astype(np.float32)
+        lengths = np.array([clip.frame_count], dtype=np.int64)
+        batches = detector.segment_batch(
+            waveforms,
+            lengths,
+            clip.sample_rate,
             threshold=self.threshold,
-            min_speech_duration=self.min_speech_seconds,
-            min_silence_duration=self.min_silence_seconds,
-            speech_pad=self.speech_pad_seconds,
+            min_speech_duration_ms=self.min_speech_seconds * 1000.0,
+            max_speech_duration_s=self.max_speech_seconds,
+            min_silence_duration_ms=self.min_silence_seconds * 1000.0,
+            speech_pad_ms=self.speech_pad_seconds * 1000.0,
         )
         spans = [
-            TimeSpan(float(segment.start), float(segment.end)).shifted(clip.offset)
-            for batch in segments
-            for segment in batch
+            TimeSpan(start / clip.sample_rate, end / clip.sample_rate).shifted(clip.offset)
+            for batch in batches
+            for start, end in batch
+            if end > start
         ]
         return tuple(merge_adjacent(spans, 0.0))
 

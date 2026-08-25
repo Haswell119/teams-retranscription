@@ -1,0 +1,83 @@
+{{- if and .Values.orchestrator.enabled .Values.orchestrator.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "orchestrator") | nindent 4 }}
+  {{- with (mergeOverwrite (deepCopy .Values.commonAnnotations) .Values.orchestrator.ingress.annotations) }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # NKP ships Traefik v3 as `kommander-traefik`. k3s calls it `traefik`;
+  # EKS/AKS/GKE typically `alb` / `nginx` / `gce`. Never guess: set it.
+  {{- with .Values.orchestrator.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.orchestrator.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.orchestrator.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "hansard.componentName" (dict "ctx" $ "component" "orchestrator") }}
+                port:
+                  name: http
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- if and .Values.orchestrator.enabled .Values.webhook.enabled .Values.webhook.ingress.enabled }}
+---
+{{- /*
+Microsoft Graph change notifications require a PUBLIC inbound HTTPS endpoint
+that answers the validation handshake within 10 s and returns 2xx within 3 s.
+This is fundamentally incompatible with an air gap, which is why polling is the
+default and this object only exists when webhook.enabled is explicitly set.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "webhook") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "webhook") | nindent 4 }}
+  annotations:
+    {{- with .Values.webhook.allowedSourceRanges }}
+    # Traefik v3 (NKP) source-range middleware equivalent; also set the same
+    # ranges on any perimeter firewall in front of the cluster.
+    traefik.ingress.kubernetes.io/router.middlewares: ""
+    hansard.io/allowed-source-ranges: {{ join "," . | quote }}
+    {{- end }}
+    {{- with (mergeOverwrite (deepCopy .Values.commonAnnotations) .Values.webhook.ingress.annotations) }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- with .Values.webhook.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.webhook.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ required "webhook.ingress.host is required when webhook.enabled" .Values.webhook.ingress.host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.webhook.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+                port:
+                  name: http
+{{- end }}

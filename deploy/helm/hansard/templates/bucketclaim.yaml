@@ -1,0 +1,41 @@
+{{- if and (eq .Values.storage.backend "s3") (include "hansard.capabilities.cosi" .) }}
+{{- $cosi := .Values.storage.cosi }}
+{{- /*
+Nutanix Objects through the COSI driver `ntnx.objectstorage.k8s.io`. The
+BucketClass and BucketAccessClass are created by the platform team, not by this
+chart, and on NKP they are conventionally both named `cosi-nutanix-nkp`.
+
+Nutanix Objects is S3-compatible but NOT region aware and NOT virtual-host
+addressable: keep storage.s3.forcePathStyle true and leave the region as the
+us-east-1 placeholder. Supply its CA through global.customCA - never disable
+certificate verification.
+*/}}
+apiVersion: objectstorage.k8s.io/v1alpha1
+kind: BucketClaim
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "artifacts") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  bucketClassName: {{ $cosi.bucketClassName }}
+  protocols:
+    - {{ $cosi.protocol }}
+---
+apiVersion: objectstorage.k8s.io/v1alpha1
+kind: BucketAccess
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "artifacts") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  bucketClaimName: {{ include "hansard.componentName" (dict "ctx" . "component" "artifacts") }}
+  bucketAccessClassName: {{ $cosi.bucketAccessClassName }}
+  protocol: {{ $cosi.protocol }}
+  # The driver writes S3 credentials here; mount it into the workloads with
+  # storage.s3.credentials.existingSecret.
+  credentialsSecretName: {{ include "hansard.componentName" (dict "ctx" . "component" "artifacts") }}
+{{- end }}

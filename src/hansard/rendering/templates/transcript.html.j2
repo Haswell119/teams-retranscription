@@ -1,0 +1,15 @@
+{% extends "base.html.j2" %}
+{% block content %}
+<main id="content">
+{% if document.blocks %}
+{% for block in document.blocks %}
+<article class="turn">
+<p class="turn-heading"><span class="speaker">{{ block.speaker }}</span><span class="timecode">{{ block.timecode }}</span></p>
+<p>{{ block.text }}</p>
+</article>
+{% endfor %}
+{% else %}
+<p class="empty">{{ labels.no_speech }}</p>
+{% endif %}
+</main>
+{% endblock %}

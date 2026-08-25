@@ -1,0 +1,3 @@
+{{- if include "hansard.cpuEnabled" . }}
+{{ include "hansard.worker.deployment" (dict "ctx" . "variant" "cpu") }}
+{{- end }}

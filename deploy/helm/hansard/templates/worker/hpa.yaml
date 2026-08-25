@@ -1,0 +1,42 @@
+{{- /*
+Autoscaling precedence, in order:
+  1. KEDA ScaledObject on Redis Stream pending entries (see keda-scaledobject.yaml)
+  2. plain HPA on CPU utilisation - this file
+  3. fixed replicas
+KEDA is never required. When it is absent, `enabled: auto` resolves to false
+and this HPA takes over if worker.autoscaling.hpa.enabled is set.
+*/}}
+{{- if and .Values.worker.autoscaling.hpa.enabled (not (include "hansard.capabilities.keda" .)) }}
+{{- range $variant := list "cpu" "gpu" }}
+{{- $gate := ternary (include "hansard.gpuEnabled" $) (include "hansard.cpuEnabled" $) (eq $variant "gpu") }}
+{{- if $gate }}
+{{- $component := printf "worker-%s" $variant }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" $ "component" $component) }}
+  namespace: {{ include "hansard.namespace" $ }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" $ "component" $component) | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "hansard.componentName" (dict "ctx" $ "component" $component) }}
+  minReplicas: {{ $.Values.worker.autoscaling.hpa.minReplicas }}
+  maxReplicas: {{ $.Values.worker.autoscaling.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $.Values.worker.autoscaling.hpa.targetCPUUtilizationPercentage }}
+  {{- with $.Values.worker.autoscaling.hpa.behavior }}
+  behavior:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

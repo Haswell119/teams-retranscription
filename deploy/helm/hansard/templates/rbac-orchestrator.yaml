@@ -1,0 +1,45 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "orchestrator") | nindent 4 }}
+# Namespaced Role, never a ClusterRole. The orchestrator's entire privilege is
+# "run a capture Job in my own namespace and watch it".
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch", "create"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames:
+      - {{ include "hansard.componentName" (dict "ctx" . "component" "bot") }}
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "orchestrator") | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "hansard.serviceAccountName.orchestrator" . }}
+    namespace: {{ include "hansard.namespace" . }}
+{{- end }}

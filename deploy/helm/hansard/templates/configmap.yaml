@@ -1,0 +1,118 @@
+{{- include "hansard.validate" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "config") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+# Every key here becomes a HANSARD_* environment variable consumed by
+# hansard.config.Settings (env_prefix HANSARD_, nested delimiter __).
+# Secrets never appear in this ConfigMap; see secret.yaml / externalsecret.yaml.
+data:
+  HANSARD_RUNTIME__LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  HANSARD_RUNTIME__LOG_FORMAT: {{ .Values.config.logFormat | quote }}
+  HANSARD_RUNTIME__WORKSPACE: {{ .Values.config.workspace | quote }}
+  HANSARD_RUNTIME__MAX_CONCURRENT_MEETINGS: {{ .Values.config.maxConcurrentMeetings | quote }}
+  HANSARD_RUNTIME__WORKER_THREADS: {{ .Values.config.workerThreads | quote }}
+  HANSARD_RUNTIME__TELEMETRY_ENABLED: "false"
+
+  HANSARD_ASR__ENGINE: {{ .Values.asr.engine | quote }}
+  HANSARD_ASR__MODEL_ID: {{ .Values.asr.modelId | quote }}
+  HANSARD_ASR__QUANTIZATION: {{ .Values.asr.quantization | quote }}
+  HANSARD_ASR__BATCH_SIZE: {{ .Values.asr.batchSize | quote }}
+  HANSARD_ASR__BEAM_SIZE: {{ .Values.asr.beamSize | quote }}
+  HANSARD_ASR__INTRA_OP_THREADS: {{ .Values.asr.intraOpThreads | quote }}
+  HANSARD_ASR__INTER_OP_THREADS: {{ .Values.asr.interOpThreads | quote }}
+  HANSARD_ASR__FALLBACK_ENGINE: {{ .Values.asr.fallbackEngine | quote }}
+  HANSARD_ASR__FALLBACK_MODEL_ID: {{ .Values.asr.fallbackModelId | quote }}
+  {{- with .Values.asr.language }}
+  HANSARD_ASR__LANGUAGE: {{ . | quote }}
+  {{- end }}
+
+  HANSARD_DIARIZATION__ENGINE: {{ .Values.diarization.engine | quote }}
+  HANSARD_DIARIZATION__MODEL_ID: {{ .Values.diarization.modelId | quote }}
+  HANSARD_DIARIZATION__MAX_SPEAKERS: {{ .Values.diarization.maxSpeakers | quote }}
+  HANSARD_DIARIZATION__MIN_SPEAKERS: {{ .Values.diarization.minSpeakers | quote }}
+
+  HANSARD_VAD__ENGINE: {{ .Values.vad.engine | quote }}
+  HANSARD_VAD__THRESHOLD: {{ .Values.vad.threshold | quote }}
+
+  HANSARD_MINUTES__ENABLED: {{ and .Values.minutes.enabled (ne .Values.minutes.endpoint "") | quote }}
+  HANSARD_MINUTES__MODEL_ID: {{ .Values.minutes.modelId | quote }}
+  HANSARD_MINUTES__CONTEXT_TOKENS: {{ .Values.minutes.contextTokens | quote }}
+  HANSARD_MINUTES__MAX_OUTPUT_TOKENS: {{ .Values.minutes.maxOutputTokens | quote }}
+  HANSARD_MINUTES__TEMPERATURE: {{ .Values.minutes.temperature | quote }}
+  {{- with .Values.minutes.endpoint }}
+  HANSARD_MINUTES__ENDPOINT: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.minutes.language }}
+  HANSARD_MINUTES__LANGUAGE: {{ . | quote }}
+  {{- end }}
+
+  HANSARD_CAPTURE__ENGINE: {{ .Values.capture.engine | quote }}
+  HANSARD_CAPTURE__DISPLAY_NAME: {{ .Values.capture.displayName | quote }}
+  HANSARD_CAPTURE__ANNOUNCE_RECORDING: {{ .Values.capture.announceRecording | quote }}
+  HANSARD_CAPTURE__ANNOUNCEMENT_TEXT: {{ .Values.capture.announcementText | quote }}
+  HANSARD_CAPTURE__JOIN_TIMEOUT_SECONDS: {{ .Values.capture.joinTimeoutSeconds | quote }}
+  HANSARD_CAPTURE__LOBBY_TIMEOUT_SECONDS: {{ .Values.capture.lobbyTimeoutSeconds | quote }}
+  HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS: {{ .Values.capture.silenceTimeoutSeconds | quote }}
+  HANSARD_CAPTURE__ALONE_TIMEOUT_SECONDS: {{ .Values.capture.aloneTimeoutSeconds | quote }}
+  HANSARD_CAPTURE__MAX_DURATION_SECONDS: {{ .Values.capture.maxDurationSeconds | quote }}
+  HANSARD_CAPTURE__HEADLESS: "true"
+
+  HANSARD_DELIVERY__DEFAULT_CHANNELS: {{ join "," .Values.delivery.channels | quote }}
+  HANSARD_DELIVERY__FORMATS: {{ join "," .Values.delivery.formats | quote }}
+  HANSARD_DELIVERY__OUTPUT_DIR: {{ .Values.delivery.outputDir | quote }}
+  {{- with .Values.delivery.smtp.host }}
+  HANSARD_DELIVERY__SMTP__HOST: {{ . | quote }}
+  HANSARD_DELIVERY__SMTP__PORT: {{ $.Values.delivery.smtp.port | quote }}
+  HANSARD_DELIVERY__SMTP__SENDER: {{ $.Values.delivery.smtp.sender | quote }}
+  HANSARD_DELIVERY__SMTP__USE_TLS: {{ $.Values.delivery.smtp.useTls | quote }}
+  HANSARD_DELIVERY__SMTP__START_TLS: {{ $.Values.delivery.smtp.startTls | quote }}
+  {{- end }}
+  {{- if .Values.delivery.graph.enabled }}
+  HANSARD_DELIVERY__GRAPH__AUTHORITY: {{ .Values.delivery.graph.authority | quote }}
+  HANSARD_DELIVERY__GRAPH__BASE_URL: {{ .Values.delivery.graph.baseUrl | quote }}
+  HANSARD_DELIVERY__GRAPH__SCOPE: {{ .Values.delivery.graph.scope | quote }}
+  {{- end }}
+
+  HANSARD_STORAGE__BACKEND: {{ .Values.storage.backend | quote }}
+  HANSARD_STORAGE__RETENTION_DAYS: {{ .Values.storage.retentionDays | quote }}
+  {{- if eq .Values.storage.backend "s3" }}
+  HANSARD_STORAGE__ENDPOINT_URL: {{ .Values.storage.s3.endpoint | quote }}
+  HANSARD_STORAGE__BUCKET: {{ .Values.storage.s3.bucket | quote }}
+  AWS_REGION: {{ .Values.storage.s3.region | quote }}
+  AWS_DEFAULT_REGION: {{ .Values.storage.s3.region | quote }}
+  # Path-style addressing is mandatory against Nutanix Objects and every other
+  # on-prem S3 gateway; virtual-host style needs wildcard DNS they do not serve.
+  AWS_S3_FORCE_PATH_STYLE: {{ .Values.storage.s3.forcePathStyle | quote }}
+  HANSARD_STORAGE__ROOT: {{ .Values.storage.filesystem.path | quote }}
+  {{- else }}
+  HANSARD_STORAGE__ROOT: {{ .Values.storage.filesystem.path | quote }}
+  {{- end }}
+
+  HANSARD_API__HOST: "0.0.0.0"
+  HANSARD_API__PORT: {{ .Values.orchestrator.containerPort | quote }}
+  HANSARD_API__METRICS_ENABLED: {{ .Values.metrics.enabled | quote }}
+
+  HANSARD_QUEUE_STREAM: {{ .Values.queue.stream | quote }}
+  HANSARD_QUEUE_GROUP: {{ .Values.queue.group | quote }}
+  HANSARD_QUEUE_CONSUMER_PREFIX: {{ .Values.queue.consumerPrefix | quote }}
+
+  HANSARD_POLLING__ENABLED: {{ .Values.polling.enabled | quote }}
+  HANSARD_POLLING__INTERVAL_SECONDS: {{ .Values.polling.intervalSeconds | quote }}
+  HANSARD_WEBHOOK__ENABLED: {{ .Values.webhook.enabled | quote }}
+  {{- if .Values.webhook.enabled }}
+  HANSARD_WEBHOOK__PATH: {{ .Values.webhook.path | quote }}
+  {{- end }}
+
+  {{- if .Values.bot.enabled }}
+  HANSARD_BOT__NAMESPACE: {{ include "hansard.namespace" . | quote }}
+  HANSARD_BOT__JOB_TEMPLATE: {{ printf "/etc/hansard/bot/%s" .Values.bot.configMapKey | quote }}
+  HANSARD_BOT__SERVICE_ACCOUNT: {{ include "hansard.serviceAccountName.bot" . | quote }}
+  {{- end }}

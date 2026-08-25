@@ -1,0 +1,94 @@
+# syntax=docker/dockerfile:1.7
+#
+# Hansard model artifact.
+#
+# Three outputs, one download:
+#
+#   1. --target export   -> a plain host directory (BuildKit local exporter),
+#                           which is what `oras push` publishes and what CI
+#                           checksums.
+#   2. --target artifact -> a FROM scratch OCI image whose entire filesystem is
+#                           /models. Usable directly as a Kubernetes `image:`
+#                           volume (models.source=image) and as the thing you
+#                           mirror with `nkp push bundle` / `skopeo copy`.
+#   3. --target copier   -> the same /models on a busybox base, so it can run
+#                           as an init container that copies into an emptyDir
+#                           on clusters without the ImageVolume feature gate.
+#                           This is the chart default (models.source=initImage).
+#
+# See deploy/docker/README.md and deploy/docker/Makefile.
+#
+# Weights are downloaded HERE, at build time, and never at pod start.
+
+ARG PYTHON_VERSION=3.11
+ARG FETCH_IMAGE=python:${PYTHON_VERSION}-slim-bookworm
+ARG BUSYBOX_IMAGE=busybox:1.36-glibc
+
+FROM ${FETCH_IMAGE} AS fetch
+
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_EXTRA_INDEX_URL=
+# Point at an internal Hugging Face mirror for air-gapped builds.
+ARG HF_ENDPOINT=https://huggingface.co
+ARG HUGGINGFACE_HUB_SPEC=huggingface_hub>=0.25
+
+ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL} \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HF_ENDPOINT=${HF_ENDPOINT} \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+
+RUN python -m pip install "${HUGGINGFACE_HUB_SPEC}"
+
+COPY deploy/docker/models.manifest /build/models.manifest
+COPY deploy/docker/fetch-models.sh /build/fetch-models.sh
+
+RUN --mount=type=secret,id=hf_token,required=false \
+    HF_TOKEN="$(cat /run/secrets/hf_token 2>/dev/null || true)" \
+    sh /build/fetch-models.sh /build/models.manifest /out/models
+
+# --- 1. host directory ------------------------------------------------------
+FROM scratch AS export
+COPY --from=fetch /out/models /
+
+# --- 2. FROM scratch OCI image (ImageVolume / mirroring) --------------------
+FROM scratch AS artifact
+
+ARG VERSION=0.1.0
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="hansard-models" \
+      org.opencontainers.image.description="Hansard ASR/VAD/diarization ONNX weights, build-time resolved" \
+      org.opencontainers.image.licenses="CC-BY-4.0 AND MIT" \
+      org.opencontainers.image.source="https://github.com/Haswell119/teams-retranscription" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      io.hansard.models.mountpath="/models"
+
+COPY --from=fetch /out/models /models
+
+# --- 3. init-container copier (chart default) -------------------------------
+FROM ${BUSYBOX_IMAGE} AS copier
+
+ARG VERSION=0.1.0
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="hansard-models-init" \
+      org.opencontainers.image.description="Hansard model weights plus a shell that copies them into an emptyDir" \
+      org.opencontainers.image.licenses="CC-BY-4.0 AND MIT" \
+      org.opencontainers.image.source="https://github.com/Haswell119/teams-retranscription" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      io.hansard.models.mountpath="/models"
+
+COPY --from=fetch /out/models /opt/hansard-models
+
+USER 10001:10001
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["set -eu; cp -a /opt/hansard-models/. \"${HANSARD_MODELS_TARGET:-/models}/\"; cd \"${HANSARD_MODELS_TARGET:-/models}\"; sha256sum -c SHA256SUMS >/dev/null; echo 'model artifact verified'"]

@@ -1,0 +1,141 @@
+# syntax=docker/dockerfile:1.7
+#
+# Hansard GPU worker: ONNX Runtime CUDA execution provider.
+#
+#   docker build -f deploy/docker/Dockerfile.worker-gpu -t hansard-worker-gpu:0.1.0 .
+#
+# ---------------------------------------------------------------------------
+# CUDA / cuDNN PINNING - read this before changing any version below.
+# ---------------------------------------------------------------------------
+# onnxruntime-gpu wheels on PyPI are built against exactly one CUDA major and
+# one cuDNN major. Getting it wrong does NOT fail loudly: ORT logs
+# "LoadLibrary failed with error 126 ... libcudnn.so.9" or
+# "Failed to create CUDAExecutionProvider" and then silently falls back to the
+# CPU provider, so you pay for a GPU node and get CPU throughput.
+#
+#   onnxruntime-gpu <= 1.18.x  (PyPI default)  -> CUDA 11.8 + cuDNN 8
+#   onnxruntime-gpu 1.19.x - 1.20.x            -> CUDA 12.x  + cuDNN 9
+#   onnxruntime-gpu >= 1.21.x                  -> CUDA 12.x  + cuDNN 9
+#
+# This image therefore pins onnxruntime-gpu>=1.19 against a CUDA 12.6 +
+# cuDNN 9 runtime base. `pyproject.toml` declares `asr-onnx-gpu` as
+# `onnxruntime-gpu>=1.18`, which would allow a CUDA 11 wheel, so the floor is
+# raised here with an explicit constraint rather than by editing the project
+# metadata.
+#
+# The NVIDIA driver comes from the host through the NVIDIA GPU Operator /
+# container toolkit and must be >= the CUDA minor-version-compatibility floor
+# for CUDA 12 (driver >= 525). Verify inside the cluster with
+# `nvidia-smi` in a debug pod on the GPU node pool.
+# ---------------------------------------------------------------------------
+
+ARG CUDA_IMAGE=nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
+ARG ONNXRUNTIME_GPU_SPEC=onnxruntime-gpu>=1.19,<2
+ARG PYTHON_BIN=python3.12
+
+FROM ${CUDA_IMAGE} AS builder
+
+ARG PYTHON_BIN
+ARG ONNXRUNTIME_GPU_SPEC
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_EXTRA_INDEX_URL=
+ARG PIP_TRUSTED_HOST=
+ARG EXTRAS=asr-onnx-gpu,diarization,observability
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST} \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install --no-install-recommends -y \
+        ${PYTHON_BIN} ${PYTHON_BIN}-venv ${PYTHON_BIN}-dev build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ${PYTHON_BIN} -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+WORKDIR /src
+COPY pyproject.toml README.md ./
+COPY src ./src
+
+# The constraint file makes the CUDA-12 floor explicit and auditable; it is the
+# single place to bump when moving to a new CUDA base image.
+RUN printf '%s\n' "${ONNXRUNTIME_GPU_SPEC}" > /tmp/gpu-constraints.txt \
+    && python -m pip install --upgrade pip setuptools wheel \
+    && python -m pip install ".[${EXTRAS}]" "${ONNXRUNTIME_GPU_SPEC}" \
+    && python -m pip uninstall -y onnxruntime 2>/dev/null || true
+
+RUN find /opt/venv -name '__pycache__' -type d -prune -exec rm -rf {} + \
+    && find /opt/venv -name '*.pyc' -delete
+
+FROM ${CUDA_IMAGE} AS runtime
+
+ARG PYTHON_BIN
+ARG HANSARD_UID=10001
+ARG HANSARD_GID=10001
+ARG VERSION=0.1.0
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="hansard-worker-gpu" \
+      org.opencontainers.image.description="Hansard GPU transcription worker (ONNX Runtime CUDA EP)" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="https://github.com/Haswell119/teams-retranscription" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install --no-install-recommends -y \
+        ${PYTHON_BIN} \
+        ffmpeg \
+        libsndfile1 \
+        libgomp1 \
+        tini \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/*
+
+RUN groupadd --gid ${HANSARD_GID} hansard \
+    && useradd --uid ${HANSARD_UID} --gid ${HANSARD_GID} --home-dir /var/lib/hansard \
+       --shell /usr/sbin/nologin --no-log-init hansard \
+    && mkdir -p /var/lib/hansard /models \
+    && chown -R ${HANSARD_UID}:${HANSARD_GID} /var/lib/hansard /models
+
+COPY --from=builder --chown=root:root /opt/venv /opt/venv
+
+ENV PATH=/opt/venv/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONFAULTHANDLER=1 \
+    HOME=/var/lib/hansard \
+    HANSARD_RUNTIME__WORKSPACE=/var/lib/hansard \
+    HANSARD_RUNTIME__MODELS_DIR=/models \
+    HANSARD_RUNTIME__ALLOW_MODEL_DOWNLOADS=false \
+    HANSARD_RUNTIME__TELEMETRY_ENABLED=false \
+    HANSARD_ASR__DEVICE=cuda \
+    HANSARD_DIARIZATION__DEVICE=cuda \
+    HF_HOME=/models/.cache \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    HANSARD_VERSION=${VERSION}
+
+USER ${HANSARD_UID}:${HANSARD_GID}
+WORKDIR /var/lib/hansard
+EXPOSE 9095
+
+# Fails the container if the CUDA execution provider did not register, which is
+# the exact symptom of a CUDA/cuDNN mismatch.
+HEALTHCHECK --interval=60s --timeout=15s --start-period=90s --retries=3 \
+  CMD ["python", "-c", "import onnxruntime,sys; sys.exit(0 if 'CUDAExecutionProvider' in onnxruntime.get_available_providers() else 1)"]
+
+ENTRYPOINT ["/usr/bin/tini", "--", "hansard"]
+CMD ["worker"]

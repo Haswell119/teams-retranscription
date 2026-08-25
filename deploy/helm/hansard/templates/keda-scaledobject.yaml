@@ -1,0 +1,51 @@
+{{- if include "hansard.capabilities.keda" . }}
+{{- $keda := .Values.worker.autoscaling.keda }}
+{{- $component := printf "worker-%s" $keda.target }}
+{{- $gate := ternary (include "hansard.gpuEnabled" .) (include "hansard.cpuEnabled" .) (eq $keda.target "gpu") }}
+{{- if $gate }}
+{{- /*
+KEDA is OPTIONAL. `enabled: auto` means "use it if keda.sh/v1alpha1 exists";
+when it does not, worker/hpa.yaml falls back to a plain CPU HorizontalPodAutoscaler,
+and if that is disabled too the deployments keep their fixed replica counts.
+Nothing in this chart ever requires KEDA.
+
+Redis Stream pending entries are the only honest backlog signal: CPU
+utilisation on an idle ASR worker says nothing about how much audio is waiting.
+*/}}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" $component) }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" $component) | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "hansard.componentName" (dict "ctx" . "component" $component) }}
+  pollingInterval: {{ $keda.pollingInterval }}
+  cooldownPeriod: {{ $keda.cooldownPeriod }}
+  minReplicaCount: {{ $keda.minReplicaCount }}
+  maxReplicaCount: {{ $keda.maxReplicaCount }}
+  {{- with $keda.idleReplicaCount }}
+  idleReplicaCount: {{ . }}
+  {{- end }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          # Never rip a worker away mid-transcription.
+          stabilizationWindowSeconds: 300
+        scaleUp:
+          stabilizationWindowSeconds: 0
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: {{ printf "%s.%s.svc.cluster.local:%v" (include "hansard.redis.serviceName" .) (include "hansard.namespace" .) .Values.redis.port | quote }}
+        stream: {{ .Values.queue.stream | quote }}
+        consumerGroup: {{ .Values.queue.group | quote }}
+        pendingEntriesCount: {{ $keda.pendingEntriesCount | quote }}
+        enableTLS: "false"
+{{- end }}
+{{- end }}

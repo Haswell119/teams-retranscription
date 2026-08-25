@@ -1,0 +1,38 @@
+apiVersion: v2
+name: hansard
+description: Sovereign, self-hosted Microsoft Teams meeting transcription and minutes. No telemetry, no runtime model downloads, air-gap ready.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+# NKP 2.16 -> Kubernetes 1.33, NKP 2.17 -> 1.34. The -0 suffix makes the
+# constraint match pre-release build metadata that managed distributions emit.
+kubeVersion: ">=1.30.0-0"
+home: https://github.com/Haswell119/teams-retranscription
+sources:
+  - https://github.com/Haswell119/teams-retranscription
+icon: https://raw.githubusercontent.com/Haswell119/teams-retranscription/main/docs/assets/hansard.png
+keywords:
+  - transcription
+  - speech-to-text
+  - diarization
+  - microsoft-teams
+  - meeting-minutes
+  - sovereign
+  - air-gap
+  - nutanix
+  - nkp
+maintainers:
+  - name: Hansard contributors
+    url: https://github.com/Haswell119/teams-retranscription
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/prerelease: "true"
+  artifacthub.io/containsSecurityUpdates: "false"
+  artifacthub.io/operator: "false"
+  artifacthub.io/signKey: |
+    fingerprint: see deploy/docker/README.md
+  artifacthub.io/links: |
+    - name: Deployment guide
+      url: https://github.com/Haswell119/teams-retranscription/blob/main/docs/deployment.md
+    - name: NKP deployment guide
+      url: https://github.com/Haswell119/teams-retranscription/blob/main/docs/deployment-nkp.md

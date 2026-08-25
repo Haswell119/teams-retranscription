@@ -1,0 +1,253 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $ns := include "hansard.namespace" . }}
+{{- $egress := .Values.networkPolicy.egress }}
+{{- /*
+Portable NetworkPolicy floor. Works on Cilium, Calico, Antrea, kindnet - and on
+NKP regardless of tier.
+
+LIMITATION, stated once and not worked around: Kubernetes NetworkPolicy has no
+FQDN selector. Several Microsoft Teams endpoints (*.teams.cloud.microsoft,
+*.cloud.microsoft, *.lync.com, join.secure.skypeassets.com, aka.ms ...) are
+published as FQDNs with NO corresponding IP ranges, so a pure CIDR allowlist
+cannot be complete. Choose one of:
+  * egress.mode=cidr  + ciliumnetworkpolicy.yaml (toFQDNs) - the NKP posture
+  * egress.mode=proxy + an HTTPS egress proxy that does the name filtering
+  * egress.mode=open  - evaluation only
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "default-deny") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hansard.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "allow-dns") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hansard.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.dns.namespaceSelector | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.dns.podSelector | nindent 14 }}
+      ports:
+        {{- range .Values.networkPolicy.dns.ports }}
+        - protocol: UDP
+          port: {{ . }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "allow-internal") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hansard.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Release-internal traffic: orchestrator <-> redis, workers -> redis,
+    # bot -> orchestrator status callbacks.
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "hansard.selectorLabels" . | nindent 14 }}
+    {{- if .Values.orchestrator.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.fromNamespaceSelector | nindent 14 }}
+        {{- with .Values.networkPolicy.ingress.extraFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.orchestrator.containerPort }}
+    {{- end }}
+    {{- if include "hansard.capabilities.serviceMonitor" . }}
+    # Prometheus scrape. Only emitted when the monitoring stack actually exists.
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: {{ .Values.orchestrator.containerPort }}
+        - protocol: TCP
+          port: {{ .Values.worker.metricsPort }}
+    {{- end }}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "hansard.selectorLabels" . | nindent 14 }}
+{{- if eq $egress.mode "proxy" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "allow-egress-proxy") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hansard.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: {{ required "networkPolicy.egress.proxy.cidr is required when mode=proxy" $egress.proxy.cidr }}
+      ports:
+        - protocol: TCP
+          port: {{ $egress.proxy.port }}
+{{- else if eq $egress.mode "open" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "allow-egress-open") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+  annotations:
+    hansard.io/warning: "egress.mode=open allows the internet minus RFC1918. Evaluation only."
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hansard.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml $egress.privateRanges | nindent 14 }}
+{{- else }}
+{{- if and $egress.teamsMedia.enabled .Values.bot.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "allow-egress-teams") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  # Bot only. The orchestrator and workers never touch Teams media.
+  podSelector:
+    matchLabels:
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "bot") | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        {{- range $egress.teamsMedia.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+        {{- range $egress.teamsMedia.cidrsV6 }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        {{- range $egress.teamsMedia.udpPorts }}
+        # Teams real-time media: UDP 3478-3481 plus 443 fallback.
+        - protocol: UDP
+          port: {{ . }}
+        {{- end }}
+        {{- range $egress.teamsMedia.tcpPorts }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+{{- end }}
+{{- if and $egress.entra.enabled .Values.orchestrator.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "allow-egress-entra") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  # Entra ID and Microsoft Graph. Orchestrator only - the bot must never be
+  # able to reach an identity endpoint.
+  podSelector:
+    matchLabels:
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "orchestrator") | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        {{- range $egress.entra.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        {{- range $egress.entra.tcpPorts }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+{{- end }}
+{{- end }}
+{{- if $egress.extraCIDRs }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "allow-egress-extra") }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+spec:
+  # Everything else the operator explicitly declares: internal SMTP relay,
+  # S3 / Nutanix Objects endpoint, self-hosted LLM, internal registry.
+  podSelector:
+    matchLabels:
+      {{- include "hansard.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        {{- range $egress.extraCIDRs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      {{- with $egress.extraPorts }}
+      ports:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

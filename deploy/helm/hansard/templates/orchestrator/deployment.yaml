@@ -1,0 +1,167 @@
+{{- if .Values.orchestrator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "orchestrator") | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- include "hansard.orchestratorReplicas" . | nindent 2 }}
+  revisionHistoryLimit: {{ .Values.orchestrator.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "orchestrator") | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "hansard.componentLabels" (dict "ctx" . "component" "orchestrator") | nindent 8 }}
+        {{- with .Values.orchestrator.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.commonAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.orchestrator.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "hansard.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "hansard.serviceAccountName.orchestrator" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccounts.orchestrator.automountServiceAccountToken }}
+      securityContext:
+        {{- include "hansard.podSecurityContext" . | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.orchestrator.terminationGracePeriodSeconds }}
+      {{- with .Values.orchestrator.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      {{- with .Values.orchestrator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.orchestrator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.orchestrator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.orchestrator.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (include "hansard.models.initContainers" .) }}
+      initContainers:
+        {{- . | trim | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: orchestrator
+          image: {{ include "hansard.image" (dict "ctx" . "image" .Values.images.api) }}
+          imagePullPolicy: {{ .Values.images.api.pullPolicy }}
+          args:
+            {{- toYaml .Values.orchestrator.args | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.orchestrator.containerPort }}
+              protocol: TCP
+          envFrom:
+            {{- include "hansard.envFrom" . | nindent 12 }}
+          env:
+            {{- include "hansard.commonEnv" . | nindent 12 }}
+            {{- with .Values.config.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with .Values.orchestrator.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          # No CPU limit anywhere in this chart: CFS throttling stalls the
+          # event loop that shepherds live meetings. Memory is limited because
+          # it is not a compressible resource.
+          resources:
+            {{- toYaml .Values.orchestrator.resources | nindent 12 }}
+          securityContext:
+            {{- include "hansard.containerSecurityContext" . | nindent 12 }}
+          {{- with .Values.orchestrator.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.orchestrator.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.orchestrator.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- include "hansard.scratchVolumeMounts" . | nindent 12 }}
+            {{- include "hansard.models.volumeMounts" . | nindent 12 }}
+            {{- include "hansard.ca.volumeMounts" . | nindent 12 }}
+            - name: workspace
+              mountPath: {{ .Values.config.workspace }}
+            {{- if .Values.bot.enabled }}
+            - name: bot-template
+              mountPath: /etc/hansard/bot
+              readOnly: true
+            {{- end }}
+            {{- with .Values.orchestrator.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        {{- include "hansard.scratchVolumes" . | nindent 8 }}
+        {{- include "hansard.models.volumes" . | nindent 8 }}
+        {{- include "hansard.ca.volumes" . | nindent 8 }}
+        - name: workspace
+          {{- if .Values.orchestrator.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.orchestrator.persistence.existingClaim | default (include "hansard.componentName" (dict "ctx" . "component" "workspace")) }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: 10Gi
+          {{- end }}
+        {{- if .Values.bot.enabled }}
+        - name: bot-template
+          configMap:
+            name: {{ include "hansard.componentName" (dict "ctx" . "component" "bot") }}
+        {{- end }}
+        {{- with .Values.orchestrator.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end }}
+{{- if and .Values.orchestrator.enabled .Values.orchestrator.persistence.enabled (not .Values.orchestrator.persistence.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "workspace") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "orchestrator") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  # RWO only. nutanix-volume (iSCSI) is the NKP default StorageClass and is
+  # RWO; nutanix-file (RWX) needs licensed Nutanix Files and is not present by
+  # default, so nothing in this chart may require it.
+  accessModes:
+    - {{ .Values.orchestrator.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.orchestrator.persistence.size }}
+  {{- $sc := .Values.orchestrator.persistence.storageClass | default .Values.global.storageClass }}
+  {{- if $sc }}
+  storageClassName: {{ $sc }}
+  {{- end }}
+{{- end }}

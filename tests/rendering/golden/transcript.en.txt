@@ -1,0 +1,10 @@
+[00:00:08] Amara Okafor: Good morning everyone, let us start with the release four point two readiness.
+[00:00:15] Léa Fontaine: The build is green on every runner, but the German locale files still have forty seven untranslated strings and nobody has proof-read them yet.
+[00:00:25] Unidentified speaker: Sorry, could you repeat the last figure?
+[00:00:30] Léa Fontaine: Forty seven strings, all of them in the billing screens.
+[00:00:33] Amara Okafor: Understood.
+[00:06:11] Amara Okafor: Then we ship four point two on the twelfth of June with the German locale disabled, and we open a follow-up ticket for the translations.
+[00:10:40] Jonas Weber: On the incident of last Tuesday: the pager fired at two in the morning, the responder had already worked a full week, and the hand-over notes were missing.
+[00:13:32] Amara Okafor: Agreed, we move the rotation to a two-week cycle starting in July.
+[00:19:40] Léa Fontaine: For the transcription cluster we need two more GPU nodes to keep the queue under ten minutes at peak.
+[00:23:45] Amara Okafor: Approved. Please draft the procurement request before the board meeting.

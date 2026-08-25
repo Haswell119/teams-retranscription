@@ -1,0 +1,66 @@
+1
+00:00:08,000 --> 00:00:14,600
+Amara Okafor: Good morning everyone, let us start with
+the release four point two readiness.
+
+2
+00:00:15,200 --> 00:00:20,674
+Léa Fontaine: The build is green on every runner, but
+the German locale files still have forty
+
+3
+00:00:20,674 --> 00:00:24,900
+seven untranslated strings and nobody has
+proof-read them yet.
+
+4
+00:00:25,400 --> 00:00:29,100
+Sorry, could you repeat the last figure?
+
+5
+00:00:29,600 --> 00:00:33,000
+Léa Fontaine: Forty seven strings, all of them in the
+billing screens.
+
+6
+00:00:33,400 --> 00:00:34,400
+Amara Okafor: Understood.
+
+7
+00:06:10,500 --> 00:06:16,234
+Then we ship four point two on the twelfth
+of June with the German locale disabled,
+
+8
+00:06:16,234 --> 00:06:19,800
+and we open a follow-up ticket for the
+translations.
+
+9
+00:10:40,000 --> 00:10:46,355
+Jonas Weber: On the incident of last Tuesday: the pager
+fired at two in the morning, the responder
+
+10
+00:10:46,355 --> 00:10:51,500
+had already worked a full week, and the
+hand-over notes were missing.
+
+11
+00:13:32,000 --> 00:13:38,400
+Amara Okafor: Agreed, we move the rotation to a two-week
+cycle starting in July.
+
+12
+00:19:40,000 --> 00:19:47,000
+Léa Fontaine: For the transcription cluster we need two
+more GPU nodes to keep the queue under ten
+
+13
+00:19:47,713 --> 00:19:49,200
+minutes at peak.
+
+14
+00:23:45,000 --> 00:23:51,800
+Amara Okafor: Approved. Please draft the procurement
+request before the board meeting.

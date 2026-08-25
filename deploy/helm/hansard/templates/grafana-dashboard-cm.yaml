@@ -1,0 +1,23 @@
+{{- if and .Values.metrics.enabled (include "hansard.capabilities.grafanaDashboard" .) }}
+{{- /*
+Grafana is part of kube-prometheus-stack, a Pro+ entitlement on NKP. This is a
+plain ConfigMap picked up by the Grafana sidecar via its label, so it needs no
+CRD of its own - but emitting it on a cluster with no Grafana is just litter,
+hence the same `auto` gate as the ServiceMonitor.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "dashboard") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+    {{ .Values.metrics.grafanaDashboard.labelKey }}: {{ .Values.metrics.grafanaDashboard.labelValue | quote }}
+  {{- with .Values.metrics.grafanaDashboard.folderAnnotation }}
+  annotations:
+    grafana_folder: {{ . | quote }}
+  {{- end }}
+data:
+  hansard.json: |
+    {{- .Files.Get "dashboards/hansard.json" | nindent 4 }}
+{{- end }}

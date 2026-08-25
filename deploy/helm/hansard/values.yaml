@@ -1,0 +1,717 @@
+# Hansard - sovereign Microsoft Teams transcription.
+#
+# Defaults are deliberately the most conservative posture that still runs:
+#   * no egress to anything the operator has not configured
+#   * no telemetry, ever
+#   * no model download at pod start
+#   * every optional cluster integration is `auto` (emitted only if its CRD
+#     exists), so the chart installs unchanged on NKP Starter and on a laptop.
+
+# -----------------------------------------------------------------------------
+# global - shared with any future subchart
+# -----------------------------------------------------------------------------
+global:
+  # Prefix for EVERY image, including redis and the model artifact. Set this to
+  # your internal registry and the chart never reaches a public registry.
+  # e.g. harbor.nkp.internal/hansard
+  imageRegistry: ""
+  imagePullSecrets: []
+  # Default StorageClass for every PVC the chart creates. Empty = cluster
+  # default (nutanix-volume on NKP). Only RWO is ever required.
+  storageClass: ""
+  # Require every image to be pinned by digest; install fails otherwise.
+  requireImageDigests: false
+  # Extra trust anchors: internal registry, Nutanix Objects, TLS-inspecting
+  # proxies. The secret must already exist in the release namespace.
+  customCA:
+    enabled: false
+    existingSecret: ""
+    key: ca-bundle.crt
+
+nameOverride: ""
+fullnameOverride: ""
+namespaceOverride: ""
+
+commonLabels: {}
+commonAnnotations: {}
+
+# -----------------------------------------------------------------------------
+# images - pin by digest in production; `make -C deploy/docker digests` prints them
+# -----------------------------------------------------------------------------
+images:
+  api:
+    registry: ""
+    repository: ghcr.io/haswell119/hansard-api
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  worker:
+    registry: ""
+    repository: ghcr.io/haswell119/hansard-worker
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  workerGpu:
+    registry: ""
+    repository: ghcr.io/haswell119/hansard-worker-gpu
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # Built by src/hansard/adapters/capture/docker/ (owned by the capture adapter).
+  bot:
+    registry: ""
+    repository: ghcr.io/haswell119/hansard-bot
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # busybox-based copier, the default models.source=initImage path.
+  modelsInit:
+    registry: ""
+    repository: ghcr.io/haswell119/hansard-models-init
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # FROM scratch image, used only by models.source=image (ImageVolume).
+  modelsArtifact:
+    registry: ""
+    repository: ghcr.io/haswell119/hansard-models
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # Used only by models.source=oras.
+  oras:
+    registry: ""
+    repository: ghcr.io/oras-project/oras
+    tag: "v1.2.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  # Used only by models.source=s3.
+  s3cli:
+    registry: ""
+    repository: docker.io/minio/mc
+    tag: "RELEASE.2024-11-21T17-21-54Z"
+    digest: ""
+    pullPolicy: IfNotPresent
+  redis:
+    registry: ""
+    repository: docker.io/library/redis
+    tag: "7.4-alpine"
+    digest: ""
+    pullPolicy: IfNotPresent
+
+# -----------------------------------------------------------------------------
+# service accounts - three identities, three blast radii
+# -----------------------------------------------------------------------------
+serviceAccounts:
+  orchestrator:
+    create: true
+    name: ""
+    annotations: {}
+    automountServiceAccountToken: true
+  worker:
+    create: true
+    name: ""
+    annotations: {}
+    automountServiceAccountToken: false
+  # The bot needs ZERO Kubernetes API access and never holds a long-lived secret.
+  bot:
+    create: true
+    name: ""
+    annotations: {}
+    automountServiceAccountToken: false
+
+rbac:
+  # Namespaced Role only. The orchestrator never gets a ClusterRole.
+  create: true
+
+# -----------------------------------------------------------------------------
+# runtime configuration -> HANSARD_* environment variables
+# -----------------------------------------------------------------------------
+config:
+  logLevel: INFO
+  logFormat: json
+  maxConcurrentMeetings: 2
+  workerThreads: 0
+  workspace: /var/lib/hansard
+  # Free-form HANSARD_* overrides for settings this chart does not model.
+  extraEnv: []
+  extraEnvFrom: []
+
+asr:
+  # parakeet | whisper | qwen3 | ensemble | null
+  engine: parakeet
+  modelId: nemo-parakeet-tdt-0.6b-v3
+  # none | int8
+  quantization: int8
+  # auto | gpu | cpu | both
+  #   auto -> CPU only. Helm cannot see node GPU capacity at template time, so
+  #           `auto` never silently schedules onto GPUs; ask for it explicitly.
+  #   both -> GPU and CPU deployments share one Redis consumer group.
+  compute: auto
+  batchSize: 4
+  beamSize: 1
+  language: ""
+  intraOpThreads: 0
+  interOpThreads: 0
+  fallbackEngine: whisper
+  fallbackModelId: large-v3-turbo
+
+diarization:
+  engine: sortformer
+  modelId: nvidia/diar_streaming_sortformer_4spk-v2.1
+  maxSpeakers: 8
+  minSpeakers: 1
+
+vad:
+  engine: silero
+  threshold: 0.5
+
+minutes:
+  enabled: true
+  # An OpenAI-compatible endpoint you host yourself. Leave empty to disable
+  # summarisation rather than pointing it at a third party.
+  endpoint: ""
+  modelId: qwen3-8b-instruct
+  contextTokens: 32768
+  maxOutputTokens: 4096
+  temperature: 0.2
+  language: ""
+
+capture:
+  # browser | file | null
+  engine: browser
+  displayName: Hansard Notetaker
+  # Disabling this is a legal decision, not a technical one. NOTES.txt shouts.
+  announceRecording: true
+  announcementText: >-
+    This meeting is being transcribed locally by Hansard.
+    No audio or text leaves this organisation.
+  joinTimeoutSeconds: 300
+  lobbyTimeoutSeconds: 600
+  silenceTimeoutSeconds: 600
+  aloneTimeoutSeconds: 120
+  maxDurationSeconds: 14400
+
+# -----------------------------------------------------------------------------
+# models - never fetched at runtime by default
+# -----------------------------------------------------------------------------
+models:
+  # initImage | image | oras | s3 | pvc
+  #   initImage : busybox copier image -> emptyDir. Works everywhere. DEFAULT.
+  #   image     : Kubernetes ImageVolume. ~11.5 s warm start, size independent,
+  #               but the feature gate is beta-and-disabled in 1.33 and it needs
+  #               containerd >= 2.1. Opt in only once you have verified both.
+  #   oras      : `oras pull` of an OCI artifact into an emptyDir.
+  #   s3        : mc mirror from an S3-compatible bucket (re-downloads per pod).
+  #   pvc       : a pre-populated volume; the only zero-network option.
+  source: initImage
+  mountPath: /models
+  # Sized for Parakeet TDT 0.6b int8 (~0.6-1.5 GB) plus the ONNX diarization
+  # and VAD models (tens of MB). It counts against the pod memory limit only
+  # when medium: Memory, which is not the default here.
+  emptyDir:
+    sizeLimit: 4Gi
+    medium: ""
+  oras:
+    # Full artifact reference, e.g. harbor.internal/hansard/hansard-models-artifact:0.1.0
+    reference: ""
+    extraArgs: []
+  s3:
+    endpoint: ""
+    bucket: ""
+    prefix: models
+    region: us-east-1
+    forcePathStyle: true
+  pvc:
+    existingClaim: ""
+    create: false
+    size: 8Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+  # Verify SHA256SUMS after staging. Costs a few seconds, catches a bad mirror.
+  verifyChecksums: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# -----------------------------------------------------------------------------
+# orchestrator / API
+# -----------------------------------------------------------------------------
+orchestrator:
+  enabled: true
+  replicaCount: 2
+  args: ["serve"]
+  containerPort: 8000
+  revisionHistoryLimit: 3
+  podAnnotations: {}
+  podLabels: {}
+  # CPU requests only. A CPU limit throttles the event loop and wrecks
+  # realtime audio handling; memory is limited because it is not compressible.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  priorityClassName: ""
+  terminationGracePeriodSeconds: 60
+  extraEnv: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    initialDelaySeconds: 20
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  startupProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    periodSeconds: 5
+    failureThreshold: 60
+  service:
+    type: ClusterIP
+    port: 8000
+    annotations: {}
+    # Only for type: LoadBalancer (MetalLB on NKP).
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+  ingress:
+    enabled: false
+    # NKP: kommander-traefik. k3s: traefik. EKS/AKS/GKE: nginx / alb / gce.
+    className: ""
+    annotations: {}
+    hosts:
+      - host: hansard.example.internal
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 0
+    behavior: {}
+  pdb:
+    enabled: true
+    minAvailable: 1
+    maxUnavailable: ""
+  # Persistent workspace for in-flight audio. RWO is enough: the orchestrator
+  # does not share it with workers (artifacts move through storage.*).
+  persistence:
+    enabled: false
+    existingClaim: ""
+    size: 20Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+
+# -----------------------------------------------------------------------------
+# workers
+# -----------------------------------------------------------------------------
+worker:
+  args: ["worker"]
+  metricsPort: 9095
+  revisionHistoryLimit: 3
+  terminationGracePeriodSeconds: 120
+  podAnnotations: {}
+  podLabels: {}
+  extraEnv: []
+  cpu:
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: "2"
+        memory: 3Gi
+      limits:
+        memory: 6Gi
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    topologySpreadConstraints: []
+    priorityClassName: ""
+  gpu:
+    replicaCount: 1
+    # The schedulable resource name. With GPU Operator time-slicing and
+    # renameByDefault: true this becomes nvidia.com/gpu.shared - which is why
+    # it is a value and not a constant.
+    resourceName: nvidia.com/gpu
+    count: 1
+    resources:
+      requests:
+        cpu: "2"
+        memory: 6Gi
+      limits:
+        memory: 12Gi
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    affinity: {}
+    topologySpreadConstraints: []
+    priorityClassName: ""
+  autoscaling:
+    # Plain HPA on CPU. Ignored when KEDA is in charge.
+    hpa:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 8
+      targetCPUUtilizationPercentage: 75
+      behavior: {}
+    # KEDA scales on Redis Stream pending entries, which is the only honest
+    # signal for a queue. auto | true | false. NEVER required.
+    keda:
+      enabled: auto
+      minReplicaCount: 0
+      maxReplicaCount: 10
+      pollingInterval: 15
+      cooldownPeriod: 300
+      pendingEntriesCount: "5"
+      idleReplicaCount: ""
+      # Which deployment KEDA scales when asr.compute=both: cpu | gpu.
+      target: cpu
+
+queue:
+  stream: "hansard:jobs"
+  group: hansard-workers
+  consumerPrefix: hansard
+
+# -----------------------------------------------------------------------------
+# capture bot - a single-use Job, no secrets, no API access
+# -----------------------------------------------------------------------------
+bot:
+  enabled: true
+  # Rendered into a ConfigMap the orchestrator reads and instantiates per meeting.
+  configMapKey: job.yaml
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 900
+  activeDeadlineSeconds: 15000
+  # >= 60 s: the bot must leave the meeting and flush its last audio buffer.
+  terminationGracePeriodSeconds: 90
+  # Chromium's internal sandbox needs user-namespace clone syscalls that
+  # RuntimeDefault seccomp blocks. Playwright's answer is a custom seccomp
+  # profile, but Pod Security Standards baseline/restricted forbid Unconfined
+  # and Localhost needs per-node file placement no operator can guarantee.
+  # SYS_ADMIN is not in the baseline allowed-capability list either.
+  # So: --no-sandbox with RuntimeDefault seccomp, non-root, no capabilities,
+  # read-only rootfs. Defensible because this bot renders exactly one origin,
+  # is a single-use Job, and carries no secrets.
+  chromium:
+    noSandbox: true
+    # Trade shared memory for heap. Enable this when you want a small shm.
+    disableDevShmUsage: false
+    extraArgs: []
+  # /dev/shm as tmpfs. Its bytes COUNT AGAINST the container memory limit:
+  # sizeLimit 1Gi + a 2 GiB working set => resources.limits.memory 3Gi.
+  shm:
+    sizeLimit: 1Gi
+  # hostUsers: false gives the bot its own user namespace (opt-in; needs the
+  # UserNamespacesSupport feature gate and a compatible runtime).
+  hostUsers: true
+  resources:
+    requests:
+      cpu: "1"
+      memory: 3Gi
+    limits:
+      memory: 3Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+  podAnnotations: {}
+  extraEnv: []
+
+# -----------------------------------------------------------------------------
+# redis - the job queue. Chart-local by default, no third-party subchart.
+# -----------------------------------------------------------------------------
+redis:
+  enabled: true
+  # Point at your own Redis/Valkey instead; then set enabled: false.
+  external:
+    url: ""
+    existingSecret: ""
+    existingSecretKey: redis-url
+  port: 6379
+  args: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  pdb:
+    enabled: false
+    minAvailable: 1
+  podAnnotations: {}
+
+# -----------------------------------------------------------------------------
+# artifact storage
+# -----------------------------------------------------------------------------
+storage:
+  # filesystem | s3
+  backend: filesystem
+  retentionDays: 30
+  filesystem:
+    path: /var/lib/hansard/artifacts
+  s3:
+    endpoint: ""
+    bucket: ""
+    # Nutanix Objects is not region aware; us-east-1 is the standard placeholder.
+    region: us-east-1
+    # MANDATORY for Nutanix Objects and every other on-prem S3 gateway.
+    forcePathStyle: true
+    # Never use insecure/skip-verify. Supply the CA through global.customCA.
+    credentials:
+      existingSecret: ""
+      accessKeyKey: AWS_ACCESS_KEY_ID
+      secretKeyKey: AWS_SECRET_ACCESS_KEY
+  # Nutanix COSI. auto -> only when storage.backend=s3 AND the
+  # objectstorage.k8s.io/v1alpha1 CRDs exist.
+  cosi:
+    enabled: auto
+    bucketClassName: cosi-nutanix-nkp
+    bucketAccessClassName: cosi-nutanix-nkp
+    protocol: S3
+    deletionPolicy: Retain
+
+# -----------------------------------------------------------------------------
+# secrets - exactly one of create / existingSecret / externalSecret
+# -----------------------------------------------------------------------------
+secrets:
+  create: true
+  existingSecret: ""
+  # Values only used when create: true. Prefer existingSecret or externalSecret.
+  data:
+    apiKey: ""
+    graphTenantId: ""
+    graphClientId: ""
+    graphClientSecret: ""
+    smtpUsername: ""
+    smtpPassword: ""
+    minutesApiKey: ""
+    s3AccessKey: ""
+    s3SecretKey: ""
+    redisPassword: ""
+  # External Secrets Operator is Pro+ on NKP. auto -> only if the CRD exists.
+  externalSecret:
+    enabled: false
+    secretStoreRef:
+      name: ""
+      kind: ClusterSecretStore
+    refreshInterval: 1h
+    # Either a full remoteRef list, or dataFrom for a whole path.
+    data: []
+    dataFrom: []
+
+# -----------------------------------------------------------------------------
+# delivery
+# -----------------------------------------------------------------------------
+delivery:
+  channels: ["filesystem"]
+  formats: ["markdown", "html"]
+  outputDir: /var/lib/hansard/artifacts
+  smtp:
+    host: ""
+    port: 25
+    sender: hansard@localhost
+    useTls: false
+    startTls: true
+  graph:
+    enabled: false
+    authority: https://login.microsoftonline.com
+    baseUrl: https://graph.microsoft.com/v1.0
+    scope: https://graph.microsoft.com/.default
+
+# -----------------------------------------------------------------------------
+# Graph change-notification receiver
+# -----------------------------------------------------------------------------
+# Microsoft Graph webhooks need a PUBLIC inbound HTTPS endpoint that answers the
+# validation handshake in <= 10 s and returns 2xx within 3 s. That is
+# incompatible with an air gap. Hansard therefore polls by default.
+webhook:
+  enabled: false
+  path: /webhooks/graph
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: ""
+    tls: []
+  # Microsoft 365 worldwide inbound ranges, 2026-07-31 service instance.
+  allowedSourceRanges:
+    - 20.20.32.0/19
+    - 20.190.128.0/18
+    - 20.231.128.0/19
+    - 40.126.0.0/18
+
+polling:
+  enabled: true
+  intervalSeconds: 60
+
+# -----------------------------------------------------------------------------
+# network policy
+# -----------------------------------------------------------------------------
+networkPolicy:
+  enabled: true
+  # Portable NetworkPolicy floor. CIDR only - Kubernetes NetworkPolicy cannot
+  # express FQDNs, and several Teams endpoints are published as FQDNs with no
+  # IP ranges at all. See cilium.networkPolicy for the NKP-optimal posture.
+  dns:
+    namespaceSelector:
+      kubernetes.io/metadata.name: kube-system
+    podSelector:
+      k8s-app: kube-dns
+    ports: [53]
+  ingress:
+    # Namespace that runs the ingress controller. NKP: kommander-traefik lives
+    # in kommander-traefik / kommander. k3s: kube-system.
+    fromNamespaceSelector:
+      kubernetes.io/metadata.name: kommander-traefik
+    extraFrom: []
+  egress:
+    # cidr | proxy | open
+    #   cidr  : allow only the CIDRs below (default, sovereign)
+    #   proxy : allow only the HTTPS proxy endpoint
+    #   open  : allow 0.0.0.0/0 minus RFC1918. Evaluation only.
+    mode: cidr
+    # Teams real-time media. UDP 3478-3481 plus TCP/UDP 443.
+    teamsMedia:
+      enabled: true
+      cidrs:
+        - 52.112.0.0/14
+        - 52.122.0.0/15
+      cidrsV6:
+        - 2603:1063::/38
+      udpPorts: [3478, 3479, 3480, 3481, 443]
+      tcpPorts: [443]
+    # Entra ID / Microsoft Graph. Orchestrator only, never the bot.
+    entra:
+      enabled: true
+      cidrs:
+        - 20.20.32.0/19
+        - 20.190.128.0/18
+        - 20.231.128.0/19
+        - 40.126.0.0/18
+      tcpPorts: [443, 80]
+    proxy:
+      # Used when mode: proxy. Also injected as HTTPS_PROXY into the pods.
+      host: ""
+      port: 3128
+      cidr: ""
+      noProxy: "localhost,127.0.0.1,.svc,.svc.cluster.local,.cluster.local"
+    # Anything else you must reach: internal SMTP relay, S3 endpoint, LLM.
+    extraCIDRs: []
+    extraPorts: []
+    # Private ranges excluded by mode: open. NKP pods are 192.168.0.0/16 and
+    # services 10.96.0.0/12 - both immutable after cluster deployment.
+    privateRanges:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 169.254.0.0/16
+      - 100.64.0.0/10
+
+cilium:
+  networkPolicy:
+    # auto -> only when cilium.io/v2 exists (Cilium is the CNI on NKP/AHV).
+    enabled: auto
+    # toFQDNs cannot cover Teams media: the bot learns media IPs through
+    # non-DNS signalling and then sends UDP straight to them. The toCIDRSet
+    # rule is therefore NOT redundant - keep both.
+    enableDnsProxy: true
+    botFqdns:
+      - "*.teams.microsoft.com"
+      - "teams.microsoft.com"
+      - "*.teams.cloud.microsoft"
+      - "*.cloud.microsoft"
+      - "*.lync.com"
+      - "*.skype.com"
+      - "join.secure.skypeassets.com"
+      - "mlccdnprod.azureedge.net"
+      - "*.office.net"
+      - "aka.ms"
+    crlFqdns:
+      - "ocsp.digicert.com"
+      - "crl3.digicert.com"
+      - "crl4.digicert.com"
+      - "oneocsp.microsoft.com"
+      - "ocsp.msocsp.com"
+      - "crl.microsoft.com"
+      - "mscrl.microsoft.com"
+    orchestratorFqdns:
+      - "graph.microsoft.com"
+      - "login.microsoftonline.com"
+      - "login.microsoft.com"
+      - "*.msauth.net"
+      - "*.msftauth.net"
+
+# -----------------------------------------------------------------------------
+# observability - every piece is Pro+ on NKP, so every piece is `auto`
+# -----------------------------------------------------------------------------
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: auto
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    relabelings: []
+    metricRelabelings: []
+  prometheusRule:
+    enabled: auto
+    labels: {}
+    # Tune per site; these are the defaults the alerts document.
+    thresholds:
+      botJoinFailureRate: 0.25
+      queuePendingGrowthMinutes: 15
+      realtimeFactor: 1.0
+      noBotsHours: 24
+  grafanaDashboard:
+    enabled: auto
+    # kube-prometheus-stack's sidecar looks for this label.
+    labelKey: grafana_dashboard
+    labelValue: "1"
+    folderAnnotation: ""
+
+# -----------------------------------------------------------------------------
+# pod security - `restricted` Pod Security Standards on every workload
+# -----------------------------------------------------------------------------
+podSecurity:
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  # Applied as pod-security.kubernetes.io/* labels only if you create the
+  # namespace with this chart (Helm does not label a pre-existing namespace).
+  enforceStandard: restricted
+
+tests:
+  enabled: true

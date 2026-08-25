@@ -1,0 +1,109 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "redis") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "redis") | nindent 4 }}
+spec:
+  serviceName: {{ include "hansard.redis.serviceName" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "redis") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hansard.componentLabels" (dict "ctx" . "component" "redis") | nindent 8 }}
+      {{- with .Values.redis.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "hansard.imagePullSecrets" . | nindent 6 }}
+      # No ServiceAccount of its own and no token: Redis never talks to the API.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "hansard.podSecurityContext" . | nindent 8 }}
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.redis.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.redis.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.redis.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: redis
+          image: {{ include "hansard.image" (dict "ctx" . "image" .Values.images.redis) }}
+          imagePullPolicy: {{ .Values.images.redis.pullPolicy }}
+          args:
+            {{- if .Values.redis.args }}
+            {{- toYaml .Values.redis.args | nindent 12 }}
+            {{- else }}
+            - --dir
+            - /data
+            - --appendonly
+            - "yes"
+            - --save
+            - "60 1"
+            - --protected-mode
+            - "yes"
+            - --port
+            - {{ .Values.redis.port | quote }}
+            {{- end }}
+          ports:
+            - name: redis
+              containerPort: {{ .Values.redis.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          securityContext:
+            {{- include "hansard.containerSecurityContext" . | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "-p", {{ .Values.redis.port | quote }}, "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            {{- include "hansard.scratchVolumeMounts" . | trim | nindent 12 }}
+      volumes:
+        {{- include "hansard.scratchVolumes" . | trim | nindent 8 }}
+        {{- if not .Values.redis.persistence.enabled }}
+        - name: data
+          emptyDir:
+            sizeLimit: {{ .Values.redis.persistence.size }}
+        {{- end }}
+  {{- if .Values.redis.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "hansard.componentLabels" (dict "ctx" . "component" "redis") | nindent 10 }}
+      spec:
+        # RWO. nutanix-volume, the NKP default StorageClass, is iSCSI/RWO;
+        # nothing here needs the licensed RWX nutanix-file class.
+        accessModes:
+          - {{ .Values.redis.persistence.accessMode }}
+        resources:
+          requests:
+            storage: {{ .Values.redis.persistence.size }}
+        {{- $sc := .Values.redis.persistence.storageClass | default .Values.global.storageClass }}
+        {{- if $sc }}
+        storageClassName: {{ $sc }}
+        {{- end }}
+  {{- end }}
+{{- end }}

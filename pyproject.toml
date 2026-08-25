@@ -39,8 +39,15 @@ asr-whisper = ["faster-whisper>=1.1"]
 diarization = ["onnxruntime>=1.18", "scipy>=1.13"]
 diarization-torch = ["torch>=2.4", "nemo-toolkit[asr]>=2.3"]
 capture = ["playwright>=1.45"]
-delivery = ["aiosmtplib>=3.0", "msal>=1.30"]
-metrics = ["jiwer>=3.0", "meeteval>=0.4", "unidecode>=1.3"]
+delivery = ["aiosmtplib>=3.0"]
+delivery-msal = ["msal>=1.30"]
+metrics = [
+  "jiwer>=3.0",
+  "scipy>=1.13",
+  "whisper-normalizer>=0.1",
+  "meeteval>=0.4",
+  "unidecode>=1.3",
+]
 observability = ["prometheus-client>=0.20"]
 dev = [
   "ruff>=0.6",

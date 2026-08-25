@@ -1,0 +1,116 @@
+# syntax=docker/dockerfile:1.7
+#
+# Hansard orchestrator / API image.
+#
+#   docker build -f deploy/docker/Dockerfile.api -t hansard-api:0.1.0 .
+#
+# Build context is the repository root. No model weights are ever baked in:
+# the runtime mounts them at ${HANSARD_RUNTIME__MODELS_DIR} (see Dockerfile.models).
+
+ARG PYTHON_VERSION=3.11
+ARG BASE_IMAGE=python:${PYTHON_VERSION}-slim-bookworm
+
+# ---------------------------------------------------------------------------
+# Stage 1 - build the virtual environment. Compilers live here and only here.
+# ---------------------------------------------------------------------------
+FROM ${BASE_IMAGE} AS builder
+
+# Air-gapped builds point these at an internal PyPI mirror (Nexus, Artifactory,
+# Harbor proxy cache) so the build never reaches pypi.org.
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_EXTRA_INDEX_URL=
+ARG PIP_TRUSTED_HOST=
+ARG EXTRAS=api,asr-onnx,diarization,delivery,observability
+
+ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST} \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install --no-install-recommends -y \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+WORKDIR /src
+COPY pyproject.toml README.md ./
+COPY src ./src
+
+RUN python -m pip install --upgrade pip setuptools wheel \
+    && python -m pip install ".[${EXTRAS}]" \
+    && find /opt/venv -name '__pycache__' -type d -prune -exec rm -rf {} + \
+    && find /opt/venv -name '*.pyc' -delete
+
+# ---------------------------------------------------------------------------
+# Stage 2 - runtime. No compilers, no package index, no writable code.
+# ---------------------------------------------------------------------------
+FROM ${BASE_IMAGE} AS runtime
+
+ARG HANSARD_UID=10001
+ARG HANSARD_GID=10001
+ARG VERSION=0.1.0
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="hansard-api" \
+      org.opencontainers.image.description="Hansard orchestrator and HTTP API" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="https://github.com/Haswell119/teams-retranscription" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}"
+
+# ffmpeg: the enhancement chain shells out to it.
+# libsndfile1: soundfile.
+# tini: PID 1 reaping, so terminationGracePeriodSeconds actually works.
+# ca-certificates: replaced or extended at runtime by global.customCA.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install --no-install-recommends -y \
+        ffmpeg \
+        libsndfile1 \
+        tini \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/*
+
+RUN groupadd --gid ${HANSARD_GID} hansard \
+    && useradd --uid ${HANSARD_UID} --gid ${HANSARD_GID} --home-dir /var/lib/hansard \
+       --shell /usr/sbin/nologin --no-log-init hansard \
+    && mkdir -p /var/lib/hansard /models \
+    && chown -R ${HANSARD_UID}:${HANSARD_GID} /var/lib/hansard /models
+
+COPY --from=builder --chown=root:root /opt/venv /opt/venv
+
+ENV PATH=/opt/venv/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONFAULTHANDLER=1 \
+    HOME=/var/lib/hansard \
+    HANSARD_RUNTIME__WORKSPACE=/var/lib/hansard \
+    HANSARD_RUNTIME__MODELS_DIR=/models \
+    HANSARD_RUNTIME__ALLOW_MODEL_DOWNLOADS=false \
+    HANSARD_RUNTIME__TELEMETRY_ENABLED=false \
+    HF_HOME=/models/.cache \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    OMP_NUM_THREADS=1 \
+    HANSARD_VERSION=${VERSION}
+
+USER ${HANSARD_UID}:${HANSARD_GID}
+WORKDIR /var/lib/hansard
+EXPOSE 8000
+
+# Kubernetes uses its own probes; this HEALTHCHECK is for docker compose and
+# for `docker run` smoke tests. It must stay dependency-free.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD ["python", "-c", "import os,urllib.request,sys;\
+sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('HANSARD_API__PORT','8000')+'/healthz',timeout=4).status==200 else 1)"]
+
+ENTRYPOINT ["/usr/bin/tini", "--", "hansard"]
+CMD ["serve"]

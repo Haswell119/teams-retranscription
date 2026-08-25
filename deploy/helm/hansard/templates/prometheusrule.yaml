@@ -1,0 +1,116 @@
+{{- if and .Values.metrics.enabled (include "hansard.capabilities.prometheusRule" .) }}
+{{- $t := .Values.metrics.prometheusRule.thresholds }}
+{{- $ns := include "hansard.namespace" . }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "hansard.fullname" . }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "hansard.labels" . | nindent 4 }}
+    {{- with .Values.metrics.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: hansard.capture
+      rules:
+        - alert: BotJoinFailureRateHigh
+          expr: |
+            (
+              sum(rate(hansard_bot_join_attempts_total{namespace="{{ $ns }}",result!="success"}[30m]))
+              /
+              clamp_min(sum(rate(hansard_bot_join_attempts_total{namespace="{{ $ns }}"}[30m])), 1e-9)
+            ) > {{ $t.botJoinFailureRate }}
+          for: 15m
+          labels:
+            severity: warning
+            component: capture
+          annotations:
+            summary: Hansard bots are failing to join meetings
+            description: >-
+              More than {{ mulf $t.botJoinFailureRate 100 }}% of join attempts in namespace
+              {{ $ns }} failed over the last 30 minutes. Usual causes: expired join URLs,
+              lobby admission policy changed, or egress to the Teams FQDNs/media CIDRs
+              being blocked. Check a bot Job's logs and the NetworkPolicy drop counters.
+        - alert: NoBotsJoinedRecently
+          expr: |
+            sum(increase(hansard_bot_join_attempts_total{namespace="{{ $ns }}"}[{{ $t.noBotsHours }}h])) == 0
+            and on() sum(hansard_build_info{namespace="{{ $ns }}"}) > 0
+          for: 1h
+          labels:
+            severity: warning
+            component: capture
+          annotations:
+            summary: No Hansard bot has attempted a meeting join
+            description: >-
+              Hansard is running in {{ $ns }} but has not attempted a single meeting join in
+              {{ $t.noBotsHours }} hours. Either nothing is scheduled, or the calendar poll
+              / Graph subscription has stopped producing work.
+    - name: hansard.pipeline
+      rules:
+        - alert: QueuePendingGrowing
+          expr: |
+            min_over_time(hansard_queue_pending{namespace="{{ $ns }}"}[{{ $t.queuePendingGrowthMinutes }}m]) > 0
+            and
+            deriv(hansard_queue_pending{namespace="{{ $ns }}"}[{{ $t.queuePendingGrowthMinutes }}m]) > 0
+          for: {{ $t.queuePendingGrowthMinutes }}m
+          labels:
+            severity: warning
+            component: queue
+          annotations:
+            summary: Hansard work queue is growing monotonically
+            description: >-
+              Stream {{`{{ $labels.stream }}`}} / group {{`{{ $labels.group }}`}} has had a
+              strictly non-empty and rising backlog for {{ $t.queuePendingGrowthMinutes }}
+              minutes. Workers are undersized, stuck, or crash-looping. If KEDA is active
+              check the ScaledObject; otherwise raise worker.cpu.replicaCount.
+        - alert: AsrRealtimeFactorDegraded
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le, compute, model) (
+                rate(hansard_asr_realtime_factor_bucket{namespace="{{ $ns }}"}[30m])
+              )
+            ) > {{ $t.realtimeFactor }}
+          for: 20m
+          labels:
+            severity: warning
+            component: asr
+          annotations:
+            summary: Hansard transcription is slower than realtime
+            description: >-
+              p95 realtime factor for model {{`{{ $labels.model }}`}} on
+              {{`{{ $labels.compute }}`}} is above {{ $t.realtimeFactor }}: it takes more
+              wall-clock time to transcribe audio than the audio lasts. On GPU workers the
+              usual cause is a CUDA/cuDNN mismatch making ONNX Runtime fall back to the CPU
+              provider - check that CUDAExecutionProvider is registered.
+        - alert: AsrFailuresSustained
+          expr: |
+            sum(rate(hansard_asr_failures_total{namespace="{{ $ns }}"}[15m])) > 0
+          for: 15m
+          labels:
+            severity: warning
+            component: asr
+          annotations:
+            summary: Hansard recognition is failing continuously
+            description: >-
+              Reason {{`{{ $labels.reason }}`}} has been failing for 15 minutes in {{ $ns }}.
+    - name: hansard.storage
+      rules:
+        - alert: ObjectStorageUnreachable
+          expr: |
+            min(hansard_object_storage_reachable{namespace="{{ $ns }}"}) == 0
+          for: 10m
+          labels:
+            severity: critical
+            component: storage
+          annotations:
+            summary: Hansard cannot reach its artifact store
+            description: >-
+              The artifact store health probe in {{ $ns }} has failed for 10 minutes.
+              Transcripts and minutes cannot be persisted. For Nutanix Objects verify
+              path-style addressing (storage.s3.forcePathStyle), that the CA bundle in
+              global.customCA is current, and that the COSI BucketAccess secret still
+              matches the bucket.
+{{- end }}

@@ -1,0 +1,18 @@
+{{- if and .Values.orchestrator.enabled .Values.orchestrator.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "orchestrator") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "orchestrator") | nindent 4 }}
+spec:
+  {{- if .Values.orchestrator.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.orchestrator.pdb.maxUnavailable }}
+  {{- else }}
+  minAvailable: {{ .Values.orchestrator.pdb.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "hansard.componentSelectorLabels" (dict "ctx" . "component" "orchestrator") | nindent 6 }}
+{{- end }}

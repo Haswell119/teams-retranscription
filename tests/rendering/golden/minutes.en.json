@@ -1,0 +1,244 @@
+{
+  "schema_version": "1.0",
+  "kind": "minutes",
+  "generator": {
+    "name": "Hansard",
+    "version": "0.1.0"
+  },
+  "meeting": {
+    "title": "Weekly platform sync",
+    "started_at": "2026-06-03T09:30:00+00:00",
+    "timezone": "UTC",
+    "language": "en",
+    "duration_seconds": 1500.0,
+    "participants": [
+      {
+        "identifier": "amara.okafor",
+        "display_name": "Amara Okafor",
+        "email": "amara.okafor@example.org",
+        "is_organizer": true,
+        "is_external": false
+      },
+      {
+        "identifier": "lea.fontaine",
+        "display_name": "Léa Fontaine",
+        "email": "lea.fontaine@example.org",
+        "is_organizer": false,
+        "is_external": false
+      },
+      {
+        "identifier": "jonas.weber",
+        "display_name": "Jonas Weber",
+        "email": "jonas.weber@partner.example",
+        "is_organizer": false,
+        "is_external": true
+      }
+    ],
+    "provenance": [
+      {
+        "component": "asr",
+        "engine": "parakeet",
+        "model_id": "nemo-parakeet-tdt-0.6b-v3"
+      },
+      {
+        "component": "diarization",
+        "engine": "sortformer",
+        "model_id": "diar_streaming_sortformer_4spk"
+      },
+      {
+        "component": "minutes",
+        "engine": "qwen3",
+        "model_id": "qwen3-8b-instruct"
+      }
+    ]
+  },
+  "minutes": {
+    "title": "Weekly platform sync",
+    "language": "en",
+    "generated_at": "2026-06-03T10:02:00+00:00",
+    "abstract": "The team confirmed that release 4.2 is ready apart from the German locale, agreed a two-week on-call rotation after last Tuesday's night incident, and approved two additional GPU nodes for the sovereign transcription cluster.",
+    "participants": [
+      {
+        "identifier": "amara.okafor",
+        "display_name": "Amara Okafor",
+        "email": "amara.okafor@example.org",
+        "is_organizer": true,
+        "is_external": false
+      },
+      {
+        "identifier": "lea.fontaine",
+        "display_name": "Léa Fontaine",
+        "email": "lea.fontaine@example.org",
+        "is_organizer": false,
+        "is_external": false
+      },
+      {
+        "identifier": "jonas.weber",
+        "display_name": "Jonas Weber",
+        "email": "jonas.weber@partner.example",
+        "is_organizer": false,
+        "is_external": true
+      }
+    ],
+    "topics": [
+      {
+        "title": "Release 4.2 readiness",
+        "summary": "Every runner is green and the only blocker is the German locale, where 47 billing strings are still untranslated and unreviewed.",
+        "key_points": [
+          "Build and integration suites pass on all runners.",
+          "47 untranslated strings remain, all in the billing screens.",
+          "The release window on 12 June cannot be moved."
+        ],
+        "start": 0.0,
+        "end": 420.0,
+        "timecode": "00:00:00.000"
+      },
+      {
+        "title": "On-call rotation and incident review",
+        "summary": "Last Tuesday's night incident showed that the weekly rotation concentrates fatigue and that hand-over notes are not written down.",
+        "key_points": [
+          "The pager fired at 02:00 for a responder at the end of a full week.",
+          "Hand-over notes were missing entirely."
+        ],
+        "start": 420.0,
+        "end": 1020.0,
+        "timecode": "00:07:00.000"
+      },
+      {
+        "title": "Transcription cluster capacity",
+        "summary": "Peak queue time exceeds ten minutes; two additional GPU nodes bring it back within the service target without leaving the data centre.",
+        "key_points": [
+          "Queue time at peak is above the ten-minute target."
+        ],
+        "start": 1020.0,
+        "end": 1500.0,
+        "timecode": "00:17:00.000"
+      }
+    ],
+    "decisions": [
+      {
+        "statement": "Release 4.2 ships on 12 June with the German locale disabled.",
+        "rationale": "The billing strings are neither translated nor proof-read, and the release window is fixed.",
+        "citations": [
+          {
+            "speaker": "Amara Okafor",
+            "quote": "Then we ship four point two on the twelfth of June with the German locale disabled.",
+            "start": 370.5,
+            "end": 379.8,
+            "timecode": "00:06:10.500"
+          }
+        ]
+      },
+      {
+        "statement": "The on-call rotation moves to a two-week cycle from July.",
+        "rationale": "A weekly cycle concentrates night work on a single responder.",
+        "citations": [
+          {
+            "speaker": "Amara Okafor",
+            "quote": "We move the rotation to a two-week cycle starting in July.",
+            "start": 812.0,
+            "end": 818.4,
+            "timecode": "00:13:32.000"
+          }
+        ]
+      },
+      {
+        "statement": "Two additional GPU nodes are approved for the transcription cluster.",
+        "rationale": null,
+        "citations": [
+          {
+            "speaker": "Amara Okafor",
+            "quote": "Approved. Please draft the procurement request before the board meeting.",
+            "start": 1425.0,
+            "end": 1431.8,
+            "timecode": "00:23:45.000"
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "description": "Disable the German locale in the 4.2 release branch and open a translation ticket.",
+        "owner": "Léa Fontaine",
+        "due_date": "2026-06-10",
+        "citations": [
+          {
+            "speaker": "Léa Fontaine",
+            "quote": "I will disable the locale in the release branch today.",
+            "start": 379.8,
+            "end": 384.0,
+            "timecode": "00:06:19.800"
+          }
+        ]
+      },
+      {
+        "description": "Circulate the incident review notes and the new hand-over template.",
+        "owner": "Jonas Weber",
+        "due_date": "2026-06-05",
+        "citations": [
+          {
+            "speaker": "Jonas Weber",
+            "quote": "I will write the review up and share the template.",
+            "start": 651.5,
+            "end": 658.0,
+            "timecode": "00:10:51.500"
+          }
+        ]
+      },
+      {
+        "description": "Draft the procurement request for the two GPU nodes.",
+        "owner": null,
+        "due_date": null,
+        "citations": []
+      },
+      {
+        "description": "Compare on-premises | cloud costs for the cluster before the board meeting.",
+        "owner": "Amara Okafor",
+        "due_date": "2026-06-18",
+        "citations": []
+      }
+    ],
+    "open_questions": [
+      {
+        "question": "Do we need a second reviewer for the German locale before the next release?",
+        "raised_by": "Léa Fontaine",
+        "citations": [
+          {
+            "speaker": "Léa Fontaine",
+            "quote": "Should a second reviewer sign off the locale?",
+            "start": 455.0,
+            "end": 460.2,
+            "timecode": "00:07:35.000"
+          }
+        ]
+      },
+      {
+        "question": "Who owns the monthly cost report once the cluster is live?",
+        "raised_by": null,
+        "citations": []
+      }
+    ],
+    "speaking_time": [
+      {
+        "speaker": "Amara Okafor",
+        "seconds": 612.5,
+        "share": 0.4083
+      },
+      {
+        "speaker": "Léa Fontaine",
+        "seconds": 498.2,
+        "share": 0.3321
+      },
+      {
+        "speaker": "Jonas Weber",
+        "seconds": 310.4,
+        "share": 0.2069
+      },
+      {
+        "speaker": "unknown",
+        "seconds": 78.9,
+        "share": 0.0526
+      }
+    ]
+  }
+}

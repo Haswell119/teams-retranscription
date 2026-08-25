@@ -1,0 +1,10 @@
+{{- if include "hansard.gpuEnabled" . }}
+{{/*
+GPU workers and CPU workers consume the SAME Redis Stream consumer group, so
+asr.compute=both is a single logical worker pool spread over two node classes.
+NKP's GPU Operator is a Pro entitlement; everything below is expressed in
+vanilla Kubernetes terms (nvidia.com/gpu resource, nvidia.com/gpu.present
+nodeSelector, standard toleration) so the chart works on any distribution.
+*/}}
+{{ include "hansard.worker.deployment" (dict "ctx" . "variant" "gpu") }}
+{{- end }}

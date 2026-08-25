@@ -1,0 +1,60 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "hansard.componentName" (dict "ctx" . "component" "test-connection") }}
+  namespace: {{ include "hansard.namespace" . }}
+  labels:
+    {{- include "hansard.componentLabels" (dict "ctx" . "component" "test") | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    {{- include "hansard.podSecurityContext" . | nindent 4 }}
+  containers:
+    - name: probe
+      image: {{ include "hansard.image" (dict "ctx" . "image" .Values.images.api) }}
+      imagePullPolicy: {{ .Values.images.api.pullPolicy }}
+      command:
+        - /bin/sh
+        - -ec
+        - |
+          # 1. the orchestrator answers its own readiness endpoint
+          python - <<'PY'
+          import os, sys, urllib.request
+          url = os.environ["HANSARD_TEST_URL"]
+          with urllib.request.urlopen(url, timeout=10) as response:
+              sys.exit(0 if response.status == 200 else 1)
+          PY
+          # 2. the model artifact was staged and verifies against its checksums
+          test -s "${HANSARD_RUNTIME__MODELS_DIR}/SHA256SUMS"
+          echo "hansard: api reachable and model artifact present"
+      env:
+        - name: HANSARD_TEST_URL
+          value: {{ printf "http://%s.%s.svc.cluster.local:%v/readyz" (include "hansard.componentName" (dict "ctx" . "component" "orchestrator")) (include "hansard.namespace" .) .Values.orchestrator.service.port | quote }}
+        - name: HANSARD_RUNTIME__MODELS_DIR
+          value: {{ .Values.models.mountPath | quote }}
+        - name: HOME
+          value: /tmp
+      securityContext:
+        {{- include "hansard.containerSecurityContext" . | nindent 8 }}
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 256Mi
+      volumeMounts:
+        {{- include "hansard.scratchVolumeMounts" . | trim | nindent 8 }}
+        {{- include "hansard.models.volumeMounts" . | trim | nindent 8 }}
+  {{- with (include "hansard.models.initContainers" .) }}
+  initContainers:
+    {{- . | trim | nindent 4 }}
+  {{- end }}
+  volumes:
+    {{- include "hansard.scratchVolumes" . | trim | nindent 4 }}
+    {{- include "hansard.models.volumes" . | trim | nindent 4 }}
+{{- end }}
