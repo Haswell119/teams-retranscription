@@ -30,10 +30,7 @@ def transcript(*utterances):
 
 
 def _timed(streams):
-    return [
-        (speaker, index * 5.0, index * 5.0 + 5.0, text)
-        for index, (speaker, text) in enumerate(streams)
-    ]
+    return [(speaker, index * 5.0, index * 5.0 + 5.0, text) for index, (speaker, text) in enumerate(streams)]
 
 
 REFERENCE = diarization(("A", 0.0, 10.0), ("B", 10.0, 20.0))

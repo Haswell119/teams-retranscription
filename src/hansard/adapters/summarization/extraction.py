@@ -144,10 +144,7 @@ def _decision_of(unit: SentenceUnit, folded: str, cues: CueSet, language: str) -
 def _causal_position(text: str, cues: CueSet) -> int | None:
     folded = fold_for_matching(text)
     positions = [
-        found.start()
-        for pattern in cues.causal
-        for found in [pattern.search(folded)]
-        if found is not None
+        found.start() for pattern in cues.causal for found in [pattern.search(folded)] if found is not None
     ]
     return min(positions) if positions else None
 

@@ -94,9 +94,7 @@ async def test_publish_keeps_traversing_attachments_inside_the_directory(tmp_pat
     payload = Payload(
         subject="Escape",
         body="body",
-        attachments=(
-            Attachment(filename="../../evil.sh", media_type="text/plain", content=b"rm -rf /"),
-        ),
+        attachments=(Attachment(filename="../../evil.sh", media_type="text/plain", content=b"rm -rf /"),),
     )
 
     await publisher.publish(target("out"), payload)

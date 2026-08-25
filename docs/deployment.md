@@ -47,7 +47,7 @@ model bundle:
 diarization:
   engine: sherpa
   embeddingModel: nemo_en_titanet_small.onnx   # relative to models.mountPath
-  clusteringThreshold: 0.95    # higher = fewer speakers
+  clusteringThreshold: 0.99    # higher = fewer speakers
   minimumSpeakerSeconds: 3.0   # shorter clusters are absorbed into their neighbour
 ```
 
@@ -59,7 +59,7 @@ The default embedding model was picked by measurement, not reputation. On
 synthetic multi-speaker meetings with exact ground truth, TitaNet scored 0.01 %
 speaker confusion (DER 14.96 %) against 47 % (DER 62.77 %) for CAM++ - which
 failed even when handed the correct number of clusters. If you change
-`embeddingModel`, re-benchmark: `clusteringThreshold: 0.95` is calibrated for
+`embeddingModel`, re-benchmark: `clusteringThreshold: 0.99` is calibrated for
 TitaNet's embedding space and does not transfer.
 
 ---

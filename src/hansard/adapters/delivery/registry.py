@@ -47,9 +47,7 @@ def available_channels() -> tuple[str, ...]:
 def build_publisher(channel: DeliveryChannel | str, settings: DeliverySettings) -> MinutesPublisher:
     factory = _FACTORIES.get(str(channel))
     if factory is None:
-        raise ConfigurationError(
-            f"unknown delivery channel '{channel}', available: {available_channels()}"
-        )
+        raise ConfigurationError(f"unknown delivery channel '{channel}', available: {available_channels()}")
     return factory(settings)
 
 
@@ -79,9 +77,7 @@ def _parse_format(value: object, fallback: WebhookBodyFormat) -> WebhookBodyForm
         return WebhookBodyFormat(value.strip().lower())
     except ValueError as error:
         supported = ", ".join(item.value for item in WebhookBodyFormat)
-        raise ConfigurationError(
-            f"unknown webhook body format '{value}', supported: {supported}"
-        ) from error
+        raise ConfigurationError(f"unknown webhook body format '{value}', supported: {supported}") from error
 
 
 def graph_credentials(settings: DeliverySettings) -> ClientCredentials | None:

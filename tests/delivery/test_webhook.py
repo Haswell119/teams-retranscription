@@ -37,8 +37,11 @@ def frozen_clock() -> float:
     ("address", "default", "expected"),
     [
         ("https://intranet.example/hook", None, "https://intranet.example/hook"),
-        ("workflow:https://prod-1.westeurope.logic.azure.com/x", None,
-         "https://prod-1.westeurope.logic.azure.com/x"),
+        (
+            "workflow:https://prod-1.westeurope.logic.azure.com/x",
+            None,
+            "https://prod-1.westeurope.logic.azure.com/x",
+        ),
         ("webhook:https://intranet.example/a", None, "https://intranet.example/a"),
         ("", "https://fallback.example/hook", "https://fallback.example/hook"),
     ],

@@ -35,7 +35,9 @@ def test_token_endpoint_follows_the_v2_shape() -> None:
 
 
 def test_scope_and_tenant_overrides_keep_the_secret() -> None:
-    connector = CREDENTIALS.with_scope("https://api.botframework.com/.default").with_tenant("botframework.com")
+    connector = CREDENTIALS.with_scope("https://api.botframework.com/.default").with_tenant(
+        "botframework.com"
+    )
 
     assert connector.scope == "https://api.botframework.com/.default"
     assert connector.token_endpoint.endswith("/botframework.com/oauth2/v2.0/token")
@@ -69,9 +71,7 @@ async def test_token_is_cached_until_it_nears_expiry(mock_client) -> None:
         source_calls.append(1)
         return httpx.Response(200, json={"access_token": f"token-{len(source_calls)}", "expires_in": 3600})
 
-    provider = CachedTokenProvider(
-        source=HttpTokenSource(credentials=CREDENTIALS, clock=clock), clock=clock
-    )
+    provider = CachedTokenProvider(source=HttpTokenSource(credentials=CREDENTIALS, clock=clock), clock=clock)
     async with mock_client(handler) as client:
         first = await provider.token(client)
         clock.now = 3000.0

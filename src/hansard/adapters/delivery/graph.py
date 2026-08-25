@@ -72,9 +72,7 @@ def parse_teams_target(address: str) -> TeamsTarget:
             primary_id=team_id.strip(),
             secondary_id=channel_id.strip(),
         )
-    raise DeliveryError(
-        f"unsupported Teams address scheme '{scheme}'; expected 'chat:' or 'channel:'"
-    )
+    raise DeliveryError(f"unsupported Teams address scheme '{scheme}'; expected 'chat:' or 'channel:'")
 
 
 def _hard_split(block: str, limit: int) -> list[str]:

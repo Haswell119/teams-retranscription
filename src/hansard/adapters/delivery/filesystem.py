@@ -13,8 +13,14 @@ _UNSAFE_CHARACTERS = re.compile(r'[\x00-\x1f\x7f<>:"/\\|?*]')
 _COLLAPSIBLE = re.compile(r"[\s]+")
 _TRAVERSAL_PARTS = frozenset({"..", "...."})
 _WINDOWS_RESERVED = frozenset(
-    {"CON", "PRN", "AUX", "NUL", *(f"COM{index}" for index in range(1, 10)),
-     *(f"LPT{index}" for index in range(1, 10))}
+    {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        *(f"COM{index}" for index in range(1, 10)),
+        *(f"LPT{index}" for index in range(1, 10)),
+    }
 )
 _MAX_NAME_LENGTH = 180
 
@@ -128,4 +134,3 @@ class FilesystemPublisher:
         directory.mkdir(parents=True, exist_ok=True)
         for path, content in files:
             path.write_bytes(content)
-

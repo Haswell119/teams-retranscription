@@ -29,6 +29,20 @@ def build_diarizer(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
     return factory(settings, models_dir)
 
 
+def _provider(device: str) -> str:
+    if device == "cuda":
+        return "cuda"
+    if device == "auto":
+        try:
+            import onnxruntime
+
+            if "CUDAExecutionProvider" in onnxruntime.get_available_providers():
+                return "cuda"
+        except ImportError:
+            return "cpu"
+    return "cpu"
+
+
 def _build_sherpa(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
     from hansard.adapters.diarization.sherpa import SherpaDiarizer
 
@@ -38,11 +52,11 @@ def _build_sherpa(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
         embedding_model=settings.embedding_model,
         clustering_threshold=settings.clustering_threshold,
         minimum_speaker_seconds=settings.minimum_speaker_seconds,
-        provider="cuda" if settings.device == "cuda" else "cpu",
+        provider=_provider(settings.device),
     )
 
 
-def _build_null(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
+def _build_null(_settings: DiarizationSettings, _models_dir: Path) -> Diarizer:
     from hansard.adapters.diarization.null_diarizer import NullDiarizer
 
     return NullDiarizer()

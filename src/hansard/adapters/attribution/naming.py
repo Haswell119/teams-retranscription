@@ -34,16 +34,14 @@ class RosterSpeakerNamer:
         return matrix
 
     def resolve_names(
-        self, transcript: Transcript, diarization: Diarization, roster: Roster
+        self, _transcript: Transcript, diarization: Diarization, roster: Roster
     ) -> dict[str, str]:
         labels = list(diarization.labels or dict.fromkeys(turn.label for turn in diarization.turns))
         if not labels:
             return {}
         names = list(dict.fromkeys(observation.display_name for observation in roster.observations))
         speaking_time = diarization.speaking_time()
-        fallback = {
-            label: f"{self.fallback_prefix} {index + 1}" for index, label in enumerate(labels)
-        }
+        fallback = {label: f"{self.fallback_prefix} {index + 1}" for index, label in enumerate(labels)}
         if not names:
             return fallback
         matrix = self._overlap_matrix(diarization, roster, labels, names)
@@ -54,7 +52,8 @@ class RosterSpeakerNamer:
             if total <= 0.0:
                 continue
             best = matrix[row][column]
-            runner_up = max((value for index, value in enumerate(matrix[row]) if index != column), default=0.0)
+            others = (value for index, value in enumerate(matrix[row]) if index != column)
+            runner_up = max(others, default=0.0)
             coverage = best / total
             margin = (best - runner_up) / total
             if coverage >= self.minimum_coverage and margin >= self.minimum_margin:

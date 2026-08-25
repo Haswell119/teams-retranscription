@@ -23,8 +23,19 @@ def decode_to_clip(data: bytes, sample_rate: int = TARGET_SAMPLE_RATE) -> AudioC
     if binary is None:
         raise HansardError("ffmpeg is required to decode in-memory audio")
     command = [
-        binary, "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
-        "-f", "f32le", "-ac", "1", "-ar", str(sample_rate), "pipe:1",
+        binary,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "pipe:0",
+        "-f",
+        "f32le",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "pipe:1",
     ]
     process = subprocess.run(command, input=data, capture_output=True, check=False)
     if process.returncode != 0:
@@ -43,8 +54,19 @@ def _load_via_ffmpeg(path: Path, sample_rate: int) -> AudioClip:
     if binary is None:
         raise HansardError(f"ffmpeg is required to read {path.suffix} audio")
     command = [
-        binary, "-hide_banner", "-loglevel", "error", "-i", str(path),
-        "-f", "f32le", "-ac", "1", "-ar", str(sample_rate), "pipe:1",
+        binary,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(path),
+        "-f",
+        "f32le",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "pipe:1",
     ]
     process = subprocess.run(command, capture_output=True, check=False)
     if process.returncode != 0:

@@ -9,16 +9,13 @@ FRENCH_MAP: dict[str, object] = {
         {
             "statement": "La version 4.2 est lancée le 12 juin sans la traduction allemande.",
             "rationale": "Deux anomalies de facturation restent ouvertes.",
-            "quote": (
-                "On part sur un lancement de la version 4.2 le 12 juin, sans la traduction allemande."
-            ),
+            "quote": ("On part sur un lancement de la version 4.2 le 12 juin, sans la traduction allemande."),
             "utterance": 4,
         },
         {
             "statement": "Le passage à quatre nœuds de transcription est validé.",
             "quote": (
-                "On valide le passage à quatre nœuds de transcription pour absorber la charge de "
-                "production."
+                "On valide le passage à quatre nœuds de transcription pour absorber la charge de production."
             ),
             "utterance": 11,
         },
@@ -67,8 +64,7 @@ FRENCH_REDUCE: dict[str, object] = {
             "index": 1,
             "title": "Lancement de la version 4.2",
             "summary": (
-                "La date de lancement de la version 4.2 est arrêtée au 12 juin sans la traduction "
-                "allemande."
+                "La date de lancement de la version 4.2 est arrêtée au 12 juin sans la traduction allemande."
             ),
             "key_points": ["Deux anomalies de facturation restent ouvertes."],
         },
@@ -106,9 +102,7 @@ ENGLISH_MAP: dict[str, object] = {
             "description": "Send the customer notice about the maintenance window.",
             "owner": "Tom",
             "due": "Friday",
-            "quote": (
-                "Can you send the customer notice about the maintenance window by Friday, Tom?"
-            ),
+            "quote": ("Can you send the customer notice about the maintenance window by Friday, Tom?"),
             "utterance": 5,
         },
         {

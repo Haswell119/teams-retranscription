@@ -106,9 +106,7 @@ def test_english_hypotheticals_are_not_decisions():
 
 
 def test_decision_rationale_is_split_from_the_statement():
-    turns = (
-        ("Léa Fontaine", "On valide le passage à quatre nœuds pour absorber la charge."),
-    )
+    turns = (("Léa Fontaine", "On valide le passage à quatre nœuds pour absorber la charge."),)
     candidates = _extract(turns, "fr", ("Léa Fontaine",))
     decision = candidates.decisions[0]
     assert decision.statement == "On valide le passage à quatre nœuds"

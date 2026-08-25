@@ -15,7 +15,9 @@ POLICY = RetryPolicy(attempts=4, initial_backoff_seconds=1.0, backoff_multiplier
 
 
 def response(status_code: int, headers: dict[str, str] | None = None) -> httpx.Response:
-    return httpx.Response(status_code=status_code, headers=headers or {}, request=httpx.Request("POST", "https://host/x"))
+    return httpx.Response(
+        status_code=status_code, headers=headers or {}, request=httpx.Request("POST", "https://host/x")
+    )
 
 
 class Responder:

@@ -219,13 +219,11 @@ FRENCH_REDUCE_USER = (
 )
 
 ENGLISH_CONTEXT_HEADER = (
-    "CONTEXT FROM THE PREVIOUS EXCERPT (for continuity only, do not report items from it):\n"
-    "{context}\n\n"
+    "CONTEXT FROM THE PREVIOUS EXCERPT (for continuity only, do not report items from it):\n{context}\n\n"
 )
 
 FRENCH_CONTEXT_HEADER = (
-    "CONTEXTE DE L'EXTRAIT PRÉCÉDENT (continuité seulement, n'en tirez aucun élément) :\n"
-    "{context}\n\n"
+    "CONTEXTE DE L'EXTRAIT PRÉCÉDENT (continuité seulement, n'en tirez aucun élément) :\n{context}\n\n"
 )
 
 ENGLISH_NOTHING = "(none)"

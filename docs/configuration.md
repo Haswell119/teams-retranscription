@@ -249,8 +249,8 @@ Microsoft Graph limitations are in [delivery](delivery.md).
 
 | Variable | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `DEFAULT_CHANNELS` | tuple | `("filesystem",)` | Declared but not read by any current code path; targets are passed explicitly. |
-| `FORMATS` | tuple | `("markdown", "html")` | Formats rendered for delivery. Any of `markdown`, `html`, `json`, `vtt`, `srt`, `text`. |
+| `DEFAULT_CHANNELS` | tuple | `("filesystem",)` | Declared but not read by any current code path; targets are passed explicitly, with `--deliver` or in the API submission. |
+| `FORMATS` | tuple | `("markdown", "html")` | The formats `hansard join` and the API render for every meeting: one `transcript.*` per entry, plus a `minutes.*` for each entry that has a minutes renderer. Any of `markdown`, `html`, `json`, `vtt`, `srt`, `text`; only the first three render minutes. |
 | `WEBHOOK_URL` | str \| null | unset | Default URL for the webhook publisher when a target does not carry its own. |
 | `OUTPUT_DIR` | path | `artifacts` | Where the filesystem publisher writes. |
 
@@ -328,12 +328,29 @@ Prefix `HANSARD_API__`.
 | `ROOT_PATH` | str | `""` | Path prefix behind a reverse proxy. |
 | `API_KEY` | SecretStr \| null | unset | Never logged. |
 | `CORS_ORIGINS` | tuple | `()` | |
-| `METRICS_ENABLED` | bool | `true` | |
+| `METRICS_ENABLED` | bool | `true` | Declared but not read. The Prometheus exporter is separate and reads `HANSARD_METRICS_PORT`, defaulting to `9095`. See [metrics](metrics.md). |
 
-**The whole section is currently inert.** `src/hansard/interfaces/` contains only
-`cli.py`; there is no HTTP application yet. The `api` extra installs FastAPI and
-Uvicorn in anticipation. The Prometheus exporter is separate and does work — it
-reads `HANSARD_METRICS_PORT`, defaulting to `9095`. See [metrics](metrics.md).
+These settings drive `hansard serve`, which runs the FastAPI application in
+`hansard.interfaces.api.app`. It needs the `api` extra.
+
+`HOST` and `PORT` are the bind address, overridable per invocation with
+`--host` and `--port`. `ROOT_PATH` is the prefix to declare when the API sits
+behind a reverse proxy at a sub-path. `CORS_ORIGINS` adds a CORS middleware
+allowing `GET`, `POST` and `DELETE` from those origins; leaving it empty adds no
+middleware at all, which is the right default for a service called by other
+services.
+
+`API_KEY` is the one to set deliberately. **While it is unset there is no
+authentication**: every `/v1` route is open to anything that can reach the port.
+Set it and each `/v1` request must carry a matching `X-API-Key` header, or it is
+refused with `401 invalid or missing X-API-Key`. `/healthz` and `/readyz` are
+always unauthenticated so a load balancer can probe them.
+
+```bash
+HANSARD_API__HOST=127.0.0.1
+HANSARD_API__PORT=8000
+HANSARD_API__API_KEY=change-me
+```
 
 ---
 
@@ -346,7 +363,7 @@ Prefix `HANSARD_RUNTIME__`.
 | `WORKSPACE` | path | `/var/lib/hansard` | Scratch directory for captured audio and intermediate files. On a bare-metal install point it somewhere your user can write. |
 | `MODELS_DIR` | path | `/var/lib/hansard/models` | Root of the model bundle. **The setting you will change first on a laptop.** The container images override it to `/models`. Layout in [installation](installation.md#the-expected-layout). |
 | `ALLOW_MODEL_DOWNLOADS` | bool | `false` | When `false`, a missing model is a hard error rather than a silent download. Leave it off: it is the property that makes an air gap enforceable, and CI runs transcription with the network disabled to prove it. |
-| `MAX_CONCURRENT_MEETINGS` | int | `2` | Declared but not read; concurrency is set by replica count today. |
+| `MAX_CONCURRENT_MEETINGS` | int | `2` | Number of concurrent job workers inside one `hansard serve` process. Each concurrent meeting holds its own recogniser in memory, so budget roughly 1.4 GB per unit before raising it. It does not apply to `hansard transcribe` or `hansard join`, which process one meeting each. |
 | `WORKER_THREADS` | int | `0` | Declared but not read. Use `HANSARD_ASR__INTRA_OP_THREADS`, or `OMP_NUM_THREADS` for the ONNX Runtime pools. |
 | `LOG_LEVEL` | str | `INFO` | Declared but not read; no logging configuration is wired up yet. |
 | `LOG_FORMAT` | `json` \| `console` | `json` | Same. |
@@ -502,8 +519,8 @@ validate and appear in `model_dump()`, but no code reads them today:
 | `audio.preserve_dynamics_for_diarization` | The behaviour is unconditional |
 | `delivery.default_channels` | Targets are always explicit |
 | Every field of `storage` | No `ArtifactStore` implementation exists |
-| Every field of `api` | No HTTP interface exists |
-| `runtime.max_concurrent_meetings`, `runtime.worker_threads`, `runtime.log_level`, `runtime.log_format` | Unused |
+| `api.metrics_enabled` | Unused; the exporter reads `HANSARD_METRICS_PORT` |
+| `runtime.worker_threads`, `runtime.log_level`, `runtime.log_format` | Unused |
 
 ## Related reading
 

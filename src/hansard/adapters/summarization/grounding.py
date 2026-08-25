@@ -181,17 +181,13 @@ def support_ratio(
     if not terms:
         return 1.0, ()
     missing = tuple(
-        term
-        for term in terms
-        if not _is_supported_term(term, available, keys, language, fuzzy_threshold)
+        term for term in terms if not _is_supported_term(term, available, keys, language, fuzzy_threshold)
     )
     return (len(terms) - len(missing)) / len(terms), missing
 
 
 def unsupported_numbers_in(text: str, index: TranscriptIndex) -> tuple[str, ...]:
-    return tuple(
-        number for number in numbers_in(text) if _normalised_number(number) not in index.numbers
-    )
+    return tuple(number for number in numbers_in(text) if _normalised_number(number) not in index.numbers)
 
 
 def unsupported_entities_in(text: str, index: TranscriptIndex) -> tuple[str, ...]:

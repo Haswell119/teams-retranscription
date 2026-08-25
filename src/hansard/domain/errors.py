@@ -13,11 +13,11 @@ class CaptureError(HansardError):
     pass
 
 
-class MeetingJoinRefused(CaptureError):
+class MeetingJoinRefusedError(CaptureError):
     pass
 
 
-class MeetingAdmissionTimeout(CaptureError):
+class MeetingAdmissionTimeoutError(CaptureError):
     pass
 
 
@@ -37,9 +37,15 @@ class DeliveryError(HansardError):
     pass
 
 
-class ArtifactNotFound(HansardError):
+class ArtifactNotFoundError(HansardError):
     pass
 
 
-class QualityGateFailed(HansardError):
+class QualityGateFailedError(HansardError):
     pass
+
+
+MeetingJoinRefused = MeetingJoinRefusedError
+MeetingAdmissionTimeout = MeetingAdmissionTimeoutError
+ArtifactNotFound = ArtifactNotFoundError
+QualityGateFailed = QualityGateFailedError

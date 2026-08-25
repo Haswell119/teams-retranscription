@@ -94,12 +94,9 @@ ENGLISH_PHRASES: Mapping[Phrase, str] = {
         "No audio, transcript or minutes left the organisation."
     ),
     Phrase.SOVEREIGNTY_TRANSCRIPT: (
-        "Transcribed locally by {generator} using {models}. "
-        "No audio and no transcript left the organisation."
+        "Transcribed locally by {generator} using {models}. No audio and no transcript left the organisation."
     ),
-    Phrase.SOVEREIGNTY_SHORT: (
-        "Transcribed locally by {generator}. No data left the organisation."
-    ),
+    Phrase.SOVEREIGNTY_SHORT: ("Transcribed locally by {generator}. No data left the organisation."),
     Phrase.DATE_PATTERN: "{day} {month} {year} at {time} ({timezone})",
     Phrase.UNIT_HOUR: "h",
     Phrase.UNIT_MINUTE: "min",
@@ -153,8 +150,7 @@ FRENCH_PHRASES: Mapping[Phrase, str] = {
         "Aucun enregistrement et aucune transcription n'est sorti de l'organisation."
     ),
     Phrase.SOVEREIGNTY_SHORT: (
-        "Transcription produite localement par {generator}. "
-        "Aucune donnée n'est sortie de l'organisation."
+        "Transcription produite localement par {generator}. Aucune donnée n'est sortie de l'organisation."
     ),
     Phrase.DATE_PATTERN: "{day} {month} {year} à {time} ({timezone})",
     Phrase.UNIT_HOUR: "h",

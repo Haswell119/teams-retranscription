@@ -149,9 +149,7 @@ def summ_re_sample(meeting: SummReMeeting) -> EvaluationSample:
 
 def summ_re_samples(root: Path) -> tuple[EvaluationSample, ...]:
     return tuple(
-        summ_re_sample(read_meeting(directory))
-        for directory in sorted(root.iterdir())
-        if directory.is_dir()
+        summ_re_sample(read_meeting(directory)) for directory in sorted(root.iterdir()) if directory.is_dir()
     )
 
 

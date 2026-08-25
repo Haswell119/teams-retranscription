@@ -76,9 +76,7 @@ class GateOutcome:
 
     def _blocking(self, status: GateStatus) -> tuple[GateResult, ...]:
         return tuple(
-            result
-            for result in self.results
-            if result.gate.tier == "must_pass" and result.status == status
+            result for result in self.results if result.gate.tier == "must_pass" and result.status == status
         )
 
 

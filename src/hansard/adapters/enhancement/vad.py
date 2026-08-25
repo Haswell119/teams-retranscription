@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 
 from hansard.domain.audio import AudioClip
+from hansard.domain.errors import ConfigurationError
 from hansard.domain.timespan import TimeSpan, merge_adjacent
 
 _ENERGY_EPSILON = 1e-10
@@ -32,9 +33,12 @@ class SileroVoiceActivityDetector:
 
             try:
                 self._detector = onnx_asr.load_vad("silero", self.model_path)
-            except Exception:
+            except Exception as error:
                 if self.model_path is None or not self.allow_download:
-                    raise
+                    raise ConfigurationError(
+                        f"voice activity model unavailable at {self.model_path!r} and downloads "
+                        f"are disabled: {error}"
+                    ) from error
                 self._detector = onnx_asr.load_vad("silero")
         return self._detector
 

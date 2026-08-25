@@ -95,9 +95,9 @@ def citation_for(unit: SentenceUnit, quote_limit: int = QUOTE_CHARACTER_LIMIT) -
     return Citation(span=unit.span, speaker=unit.speaker, quote=truncate(unit.text, quote_limit))
 
 
-def citations_for(units: Sequence[SentenceUnit], quote_limit: int = QUOTE_CHARACTER_LIMIT) -> tuple[
-    Citation, ...
-]:
+def citations_for(
+    units: Sequence[SentenceUnit], quote_limit: int = QUOTE_CHARACTER_LIMIT
+) -> tuple[Citation, ...]:
     return tuple(citation_for(unit, quote_limit) for unit in units)
 
 

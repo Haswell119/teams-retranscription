@@ -38,9 +38,7 @@ def _probe_wave(path: Path) -> AudioProbe:
             rate = handle.getframerate()
             frames = handle.getnframes()
     except (OSError, wave.Error) as error:
-        raise CaptureError(
-            f"could not read {path}; convert it to WAV or FLAC first ({error})"
-        ) from error
+        raise CaptureError(f"could not read {path}; convert it to WAV or FLAC first ({error})") from error
     return AudioProbe(sample_rate=rate, duration_seconds=frames / rate if rate else 0.0)
 
 

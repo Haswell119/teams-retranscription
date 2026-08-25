@@ -58,14 +58,14 @@ def test_documents_are_responsive(minutes_html):
 
 def test_semantic_structure(minutes_html):
     for fragment in (
-        "<header class=\"masthead\">",
-        "<nav class=\"toc\"",
-        "<main id=\"content\">",
-        "<section aria-labelledby=\"decisions\">",
-        "<footer class=\"colophon\">",
-        "<th scope=\"col\">Owner</th>",
-        "<th scope=\"row\">Léa Fontaine</th>",
-        "<time datetime=\"2026-06-03T09:30:00+00:00\">",
+        '<header class="masthead">',
+        '<nav class="toc"',
+        '<main id="content">',
+        '<section aria-labelledby="decisions">',
+        '<footer class="colophon">',
+        '<th scope="col">Owner</th>',
+        '<th scope="row">Léa Fontaine</th>',
+        '<time datetime="2026-06-03T09:30:00+00:00">',
     ):
         assert fragment in minutes_html
 
@@ -92,8 +92,8 @@ def test_language_attribute_follows_the_context(minutes, fr_context):
 
 def test_french_headings(minutes, fr_context):
     document = RENDERER.render_minutes(minutes, fr_context)
-    assert "<h2 id=\"decisions\">Relevé de décisions</h2>" in document
-    assert "<h2 id=\"speaking\">Temps de parole</h2>" in document
+    assert '<h2 id="decisions">Relevé de décisions</h2>' in document
+    assert '<h2 id="speaking">Temps de parole</h2>' in document
     assert "Aller au contenu" in document
 
 
@@ -105,7 +105,7 @@ def test_content_is_escaped(context, minutes):
 
 
 def test_transcript_turns_are_articles(transcript_html):
-    assert transcript_html.count("<article class=\"turn\">") == 10
+    assert transcript_html.count('<article class="turn">') == 10
     assert '<span class="speaker">Amara Okafor</span><span class="timecode">00:00:08</span>' in (
         transcript_html
     )

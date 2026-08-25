@@ -35,8 +35,10 @@ def target(address: str) -> DeliveryTarget:
         ("a@example.org", ("a@example.org",)),
         ("a@example.org,b@example.org", ("a@example.org", "b@example.org")),
         ("a@example.org; b@example.org", ("a@example.org", "b@example.org")),
-        (" a@example.org ;;  b@example.org , c@example.org ",
-         ("a@example.org", "b@example.org", "c@example.org")),
+        (
+            " a@example.org ;;  b@example.org , c@example.org ",
+            ("a@example.org", "b@example.org", "c@example.org"),
+        ),
         ("a@example.org a@example.org", ("a@example.org",)),
     ],
 )

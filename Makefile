@@ -18,7 +18,7 @@ install-dev: install ## Also install development and capture dependencies
 	$(PYTHON) -m playwright install --with-deps chromium
 
 models: ## Fetch and verify the model bundle into $(MODELS_DIR)
-	MODELS_DIR=$(MODELS_DIR) deploy/docker/fetch-models.sh
+	deploy/docker/fetch-models.sh deploy/docker/models.manifest deploy/docker/models.NOTICE $(MODELS_DIR)
 	@echo "set HANSARD_RUNTIME__MODELS_DIR=$(MODELS_DIR)"
 
 bench-data: ## Fetch the evaluation corpora

@@ -42,3 +42,11 @@ Used unmodified for voice activity detection.
 --------------------------------------------------------------------------------
 Attribution required by CC-BY-4.0 section 3(a) is satisfied by this file, which
 is distributed with every container image and every source distribution.
+
+--------------------------------------------------------------------------------
+tests/fixtures/speech_en_8s.wav
+Excerpt from the LibriSpeech corpus (dev-clean, speaker 1272)
+Copyright Vassil Panayotov and contributors
+Licensed under Creative Commons Attribution 4.0 International (CC-BY-4.0)
+https://www.openslr.org/12
+Used unmodified, trimmed and level-normalised, as a test fixture only.

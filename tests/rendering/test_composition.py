@@ -162,8 +162,7 @@ def test_long_utterance_is_split_into_several_cues():
 
 def test_word_timings_drive_cue_boundaries():
     words = tuple(
-        Word(text=f"word{index}", span=TimeSpan(float(index), float(index) + 1.0))
-        for index in range(20)
+        Word(text=f"word{index}", span=TimeSpan(float(index), float(index) + 1.0)) for index in range(20)
     )
     text = " ".join(word.text for word in words)
     transcript = Transcript(utterances=(_utterance(0.0, 20.0, text, words=words),))

@@ -44,9 +44,7 @@ def payload() -> Payload:
 
 @pytest.fixture
 def token_provider() -> CachedTokenProvider:
-    return CachedTokenProvider(
-        source=StubTokenSource([AccessToken(value="graph-token", expires_at=1e9)])
-    )
+    return CachedTokenProvider(source=StubTokenSource([AccessToken(value="graph-token", expires_at=1e9)]))
 
 
 @pytest.fixture

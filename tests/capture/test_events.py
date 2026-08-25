@@ -161,9 +161,7 @@ def test_disagreeing_signals_are_contested_rather_than_guessed():
         roster_payload(ORIGIN, ("a", "Alice", "presenter", (11,)), ("b", "Bob", "presenter", (22,)))
     )
     reducer.push_payload(csrc_payload(ORIGIN + 3_000, 11))
-    reducer.push_payload(
-        {"kind": "dom_speaking", "at_epoch_ms": ORIGIN + 3_000, "display_names": ["Bob"]}
-    )
+    reducer.push_payload({"kind": "dom_speaking", "at_epoch_ms": ORIGIN + 3_000, "display_names": ["Bob"]})
     timeline = reducer.timeline(ORIGIN + 6_000)
     assert timeline.observations() == ()
     assert timeline.contested()[0].candidates == ("a",)
@@ -175,9 +173,7 @@ def test_cross_check_can_be_disabled():
         roster_payload(ORIGIN, ("a", "Alice", "presenter", (11,)), ("b", "Bob", "presenter", (22,)))
     )
     reducer.push_payload(csrc_payload(ORIGIN + 3_000, 11))
-    reducer.push_payload(
-        {"kind": "dom_speaking", "at_epoch_ms": ORIGIN + 3_000, "display_names": ["Bob"]}
-    )
+    reducer.push_payload({"kind": "dom_speaking", "at_epoch_ms": ORIGIN + 3_000, "display_names": ["Bob"]})
     assert reducer.timeline(ORIGIN + 6_000).observations()[0].display_name == "Alice"
 
 

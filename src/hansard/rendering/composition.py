@@ -478,9 +478,7 @@ def _sequenced_cues(
         if position + 1 < len(ordered):
             following_start = ordered[position + 1][1].start
             end = min(end, max(following_start, start + layout.minimum_duration))
-        cues.append(
-            SubtitleCue(index=len(cues) + 1, span=TimeSpan(start, end), speaker=speaker, lines=lines)
-        )
+        cues.append(SubtitleCue(index=len(cues) + 1, span=TimeSpan(start, end), speaker=speaker, lines=lines))
         cursor = end
     return tuple(cues)
 

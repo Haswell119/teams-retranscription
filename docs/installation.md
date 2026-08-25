@@ -88,6 +88,7 @@ Every extra is declared in `pyproject.toml`. Pick by what you intend to do.
 | Webhook or Teams Workflows delivery | *none* | `httpx` again |
 | Teams delivery through Microsoft Graph | `delivery-msal` (optional) | `msal`. Without it the client-credentials flow runs over `httpx` instead |
 | The browser bot | `capture` | `playwright`, plus the system packages above |
+| The HTTP API (`hansard serve`) | `api` | `fastapi`, `uvicorn`, `python-multipart` |
 | Prometheus metrics | `observability` | `prometheus-client` |
 | Run the benchmarks | `metrics` | `jiwer`, `scipy`, `meeteval`, `whisper-normalizer`, `unidecode` |
 | Contribute | `dev` | `ruff`, `mypy`, `pytest` and friends |
@@ -101,16 +102,14 @@ pip install "hansard[asr-onnx,diarization,delivery,metrics,observability]"
 `make install` does the same thing with `uv`, and `make install-dev` adds `dev`,
 `capture` and the Chromium download.
 
-### Two extras that do not yet do what their name suggests
+### One extra that does not do what its name suggests
 
-- **`api`** installs FastAPI and Uvicorn, but there is no HTTP interface in the
-  tree yet: `src/hansard/interfaces/` contains only `cli.py`. The whole `api`
-  settings section is currently inert. See
-  [configuration](configuration.md#not-yet-wired-up).
-- **`asr-whisper`** installs `faster-whisper`, but the module the ASR registry
-  imports for the `whisper` engine, `hansard.adapters.asr.whisper_engine`, is
-  not present. `HANSARD_ASR__ENGINE=whisper` therefore fails with an
-  `ImportError`. Parakeet is the supported recogniser.
+**`asr-whisper`** installs `faster-whisper`, but the module the ASR registry
+imports for the `whisper` engine, `hansard.adapters.asr.whisper_engine`, is not
+present. `HANSARD_ASR__ENGINE=whisper` therefore fails with
+`ModuleNotFoundError: No module named 'hansard.adapters.asr.whisper_engine'`.
+Parakeet is the supported recogniser, and the reasons are in
+[architecture](architecture.md#design-decisions-and-why).
 
 ---
 
@@ -232,10 +231,9 @@ every service read-only, non-root, with all capabilities dropped.
 
 Two caveats worth stating plainly. There is **no browser bot in compose** — a
 Teams bot needs its own `/dev/shm` budget and egress policy, which compose cannot
-model honestly. And the `api` and `worker` services invoke `hansard serve` and
-`hansard worker`, subcommands that do not exist in the CLI yet; the `models` and
-`cli` services are the parts that work today. The full walkthrough, including
-what to do about that, is in [deployment](deployment.md).
+model honestly. And the `worker` service invokes `hansard worker`, which is not a
+CLI subcommand; the `models`, `api` and `cli` services are the parts that work
+today. The full walkthrough is in [deployment](deployment.md).
 
 For Kubernetes, air-gapped installation, GPU node pools and network policy, go
 to [deployment](deployment.md) and [deployment on NKP](deployment-nkp.md).
@@ -280,8 +278,8 @@ environment as your real workload.
 hansard transcribe meeting.m4a --language fr --format markdown,vtt
 ```
 
-The full command set today is `version`, `doctor` and `transcribe`. `transcribe`
-takes:
+The command set is `version`, `doctor`, `transcribe`, `serve` and `join`.
+`transcribe` takes:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -302,13 +300,46 @@ the result today. Speaker count is inferred from the audio. The knob that does
 change the outcome is `HANSARD_DIARIZATION__CLUSTERING_THRESHOLD` — see
 [configuration](configuration.md#diarization).
 
-The `join` command shown in some places does not exist yet either; joining a
-live meeting goes through the containerised bot described in
-[deployment](deployment.md) and [Teams setup](teams-setup.md).
-
 Output formats are documented in [output formats](output-formats.md); minutes
 and the local LLM in [minutes](minutes.md); sending the result somewhere in
 [delivery](delivery.md).
+
+### Joining a live meeting
+
+```bash
+hansard join "https://teams.microsoft.com/l/meetup-join/..." \
+  --title "Comité de pilotage" \
+  --deliver email:equipe@example.org \
+  --deliver filesystem:comite-pilotage
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--title` | `Meeting` | Meeting title |
+| `--language`, `-l` | unset | Omit it and the language is detected |
+| `--deliver` | none | `channel:address`, repeatable. Channels are `email`, `webhook`, `filesystem` and `teams-chat` (written with a hyphen; it maps to `teams_chat`). A `filesystem:` address is a directory **relative to `HANSARD_DELIVERY__OUTPUT_DIR`** — an absolute path is refused, and so is one that escapes the root |
+| `--output`, `-o` | `runtime.workspace` | Overrides the workspace the artefacts are written under |
+| `--vocabulary` | unset | Same glossary file as `transcribe` |
+
+`join` captures, transcribes, writes the minutes and reports the final job state.
+It needs the `capture` extra and the system packages listed above, and it needs
+your Teams administrator to have allowed the bot — see
+[Teams setup](teams-setup.md).
+
+### Running the HTTP API
+
+```bash
+pip install "hansard[api,asr-onnx,diarization]"
+hansard serve --host 127.0.0.1 --port 8000
+```
+
+`--host` and `--port` default to `HANSARD_API__HOST` and `HANSARD_API__PORT`;
+`--reload` restarts on source change and is for development only. The
+application exposes `/healthz`, `/readyz` and a `/v1/meetings` job API for
+submitting a recording or a join URL, listing jobs, reading one job's detail, and
+downloading its artefacts. Set `HANSARD_API__API_KEY` to require an `X-API-Key`
+header on every `/v1` route; without it the API is unauthenticated, so bind it to
+a private interface. See [configuration](configuration.md#api).
 
 ---
 

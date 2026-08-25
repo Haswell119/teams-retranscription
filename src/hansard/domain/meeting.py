@@ -46,6 +46,7 @@ class MeetingRequest:
     expected_participants: tuple[str, ...] = ()
     vocabulary: tuple[str, ...] = ()
     max_duration_seconds: int = 4 * 3600
+    speaker_count: int | None = None
     delivery: tuple[DeliveryTarget, ...] = ()
     identifier: str = field(default_factory=lambda: uuid4().hex)
 

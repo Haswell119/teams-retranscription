@@ -28,8 +28,9 @@ def writer():
 
 
 @pytest.mark.parametrize("language", ["fr", "en"])
-def test_extractive_minutes_are_fully_grounded(writer, language, fr_transcript, en_transcript,
-                                               fr_roster, en_roster, fr_request, en_request):
+def test_extractive_minutes_are_fully_grounded(
+    writer, language, fr_transcript, en_transcript, fr_roster, en_roster, fr_request, en_request
+):
     transcript = fr_transcript if language == "fr" else en_transcript
     roster = fr_roster if language == "fr" else en_roster
     request = fr_request if language == "fr" else en_request
@@ -124,8 +125,9 @@ def test_unsupported_owner_is_cleared(en_transcript):
     assert verified.actions[0].owner is None
 
 
-def test_unsupported_abstract_sentence_is_removed_and_the_rest_kept(fr_transcript, writer,
-                                                                    fr_roster, fr_request):
+def test_unsupported_abstract_sentence_is_removed_and_the_rest_kept(
+    fr_transcript, writer, fr_roster, fr_request
+):
     grounded = writer.compose(fr_transcript, fr_roster, fr_request)
     polluted = replace(
         grounded,
@@ -196,9 +198,7 @@ def test_drop_can_be_disabled_for_review_workflows(fr_transcript):
         generated_at=GENERATED_AT,
     )
     options = GroundingOptions(drop_unsupported=False)
-    verified, report = GroundingVerifier(language="fr", options=options).verify(
-        minutes, fr_transcript, "llm"
-    )
+    verified, report = GroundingVerifier(language="fr", options=options).verify(minutes, fr_transcript, "llm")
     assert verified.abstract == minutes.abstract
     assert report.dropped == ()
     assert report.checks[0].verdict is Verdict.UNSUPPORTED

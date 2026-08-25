@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import time
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from hansard.adapters.diarization.refinement import SpeechCoverageRefiner
@@ -75,9 +75,7 @@ class TranscriptionPipeline:
         diarization = Diarization()
         if self.diarizer is not None:
             with _timed(timings, "diarise"):
-                acoustic = (
-                    self.diarization_enhancer.enhance(clip) if self.diarization_enhancer else clip
-                )
+                acoustic = self.diarization_enhancer.enhance(clip) if self.diarization_enhancer else clip
                 diarization = self.diarizer.diarize(
                     acoustic,
                     DiarizationRequest(
@@ -107,6 +105,8 @@ class TranscriptionPipeline:
 
 
 def _known_speaker_count(request: MeetingRequest, roster: Roster | None) -> int | None:
+    if request.speaker_count:
+        return request.speaker_count
     if roster and roster.participants:
         return len(roster.participants)
     if request.expected_participants:

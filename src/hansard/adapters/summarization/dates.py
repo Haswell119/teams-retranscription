@@ -10,22 +10,65 @@ from hansard.adapters.summarization.text import fold_for_matching
 Resolver = Callable[[re.Match[str], date], date | None]
 
 FRENCH_MONTHS: Mapping[str, int] = {
-    "janvier": 1, "fevrier": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
-    "juillet": 7, "aout": 8, "septembre": 9, "octobre": 10, "novembre": 11, "decembre": 12,
+    "janvier": 1,
+    "fevrier": 2,
+    "mars": 3,
+    "avril": 4,
+    "mai": 5,
+    "juin": 6,
+    "juillet": 7,
+    "aout": 8,
+    "septembre": 9,
+    "octobre": 10,
+    "novembre": 11,
+    "decembre": 12,
 }
 
 ENGLISH_MONTHS: Mapping[str, int] = {
-    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3, "april": 4, "apr": 4,
-    "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7, "august": 8, "aug": 8, "september": 9,
-    "sept": 9, "sep": 9, "october": 10, "oct": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
+    "january": 1,
+    "jan": 1,
+    "february": 2,
+    "feb": 2,
+    "march": 3,
+    "mar": 3,
+    "april": 4,
+    "apr": 4,
+    "may": 5,
+    "june": 6,
+    "jun": 6,
+    "july": 7,
+    "jul": 7,
+    "august": 8,
+    "aug": 8,
+    "september": 9,
+    "sept": 9,
+    "sep": 9,
+    "october": 10,
+    "oct": 10,
+    "november": 11,
+    "nov": 11,
+    "december": 12,
+    "dec": 12,
 }
 
 FRENCH_WEEKDAYS: Mapping[str, int] = {
-    "lundi": 0, "mardi": 1, "mercredi": 2, "jeudi": 3, "vendredi": 4, "samedi": 5, "dimanche": 6,
+    "lundi": 0,
+    "mardi": 1,
+    "mercredi": 2,
+    "jeudi": 3,
+    "vendredi": 4,
+    "samedi": 5,
+    "dimanche": 6,
 }
 
 ENGLISH_WEEKDAYS: Mapping[str, int] = {
-    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6,
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
 }
 
 FRIDAY = 4
@@ -238,7 +281,9 @@ FRENCH_DATE_PATTERNS: tuple[DatePattern, ...] = (
     DatePattern(re.compile(r"\bdemain\b"), _tomorrow),
     DatePattern(re.compile(r"\b(?:aujourd'hui|ce soir|en fin de journee)\b"), _same_day),
     DatePattern(
-        re.compile(rf"\b(?:d'ici\s+|avant\s+|pour\s+)?(?P<weekday>{FRENCH_WEEKDAY_NAMES})(?P<next>\s+prochain)?\b"),
+        re.compile(
+            rf"\b(?:d'ici\s+|avant\s+|pour\s+)?(?P<weekday>{FRENCH_WEEKDAY_NAMES})(?P<next>\s+prochain)?\b"
+        ),
         _french_weekday,
     ),
     DatePattern(re.compile(r"\b(?:la\s+)?semaine\s+prochaine\b"), _next_week_end),
@@ -283,9 +328,7 @@ ENGLISH_DATE_PATTERNS: tuple[DatePattern, ...] = (
     DatePattern(re.compile(r"\btomorrow\b"), _tomorrow),
     DatePattern(re.compile(r"\b(?:today|by eod|end of (?:the )?day|tonight)\b"), _same_day),
     DatePattern(
-        re.compile(
-            rf"\b(?:(?P<next>next)\s+|by\s+|on\s+|before\s+)?(?P<weekday>{ENGLISH_WEEKDAY_NAMES})\b"
-        ),
+        re.compile(rf"\b(?:(?P<next>next)\s+|by\s+|on\s+|before\s+)?(?P<weekday>{ENGLISH_WEEKDAY_NAMES})\b"),
         _english_weekday,
     ),
     DatePattern(re.compile(r"\bnext week\b"), _next_week_end),

@@ -13,9 +13,7 @@ from hansard.domain.errors import CaptureError
 
 FFMPEG: Final[str] = "ffmpeg"
 WAV_HEADER_BYTES: Final[int] = 44
-VOLUME_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"(mean_volume|max_volume):\s*(-?\d+(?:\.\d+)?)\s*dB"
-)
+VOLUME_PATTERN: Final[re.Pattern[str]] = re.compile(r"(mean_volume|max_volume):\s*(-?\d+(?:\.\d+)?)\s*dB")
 
 SILENCE_DIAGNOSTIC: Final[str] = (
     "the capture contains no audible audio. Usual causes, in order of likelihood: "

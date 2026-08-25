@@ -86,8 +86,15 @@ def test_quotes_are_never_invented(fr_transcript, fr_roster, fr_request):
     [((FRENCH_MAP,), FRENCH_REDUCE, "fr"), ((ENGLISH_MAP,), ENGLISH_REDUCE, "en")],
 )
 def test_hallucinated_action_is_dropped_and_reported(
-    answers, reduce_answer, language, fr_transcript, en_transcript, fr_roster, en_roster,
-    fr_request, en_request,
+    answers,
+    reduce_answer,
+    language,
+    fr_transcript,
+    en_transcript,
+    fr_roster,
+    en_roster,
+    fr_request,
+    en_request,
 ):
     transcript = fr_transcript if language == "fr" else en_transcript
     roster = fr_roster if language == "fr" else en_roster
@@ -125,9 +132,7 @@ def test_due_date_is_grounded_in_the_cited_utterance(fr_transcript, fr_roster, f
     assert minutes.actions[0].due_date == "2026-06-04"
 
 
-def test_citation_is_recovered_from_the_quote_when_the_index_is_wrong(
-    fr_transcript, fr_roster, fr_request
-):
+def test_citation_is_recovered_from_the_quote_when_the_index_is_wrong(fr_transcript, fr_roster, fr_request):
     answer = copy.deepcopy(FRENCH_MAP)
     answer["decisions"] = [answer["decisions"][0] | {"utterance": 999}]
     generator = ScriptedGenerator([answer], FRENCH_REDUCE)
@@ -189,8 +194,9 @@ def test_several_chunks_are_mapped_and_deduplicated(fr_transcript, fr_roster, fr
     assert len(outcome.minutes.actions) == 2
 
 
-def test_prompts_are_written_in_the_meeting_language(fr_transcript, fr_roster, fr_request,
-                                                     en_transcript, en_roster, en_request):
+def test_prompts_are_written_in_the_meeting_language(
+    fr_transcript, fr_roster, fr_request, en_transcript, en_roster, en_request
+):
     french = ScriptedGenerator([FRENCH_MAP], FRENCH_REDUCE)
     _writer(french).compose(fr_transcript, fr_roster, fr_request)
     assert "secrétaire de séance" in french.prompts[0][0]

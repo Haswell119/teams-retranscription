@@ -13,15 +13,24 @@ what actually runs during a meeting, and where the seams are.
 | `domain/` | `AudioClip`, `TimeSpan`, `Word`, `Utterance`, `Transcript`, `SpeakerTurn`, `Diarization`, `Roster`, `Minutes`, the error hierarchy, and a Hungarian-algorithm assignment solver | Frozen dataclasses and pure functions. No I/O, no models, no third-party clients. `numpy` is the only external import. |
 | `ports/` | `Protocol` interfaces: `SpeechRecognizer`, `Diarizer`, `SpeakerAttributor`, `SpeakerNamer`, `AudioEnhancer`, `VoiceActivityDetector`, `MeetingCapture`, `MinutesWriter`, `TextGenerator`, `MinutesPublisher`, `ArtifactStore` | Types and signatures only. Every one is `runtime_checkable`, so conformance is testable without inheritance. |
 | `adapters/` | The implementations: ONNX, sherpa-onnx, ffmpeg, Playwright, SMTP, Microsoft Graph, an OpenAI-compatible HTTP client | Each subpackage carries its own registry and imports its heavy dependency **inside** the factory function, so an install without an extra still imports cleanly. |
-| `application/` | `TranscriptionPipeline` — the use case that sequences enhancement, detection, recognition, diarization, refinement, attribution and naming | Depends on ports only. It has never heard of ONNX. |
-| `interfaces/` | The Typer CLI | The only entry point today. |
+| `application/` | `TranscriptionPipeline`, which sequences enhancement, detection, recognition, diarization, refinement, attribution and naming; `MeetingService`, which wraps it with capture, minutes and rendering; and `JobRecord`/`JobStore`/`JobQueue` | Depends on ports only. It has never heard of ONNX. |
+| `interfaces/` | The Typer CLI (`version`, `doctor`, `transcribe`, `serve`, `join`) and the FastAPI application behind `serve` | Drivers. Both compose the same `MeetingService`. |
 | `rendering/` | Markdown, HTML, JSON, WebVTT, SubRip and plain-text renderers, plus bilingual strings and a timecode module | Domain objects in, bytes out. |
 | `evaluation/` | The quality harness, the text normalizers, the metric implementations, corpus preparation and reporting | Depends on `ports` and `domain`, never on `adapters`. |
 | `observability/` | Prometheus metric definitions and the exporter | Optional; absent `prometheus-client`, the module degrades to no-ops. |
 
-`factory.py` is the composition root. It is the one place that reads `Settings`
-and decides which adapter each port gets. Nothing else in the codebase knows
-both a setting and an implementation.
+`factory.py` is the composition root for the pipeline. It is the one place that
+reads `Settings` and decides which adapter each port gets, so nothing else in the
+codebase knows both a setting and an implementation. The CLI and the API each add
+a thin composition of their own — capture engine, minutes writer, delivery
+dispatcher — and hand the result to the same `MeetingService`.
+
+The two drivers differ only in how work arrives. `hansard join` runs one meeting
+and exits. `hansard serve` accepts submissions on `/v1/meetings`, hands them to an
+in-process `JobQueue` whose worker count is `runtime.max_concurrent_meetings`, and
+exposes state and artefacts over `/v1/meetings/{id}`. The job store is in memory
+and bounded, so state does not survive a restart; artefacts do, because they are
+files under `runtime.workspace`.
 
 ### Why this shape
 
@@ -61,7 +70,8 @@ Everything below is what is in the tree today.
 | `MinutesWriter` | `ports/summarization.py` | `LlmMinutesWriter`, `ExtractiveMinutesWriter` |
 | `TextGenerator` | `ports/summarization.py` | `OpenAiCompatibleGenerator` |
 | `MinutesPublisher` | `ports/delivery.py` | `FilesystemPublisher`, `EmailPublisher`, `WebhookPublisher`, `TeamsChatPublisher` (Graph), `TeamsBotPublisher` (Bot Framework), and `AddressRoutedPublisher`, which dispatches by address scheme |
-| `ArtifactStore` | `ports/storage.py` | **None.** `adapters/storage/` is empty; the `storage` settings section is inert. Artefacts are written by `FilesystemPublisher`. |
+| `ArtifactStore` | `ports/storage.py` | **None.** `adapters/storage/` is empty; the `storage` settings section is inert. Artefacts are written to `runtime.workspace` by `MeetingService` and to `delivery.output_dir` by `FilesystemPublisher`. |
+| `JobStore` | `application/jobs.py` | `InMemoryJobStore`. Declared beside its use rather than in `ports/`, because it is an application concern rather than an external system. |
 
 Rendering has its own two protocols in `rendering/ports.py`, `TranscriptRenderer`
 and `MinutesRenderer`, implemented six and three times respectively. See
@@ -88,30 +98,35 @@ join URL
    │  16 kHz mono WAV  +  Roster(participants, observations)
    ▼  TranscriptionPipeline.run(clip, request, roster)
    │
-   ├── enhance ──────────────► high pass + loudnorm ──┐
-   │                                                   ├─► RECOGNITION CHAIN
-   ├── voice activity ────────► Silero VAD ────────────┘
-   │        │
-   │        └─► plan_segments(): merge, split at 30 s, pad 0.2 s
+   ├── enhance ──────────► high pass + loudnorm ─────┐
+   │                                                 ├─► RECOGNITION CHAIN
+   ├── voice activity ───► Silero VAD ───────────────┘
+   │                       │
+   │                       └─► plan_segments(): merge, split at 30 s, pad 0.2 s
    │
-   ├── recognise ────────────► Parakeet TDT, batched, word timestamps
+   ├── recognise ────────► Parakeet TDT, batched, word timestamps
    │
-   ├── enhance (separately) ──► high pass only ────────► DIARIZATION CHAIN
+   ├── enhance (again) ──► high pass only ───────────► DIARIZATION CHAIN
    │
-   ├── diarise ──────────────► pyannote segmentation + TitaNet
-   │                            embeddings + clustering
+   ├── diarise ──────────► pyannote segmentation + TitaNet embeddings,
+   │                       then clustering
    │
-   ├── refine ───────────────► speech the VAD found but the diarizer
-   │                            left uncovered is given to the nearest turn
+   ├── refine ───────────► speech the VAD found but the diarizer left
+   │                       uncovered is given to the nearest turn
    │
-   ├── attribute ────────────► word-level fusion (below)
+   ├── attribute ────────► word-level fusion (below)
    │
-   └── resolve names ────────► clusters matched to roster display names
-   │
-   ▼  Transcript
-       ├─► VocabularyBiaser: phonetic correction against your glossary
-       ├─► MinutesWriter: LLM map-reduce with grounding, or extractive
-       └─► renderers ─► DeliveryDispatcher ─► filesystem / email / webhook / Teams
+   └── resolve names ────► clusters matched to roster display names
+                           │
+                           ▼  Transcript
+                           ├─► VocabularyBiaser: phonetic correction
+                           │                     against your glossary
+                           ├─► MinutesWriter: LLM map-reduce with grounding,
+                           │                  or deterministic extraction
+                           └─► renderers ─► DeliveryDispatcher ─► filesystem
+                                                                  email
+                                                                  webhook
+                                                                  Teams
 ```
 
 ### The two audio chains
@@ -233,6 +248,7 @@ path is synchronous, the I/O path is `async`.**
 | Capture (browser, PulseAudio, roster) | I/O bound | `async`, `asyncio` throughout | The recording streams to disk, not to memory |
 | Delivery | Network | `async`, targets fanned out with `asyncio.gather` and a per-target timeout | Negligible |
 | Minutes generation | Network, one request at a time | Synchronous `httpx` behind the `TextGenerator` port | The transcript plus one chunk of prompt |
+| Job orchestration | Coordination | `async`; `MeetingService` pushes each blocking stage through `asyncio.to_thread` so the event loop keeps serving requests | The job store holds up to 512 records in memory |
 
 Nothing in the inference path is threaded by Hansard. Parallelism inside
 recognition and diarization belongs to ONNX Runtime, controlled by
@@ -241,6 +257,10 @@ deliberate: an application-level thread pool on top of a runtime that is already
 saturating every core produces contention, not throughput. Running several
 meetings at once is a matter of running several worker processes, which is what
 the Helm chart does.
+
+Running several meetings at once inside one `serve` process is governed by
+`runtime.max_concurrent_meetings`; each concurrent job holds its own recogniser,
+so that setting is a memory decision more than a throughput one.
 
 Peak resident memory for the full CPU pipeline was measured at 2.9 GB, with
 recognition alone at 1.4 GB. Time splits roughly 55 % recognition, 40 %

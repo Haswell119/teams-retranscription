@@ -71,7 +71,7 @@ def decisions_from(
             statement=candidate.statement,
             rationale=candidate.rationale,
             citations=citations_of(
-                [candidate.unit, *( [candidate.rationale_unit] if candidate.rationale_unit else [] )],
+                [candidate.unit, *([candidate.rationale_unit] if candidate.rationale_unit else [])],
                 include_citations,
             ),
         )

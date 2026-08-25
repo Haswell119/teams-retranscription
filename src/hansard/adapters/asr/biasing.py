@@ -41,7 +41,7 @@ class VocabularyBiaser:
                 continue
             key = sound_key(cleaned, language)
             if key:
-                compiled.append(BoostPhrase(cleaned, key, len(cleaned.split())))
+                compiled.append(BoostPhrase(cleaned, key, len(key.split())))
         return tuple(sorted(compiled, key=lambda item: -item.word_count))
 
     def _best_match(self, window: str, language: str, phrases: tuple[BoostPhrase, ...]) -> BoostPhrase | None:

@@ -341,8 +341,7 @@ class ProbeRunner:
 
 
 VOLUMEDETECT_LOUD = (
-    "[Parsed_volumedetect_0 @ 0x1] mean_volume: -26.4 dB\n"
-    "[Parsed_volumedetect_0 @ 0x1] max_volume: -3.1 dB\n"
+    "[Parsed_volumedetect_0 @ 0x1] mean_volume: -26.4 dB\n[Parsed_volumedetect_0 @ 0x1] max_volume: -3.1 dB\n"
 )
 
 VOLUMEDETECT_SILENT = (

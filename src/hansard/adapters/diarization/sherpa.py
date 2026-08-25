@@ -59,7 +59,7 @@ class SherpaDiarizer:
             provider=self.provider,
         )
         clustering = sherpa_onnx.FastClusteringConfig(
-            num_clusters=request.known_speaker_count or -1,
+            num_clusters=_bounded_cluster_count(request),
             threshold=self.clustering_threshold,
         )
         config = sherpa_onnx.OfflineSpeakerDiarizationConfig(
@@ -95,6 +95,13 @@ class SherpaDiarizer:
         return Diarization(turns=turns, labels=labels)
 
 
+def _bounded_cluster_count(request: DiarizationRequest) -> int:
+    known = request.known_speaker_count
+    if not known:
+        return -1
+    return max(request.min_speakers, min(known, request.max_speakers))
+
+
 def _absorb_marginal_speakers(
     turns: tuple[SpeakerTurn, ...], minimum_seconds: float
 ) -> tuple[SpeakerTurn, ...]:
@@ -117,9 +124,7 @@ def _absorb_marginal_speakers(
     return tuple(absorbed)
 
 
-def _nearest_stable_label(
-    ordered: list[SpeakerTurn], position: int, marginal: set[str]
-) -> str | None:
+def _nearest_stable_label(ordered: list[SpeakerTurn], position: int, marginal: set[str]) -> str | None:
     offset = 1
     while position - offset >= 0 or position + offset < len(ordered):
         for index in (position - offset, position + offset):

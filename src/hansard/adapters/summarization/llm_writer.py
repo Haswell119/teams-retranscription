@@ -186,11 +186,7 @@ def render_decisions(decisions: Sequence[Decision]) -> tuple[str, ...]:
 
 def render_actions(actions: Sequence[ActionItem]) -> tuple[str, ...]:
     return tuple(
-        " — ".join(
-            part
-            for part in (action.description, action.owner or "", action.due_date or "")
-            if part
-        )
+        " — ".join(part for part in (action.description, action.owner or "", action.due_date or "") if part)
         for action in actions
     )
 
@@ -491,9 +487,8 @@ class LlmMinutesWriter:
     ) -> tuple[str, tuple[Topic, ...]]:
         prompt = pack.reduce_user.format(
             title=request.title,
-            participants=", ".join(
-                participant for participant in request.expected_participants
-            ) or pack.nothing,
+            participants=", ".join(participant for participant in request.expected_participants)
+            or pack.nothing,
             duration=format_range(
                 analysis.units[0].span.start,
                 analysis.units[-1].span.end,
@@ -508,16 +503,12 @@ class LlmMinutesWriter:
         )
         try:
             payload = parse_json_object(
-                self.generator.complete(
-                    pack.reduce_system, prompt, self.max_reduce_tokens, REDUCE_SCHEMA
-                )
+                self.generator.complete(pack.reduce_system, prompt, self.max_reduce_tokens, REDUCE_SCHEMA)
             )
         except SummarizationError as error:
             notes.append(f"consolidation fell back to extractive summarisation: {error}")
             return self.fallback.abstract(analysis), self._extractive_topics(analysis)
-        abstract = as_text(payload.get("abstract")) or join_sentences(
-            [chunk.summary for chunk in harvested]
-        )
+        abstract = as_text(payload.get("abstract")) or join_sentences([chunk.summary for chunk in harvested])
         return abstract, self._topics(payload.get("topics"), analysis)
 
     def _extractive_topics(self, analysis: TranscriptAnalysis) -> tuple[Topic, ...]:

@@ -19,7 +19,7 @@ class NullDiarizer:
     def max_supported_speakers(self) -> int:
         return 1
 
-    def diarize(self, clip: AudioClip, request: DiarizationRequest) -> Diarization:
+    def diarize(self, clip: AudioClip, _request: DiarizationRequest) -> Diarization:
         if clip.frame_count == 0:
             return Diarization()
         turn = SpeakerTurn(span=clip.span, label=self.label)

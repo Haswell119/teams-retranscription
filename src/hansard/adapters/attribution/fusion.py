@@ -16,7 +16,6 @@ class WordLevelAttributor:
     dominance_margin: float = 1.5
     switch_probability: float = 0.05
     nearest_turn_horizon: float = 2.0
-    overlap_fraction: float = 0.40
 
     @property
     def name(self) -> str:

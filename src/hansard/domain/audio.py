@@ -35,8 +35,8 @@ class AudioClip:
 
     def extract(self, span: TimeSpan) -> AudioClip:
         local = TimeSpan(span.start - self.offset, span.end - self.offset).clamped(0.0, self.duration)
-        first = int(round(local.start * self.sample_rate))
-        last = int(round(local.end * self.sample_rate))
+        first = round(local.start * self.sample_rate)
+        last = round(local.end * self.sample_rate)
         return replace(self, samples=self.samples[first:last], offset=self.offset + local.start)
 
     def with_samples(self, samples: np.ndarray) -> AudioClip:

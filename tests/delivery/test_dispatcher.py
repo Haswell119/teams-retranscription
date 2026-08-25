@@ -34,9 +34,7 @@ class SpyPublisher:
 def dispatcher(
     publishers: dict[DeliveryChannel, MinutesPublisher], timeout: float = 5.0
 ) -> DeliveryDispatcher:
-    return DeliveryDispatcher(
-        resolve_publisher=lambda channel: publishers[channel], timeout_seconds=timeout
-    )
+    return DeliveryDispatcher(resolve_publisher=lambda channel: publishers[channel], timeout_seconds=timeout)
 
 
 def targets() -> tuple[DeliveryTarget, ...]:

@@ -76,7 +76,7 @@ def _build_whisper(settings: AsrSettings, models_dir: Path) -> SpeechRecognizer:
     )
 
 
-def _build_null(settings: AsrSettings, models_dir: Path) -> SpeechRecognizer:
+def _build_null(_settings: AsrSettings, _models_dir: Path) -> SpeechRecognizer:
     from hansard.adapters.asr.null_engine import NullRecognizer
 
     return NullRecognizer()

@@ -73,11 +73,7 @@ def build_message(
 
 
 def _html_document(payload: Payload) -> str:
-    return (
-        "<html><body>"
-        f"{to_html(payload.body, payload.body_format)}"
-        "</body></html>"
-    )
+    return f"<html><body>{to_html(payload.body, payload.body_format)}</body></html>"
 
 
 @dataclass(frozen=True, slots=True)

@@ -243,9 +243,7 @@ class GraphTranscriptFallback:
         entries = payload.get("value") if isinstance(payload, Mapping) else None
         if not isinstance(entries, Sequence):
             return ()
-        return tuple(
-            str(entry["id"]) for entry in entries if isinstance(entry, Mapping) and entry.get("id")
-        )
+        return tuple(str(entry["id"]) for entry in entries if isinstance(entry, Mapping) and entry.get("id"))
 
     async def fetch_vtt(self, user_id: str, meeting_id: str, transcript_id: str) -> str:
         self._require_enabled()

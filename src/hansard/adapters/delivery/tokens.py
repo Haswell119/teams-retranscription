@@ -157,9 +157,7 @@ def build_token_provider(
     source: TokenSource = (
         MsalTokenSource(credentials=credentials, clock=clock)
         if prefer_msal and msal_available()
-        else HttpTokenSource(
-            credentials=credentials, retry_policy=retry_policy, sleep=sleep, clock=clock
-        )
+        else HttpTokenSource(credentials=credentials, retry_policy=retry_policy, sleep=sleep, clock=clock)
     )
     return CachedTokenProvider(source=source, clock=clock)
 

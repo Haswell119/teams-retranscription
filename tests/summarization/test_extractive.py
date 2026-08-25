@@ -66,8 +66,9 @@ def test_english_minutes_end_to_end(writer, en_transcript, en_roster, en_request
 
 
 @pytest.mark.parametrize("language", ["fr", "en"])
-def test_every_item_is_cited_and_the_quote_is_verbatim(writer, language, fr_roster, en_roster,
-                                                       fr_request, en_request):
+def test_every_item_is_cited_and_the_quote_is_verbatim(
+    writer, language, fr_roster, en_roster, fr_request, en_request
+):
     transcript = french_transcript() if language == "fr" else english_transcript()
     roster = fr_roster if language == "fr" else en_roster
     request = fr_request if language == "fr" else en_request
@@ -93,9 +94,7 @@ def test_citation_span_matches_the_quoted_utterance(writer, fr_transcript, fr_ro
     minutes = writer.compose(fr_transcript, fr_roster, fr_request)
     citation = minutes.decisions[0].citations[0]
     speaking = [
-        utterance
-        for utterance in fr_transcript.utterances
-        if utterance.span.intersects(citation.span)
+        utterance for utterance in fr_transcript.utterances if utterance.span.intersects(citation.span)
     ]
     assert speaking
     assert any(fold_for_matching(citation.quote) in fold_for_matching(u.text) for u in speaking)
@@ -180,9 +179,9 @@ def test_empty_transcript_does_not_crash(writer):
     ("language", "closing"),
     [("fr", "Merci à tous, on se retrouve lundi prochain."), ("en", "Same time next week, thanks everyone.")],
 )
-def test_greetings_and_closings_stay_out_of_the_summary(writer, language, closing, fr_transcript,
-                                                        en_transcript, fr_roster, en_roster,
-                                                        fr_request, en_request):
+def test_greetings_and_closings_stay_out_of_the_summary(
+    writer, language, closing, fr_transcript, en_transcript, fr_roster, en_roster, fr_request, en_request
+):
     transcript = fr_transcript if language == "fr" else en_transcript
     roster = fr_roster if language == "fr" else en_roster
     request = fr_request if language == "fr" else en_request

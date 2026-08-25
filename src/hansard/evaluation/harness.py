@@ -378,9 +378,7 @@ def _merge(items: Iterable[_Totals]) -> _Totals:
 
 
 def _dataset_slices(groups: dict[tuple[str, str], _Totals]) -> tuple[CorpusSlice, ...]:
-    return tuple(
-        _slice(dataset, language, totals) for (dataset, language), totals in sorted(groups.items())
-    )
+    return tuple(_slice(dataset, language, totals) for (dataset, language), totals in sorted(groups.items()))
 
 
 def _language_slices(groups: dict[tuple[str, str], _Totals]) -> tuple[CorpusSlice, ...]:

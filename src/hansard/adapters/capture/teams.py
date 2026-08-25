@@ -39,8 +39,7 @@ RecorderBuilder = Callable[[str], FfmpegRecorder]
 
 DEFAULT_ANNOUNCEMENTS: Final[dict[str, str]] = {
     "en": (
-        "This meeting is being transcribed locally by Hansard. "
-        "No audio or text leaves this organisation."
+        "This meeting is being transcribed locally by Hansard. No audio or text leaves this organisation."
     ),
     "fr": (
         "Cette réunion est transcrite localement par Hansard. "

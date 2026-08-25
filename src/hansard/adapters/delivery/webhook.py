@@ -189,10 +189,6 @@ class WebhookPublisher:
                     self.sleep,
                 )
             except httpx.HTTPError as error:
-                raise DeliveryError(
-                    f"cannot reach webhook {url}: {type(error).__name__}: {error}"
-                ) from error
+                raise DeliveryError(f"cannot reach webhook {url}: {type(error).__name__}: {error}") from error
         if response.status_code >= httpx.codes.BAD_REQUEST:
-            raise DeliveryError(
-                f"webhook {url} answered {response.status_code}: {response.text[:300]}"
-            )
+            raise DeliveryError(f"webhook {url} answered {response.status_code}: {response.text[:300]}")

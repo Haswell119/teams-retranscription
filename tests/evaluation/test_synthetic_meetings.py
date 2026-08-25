@@ -24,9 +24,7 @@ pytestmark = pytest.mark.skipif(not THREE_SPEAKERS.exists(), reason="synthetic m
 
 def relabelled(sample):
     mapping = {name: f"speaker_{index}" for index, name in enumerate(sorted(sample.reference.speakers))}
-    turns = tuple(
-        SpeakerTurn(turn.span, mapping[turn.label]) for turn in sample.reference_diarization.turns
-    )
+    turns = tuple(SpeakerTurn(turn.span, mapping[turn.label]) for turn in sample.reference_diarization.turns)
     diarization = Diarization(turns=turns, labels=tuple(sorted(mapping.values())))
     return sample.reference.renamed(mapping), diarization
 

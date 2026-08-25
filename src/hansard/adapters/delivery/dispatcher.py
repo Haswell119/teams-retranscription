@@ -46,9 +46,7 @@ class DeliveryReport:
         return bool(self.delivered)
 
     def failure_summary(self) -> str:
-        return "; ".join(
-            f"{outcome.channel}:{outcome.address}: {outcome.error}" for outcome in self.failed
-        )
+        return "; ".join(f"{outcome.channel}:{outcome.address}: {outcome.error}" for outcome in self.failed)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,9 +59,7 @@ class DeliveryDispatcher:
     async def deliver(self, targets: Sequence[DeliveryTarget], payload: Payload) -> DeliveryReport:
         if not targets:
             return DeliveryReport()
-        outcomes = await asyncio.gather(
-            *(self._deliver_one(target, payload) for target in targets)
-        )
+        outcomes = await asyncio.gather(*(self._deliver_one(target, payload) for target in targets))
         return DeliveryReport(outcomes=tuple(outcomes))
 
     def _publisher_for(self, channel: DeliveryChannel) -> MinutesPublisher:

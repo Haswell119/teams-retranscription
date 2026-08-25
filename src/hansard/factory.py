@@ -84,6 +84,7 @@ class Composition:
                 if settings.attribution.strategy == "diarization_only"
                 else RosterSpeakerNamer(
                     minimum_coverage=settings.attribution.min_observation_overlap,
+                    fallback_prefix=settings.attribution.fallback_label_prefix,
                 )
             ),
             refiner=(

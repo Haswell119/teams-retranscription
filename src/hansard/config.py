@@ -6,8 +6,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-AsrEngine = Literal["parakeet", "whisper", "qwen3", "ensemble", "null"]
-DiarizationEngine = Literal["sherpa", "sortformer", "pyannote", "null"]
+AsrEngine = Literal["parakeet", "whisper", "qwen3", "null"]
+DiarizationEngine = Literal["sherpa", "spectral", "sortformer", "pyannote", "null"]
 Device = Literal["auto", "cpu", "cuda"]
 
 
@@ -15,7 +15,6 @@ class AudioSettings(BaseModel):
     sample_rate: int = 16_000
     loudness_normalisation: bool = True
     target_lufs: float = -23.0
-    preserve_dynamics_for_diarization: bool = True
     high_pass_hz: float = 60.0
     denoise: bool = False
     max_segment_seconds: float = 30.0
@@ -40,10 +39,6 @@ class AsrSettings(BaseModel):
     beam_size: int = 1
     batch_size: int = 4
     language: str | None = None
-    fallback_engine: AsrEngine | None = "whisper"
-    fallback_model_id: str = "large-v3-turbo"
-    fallback_confidence_threshold: float = 0.55
-    vocabulary_boost: float = 2.0
     intra_op_threads: int = 0
     inter_op_threads: int = 0
 
@@ -60,7 +55,6 @@ class DiarizationSettings(BaseModel):
     collar_seconds: float = 0.25
     speech_coverage_refinement: bool = True
     maximum_turn_extension: float = 2.5
-    overflow_engine: DiarizationEngine = "sherpa"
 
 
 class AttributionSettings(BaseModel):
@@ -89,8 +83,7 @@ class CaptureSettings(BaseModel):
     display_name: str = "Hansard Notetaker"
     announce_recording: bool = True
     announcement_text: str = (
-        "This meeting is being transcribed locally by Hansard. "
-        "No audio or text leaves this organisation."
+        "This meeting is being transcribed locally by Hansard. No audio or text leaves this organisation."
     )
     join_timeout_seconds: int = 300
     lobby_timeout_seconds: int = 600
@@ -123,7 +116,6 @@ class GraphSettings(BaseModel):
 
 
 class DeliverySettings(BaseModel):
-    default_channels: tuple[str, ...] = ("filesystem",)
     formats: tuple[str, ...] = ("markdown", "html")
     smtp: SmtpSettings = Field(default_factory=SmtpSettings)
     graph: GraphSettings = Field(default_factory=GraphSettings)
@@ -155,7 +147,6 @@ class RuntimeSettings(BaseModel):
     models_dir: Path = Path("/var/lib/hansard/models")
     allow_model_downloads: bool = False
     max_concurrent_meetings: int = 2
-    worker_threads: int = 0
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
     telemetry_enabled: bool = False

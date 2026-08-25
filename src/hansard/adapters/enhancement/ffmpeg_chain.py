@@ -43,14 +43,29 @@ class FfmpegEnhancer:
         if binary is None:
             raise HansardError("ffmpeg is required by FfmpegEnhancer")
         command = [
-            binary, "-hide_banner", "-loglevel", "error",
-            "-f", "f32le", "-ac", "1", "-ar", str(clip.sample_rate), "-i", "pipe:0",
-            "-af", chain,
-            "-f", "f32le", "-ac", "1", "-ar", str(clip.sample_rate), "pipe:1",
+            binary,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "f32le",
+            "-ac",
+            "1",
+            "-ar",
+            str(clip.sample_rate),
+            "-i",
+            "pipe:0",
+            "-af",
+            chain,
+            "-f",
+            "f32le",
+            "-ac",
+            "1",
+            "-ar",
+            str(clip.sample_rate),
+            "pipe:1",
         ]
-        process = subprocess.run(
-            command, input=clip.samples.tobytes(), capture_output=True, check=False
-        )
+        process = subprocess.run(command, input=clip.samples.tobytes(), capture_output=True, check=False)
         if process.returncode != 0:
             raise HansardError(f"ffmpeg enhancement failed: {process.stderr.decode(errors='replace')[:400]}")
         enhanced = np.frombuffer(process.stdout, dtype=np.float32).copy()

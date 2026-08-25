@@ -23,9 +23,7 @@ def test_merged_by_speaker_joins_contiguous_same_speaker():
 
 
 def test_merged_by_speaker_keeps_different_speakers():
-    transcript = Transcript(
-        utterances=(utterance(0, 1, "bonjour", "A"), utterance(1.1, 2, "salut", "B"))
-    )
+    transcript = Transcript(utterances=(utterance(0, 1, "bonjour", "A"), utterance(1.1, 2, "salut", "B")))
     assert len(transcript.merged_by_speaker().utterances) == 2
 
 

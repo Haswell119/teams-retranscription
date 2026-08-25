@@ -144,7 +144,9 @@ def _collect_speakers(root: Path) -> dict[str, list[tuple[Path, str]]]:
     return speakers
 
 
-def synthesise_meeting(recipe: MeetingRecipe, speakers: dict[str, list[tuple[Path, str]]], output: Path) -> Path:
+def synthesise_meeting(
+    recipe: MeetingRecipe, speakers: dict[str, list[tuple[Path, str]]], output: Path
+) -> Path:
     generator = random.Random(recipe.seed)
     chosen = generator.sample(sorted(speakers), recipe.speakers)
     pools: dict[str, list[tuple[Path, str]]] = {}
@@ -173,8 +175,15 @@ def synthesise_meeting(recipe: MeetingRecipe, speakers: dict[str, list[tuple[Pat
             if overlapping
             else position + generator.uniform(0.15, 0.8)
         )
-        timeline.append({"speaker": speaker, "start": start, "end": start + duration, "text": text,
-                         "samples": samples})
+        timeline.append(
+            {
+                "speaker": speaker,
+                "start": start,
+                "end": start + duration,
+                "text": text,
+                "samples": samples,
+            }
+        )
         position = max(position, start + duration)
     total = position + 1.0
     mixture = np.zeros(int(total * TARGET_SAMPLE_RATE) + TARGET_SAMPLE_RATE, dtype=np.float32)

@@ -16,8 +16,31 @@ from hansard.ports.asr import EngineProfile, RecognitionHints
 _KNOWN_PROFILES: dict[str, tuple[tuple[str, ...], int, str]] = {
     "nemo-parakeet-tdt-0.6b-v3": (
         (
-            "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "hr", "hu", "it", "lt",
-            "lv", "mt", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "uk",
+            "bg",
+            "cs",
+            "da",
+            "de",
+            "el",
+            "en",
+            "es",
+            "et",
+            "fi",
+            "fr",
+            "hr",
+            "hu",
+            "it",
+            "lt",
+            "lv",
+            "mt",
+            "nl",
+            "pl",
+            "pt",
+            "ro",
+            "ru",
+            "sk",
+            "sl",
+            "sv",
+            "uk",
         ),
         1500,
         "cc-by-4.0",
@@ -42,9 +65,7 @@ class OnnxRecognizer:
 
     @property
     def profile(self) -> EngineProfile:
-        languages, memory, licence = _KNOWN_PROFILES.get(
-            self.model_id, (("multilingual",), 2000, "unknown")
-        )
+        languages, memory, licence = _KNOWN_PROFILES.get(self.model_id, (("multilingual",), 2000, "unknown"))
         return EngineProfile(
             name=f"onnx:{self.model_id}",
             languages=languages,
@@ -111,11 +132,11 @@ class OnnxRecognizer:
             )
             words = tokens_to_words(stream, span)
             text = result.text.strip() or words_to_text(words)
+
             if not text:
                 continue
-            confidence = (
-                float(np.mean([word.confidence for word in words])) if words else 1.0
-            )
+            scores = [word.confidence for word in words]
+            confidence = float(np.mean(scores)) if scores else 1.0
             utterances.append(
                 Utterance(
                     span=span,
@@ -138,9 +159,9 @@ class OnnxRecognizer:
             usable = [(wave, span) for wave, span in zip(waveforms, chunk, strict=True) if wave.size]
             if not usable:
                 continue
-            utterances.extend(
-                self._decode_batch(model, [wave for wave, _ in usable], [span for _, span in usable], language)
-            )
+            waves = [wave for wave, _ in usable]
+            covered = [span for _, span in usable]
+            utterances.extend(self._decode_batch(model, waves, covered, language))
         utterances.sort(key=lambda utterance: utterance.span.start)
         return Transcript(
             utterances=tuple(utterances),
