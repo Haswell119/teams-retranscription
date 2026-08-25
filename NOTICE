@@ -1,0 +1,44 @@
+Hansard
+Copyright 2026 Hansard contributors
+
+This product includes software developed by the Hansard contributors,
+licensed under the Apache License, Version 2.0.
+
+This product depends on machine-learning models distributed under their own
+licences. The models are not part of this source distribution; they are
+fetched at build time and their licence terms are reproduced below.
+
+--------------------------------------------------------------------------------
+NVIDIA Parakeet TDT 0.6B v3
+Copyright NVIDIA Corporation
+Licensed under Creative Commons Attribution 4.0 International (CC-BY-4.0)
+https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+ONNX conversion: https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx
+Used unmodified for speech recognition.
+
+--------------------------------------------------------------------------------
+NVIDIA TitaNet Small
+Copyright NVIDIA Corporation
+Licensed under Creative Commons Attribution 4.0 International (CC-BY-4.0)
+https://catalog.ngc.nvidia.com/models
+Distributed as ONNX by https://github.com/k2-fsa/sherpa-onnx
+Used unmodified for speaker embedding extraction.
+
+--------------------------------------------------------------------------------
+pyannote segmentation 3.0
+Copyright Herve Bredin and contributors
+Licensed under the MIT License
+https://huggingface.co/pyannote/segmentation-3.0
+Distributed as ONNX by https://github.com/k2-fsa/sherpa-onnx
+Used unmodified for speaker segmentation.
+
+--------------------------------------------------------------------------------
+Silero VAD
+Copyright Silero Team
+Licensed under the MIT License
+https://github.com/snakers4/silero-vad
+Used unmodified for voice activity detection.
+
+--------------------------------------------------------------------------------
+Attribution required by CC-BY-4.0 section 3(a) is satisfied by this file, which
+is distributed with every container image and every source distribution.
