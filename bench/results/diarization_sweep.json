@@ -14,13 +14,17 @@
   },
   "shipped_default": {
     "minimum_speaker_seconds": 10.0,
-    "merge_similarity": 0.7
+    "merge_similarity": 0.8
   },
   "previous_default": {
     "minimum_speaker_seconds": 3.0,
     "merge_similarity": 0.6
   },
-  "rows": [
+  "corpora": [
+    "AMI Mix-Headset",
+    "SUMM-RE 020c_EBPZ"
+  ],
+  "ami_rows": [
     {
       "minimum_speaker_seconds": 0.0,
       "merge_similarity": null,
@@ -197,5 +201,124 @@
       ],
       "reference_speakers": 4
     }
-  ]
+  ],
+  "ami_caveat": "this sweep only tested merge similarity at and below 0.70",
+  "summ_re_rows": [
+    {
+      "minimum_speaker_seconds": 0.0,
+      "merge_similarity": null,
+      "detected_speakers": 11,
+      "der_percent": 29.78,
+      "der_missed_percent": 5.0,
+      "der_false_alarm_percent": 9.41,
+      "der_confusion_percent": 15.36
+    },
+    {
+      "minimum_speaker_seconds": 0.0,
+      "merge_similarity": 0.8,
+      "detected_speakers": 10,
+      "der_percent": 28.49,
+      "der_missed_percent": 5.15,
+      "der_false_alarm_percent": 9.41,
+      "der_confusion_percent": 13.93
+    },
+    {
+      "minimum_speaker_seconds": 0.0,
+      "merge_similarity": 0.7,
+      "detected_speakers": 8,
+      "der_percent": 55.61,
+      "der_missed_percent": 5.88,
+      "der_false_alarm_percent": 8.26,
+      "der_confusion_percent": 41.47
+    },
+    {
+      "minimum_speaker_seconds": 0.0,
+      "merge_similarity": 0.6,
+      "detected_speakers": 6,
+      "der_percent": 60.11,
+      "der_missed_percent": 6.69,
+      "der_false_alarm_percent": 8.0,
+      "der_confusion_percent": 45.42
+    },
+    {
+      "minimum_speaker_seconds": 3.0,
+      "merge_similarity": null,
+      "detected_speakers": 6,
+      "der_percent": 29.72,
+      "der_missed_percent": 5.13,
+      "der_false_alarm_percent": 9.35,
+      "der_confusion_percent": 15.24
+    },
+    {
+      "minimum_speaker_seconds": 3.0,
+      "merge_similarity": 0.8,
+      "detected_speakers": 5,
+      "der_percent": 28.43,
+      "der_missed_percent": 5.27,
+      "der_false_alarm_percent": 9.35,
+      "der_confusion_percent": 13.81
+    },
+    {
+      "minimum_speaker_seconds": 3.0,
+      "merge_similarity": 0.7,
+      "detected_speakers": 3,
+      "der_percent": 55.44,
+      "der_missed_percent": 6.0,
+      "der_false_alarm_percent": 8.2,
+      "der_confusion_percent": 41.24
+    },
+    {
+      "minimum_speaker_seconds": 3.0,
+      "merge_similarity": 0.6,
+      "detected_speakers": 1,
+      "der_percent": 60.05,
+      "der_missed_percent": 6.82,
+      "der_false_alarm_percent": 7.93,
+      "der_confusion_percent": 45.3
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": null,
+      "detected_speakers": 5,
+      "der_percent": 29.37,
+      "der_missed_percent": 5.13,
+      "der_false_alarm_percent": 9.35,
+      "der_confusion_percent": 14.9
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.8,
+      "detected_speakers": 4,
+      "der_percent": 28.09,
+      "der_missed_percent": 5.27,
+      "der_false_alarm_percent": 9.35,
+      "der_confusion_percent": 13.47
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.7,
+      "detected_speakers": 2,
+      "der_percent": 55.49,
+      "der_missed_percent": 6.15,
+      "der_false_alarm_percent": 8.19,
+      "der_confusion_percent": 41.15
+    },
+    {
+      "minimum_speaker_seconds": 10.0,
+      "merge_similarity": 0.6,
+      "detected_speakers": 1,
+      "der_percent": 60.05,
+      "der_missed_percent": 6.82,
+      "der_false_alarm_percent": 7.93,
+      "der_confusion_percent": 45.3
+    }
+  ],
+  "summ_re_reference_speakers": 4,
+  "summ_re_raw_clusters": 11,
+  "summ_re_reference_seconds": {
+    "017": 59,
+    "053": 326,
+    "057": 380,
+    "063": 12
+  }
 }
