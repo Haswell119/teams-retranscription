@@ -117,19 +117,29 @@ comparable — same recipe, same speaker counts, same overlap ratios, same metri
 `make bench-data` produces both language sets and `make bench-meetings` scores
 all six fixtures, French and English, in one run.
 
-> **Results pending.** The French fixtures exist and are wired into the harness,
-> but no French meeting run has been recorded in `bench/results/` yet, so there
-> are no French cpWER, WDER or DER numbers to publish here. This placeholder is
-> deliberate: we would rather show an empty table than an English number with a
-> French label on it. Until it is filled in, the French evidence on this page is
-> [§1](#1-speech-recognition-french-and-english) — read speech — and the French
-> meeting quality gates have no data to run against.
+Source:
+[`bench/results/synthetic_meetings_fr.json`](../bench/results/synthetic_meetings_fr.json).
 
-| Meeting | Speakers (reference → detected) | WER | CER | cpWER | tcpWER@5s | WDER | DER (collar 0) | RTF |
-| --- | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `meeting_fr_3spk` | 3 → _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
-| `meeting_fr_6spk` | 6 → _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
-| `meeting_fr_9spk` | 9 → _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Meeting | Speakers (reference → detected) | Words (reference → produced) | WER | CER | **cpWER** | tcpWER@5s | **WDER** | DER (collar 0) | RTF | Peak RAM |
+| --- | :---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `meeting_fr_3spk`, 361 s | 3 → **3** | 846 → 843 | 4.20 % | 1.62 % | **4.20 %** | 4.20 % | **0.00 %** | 11.88 % | 0.30 | 3391 MB |
+| `meeting_fr_6spk`, 756 s | 6 → **6** | 1990 → 1998 | 5.08 % | 1.82 % | **6.48 %** | 6.67 % | **0.69 %** | 8.87 % | 0.29 | 3950 MB |
+| `meeting_fr_9spk`, 843 s | 9 → **9** | 2091 → 2058 | 7.23 % | 4.16 % | **13.36 %** | 13.94 % | **3.42 %** | 13.98 % | 0.29 | 4118 MB |
+
+```bash
+make bench-data
+make bench-meetings
+```
+
+The speaker count is exact at three, six and nine, as in English, and the word
+counts show no systematic loss. French is *faster* than English here — 0.29
+against 0.61–0.81 — because the source utterances are longer, so the recognizer
+spends less of its time on segment overheads.
+
+French cpWER rises more steeply with speaker count than English does (4.20 %,
+6.48 %, 13.36 % against 2.52 %, 5.56 %, 6.51 %). The WER column shows why: at
+nine speakers French WDER is 3.42 % against 1.52 % in English, so the extra
+error is speaker attribution rather than recognition.
 
 ### 2.3 AMI, real meeting audio
 
@@ -187,7 +197,43 @@ change the published figure. The sweep is written up in
 Until AMI is re-run with those defaults, the headline number stays at 49.39 % —
 we do not publish an improvement we have not recorded.
 
-### 2.4 How this compares to Microsoft
+### 2.4 SUMM-RE, real French meeting audio
+
+Source: [`bench/results/summ_re.json`](../bench/results/summ_re.json). AMI gave
+us a real spontaneous *English* meeting to be measured against. SUMM-RE, a French
+meeting corpus published by Linagora under CC-BY-SA-4.0, is the French
+counterpart: per-speaker tracks summed into one mixed stream, which is the same
+construction as the AMI Mix-Headset condition and the same thing Teams delivers.
+
+| Meeting | Duration | Speakers (reference → detected) | Words (reference → produced) | WER | **cpWER** | WDER | DER (collar 0) | Reference overlap | RTF |
+| --- | ---: | :---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `020c_EBPZ` | 18.2 min | 4 → **2** | 3283 → 2356 | 37.52 % | **89.82 %** | 45.09 % | 63.78 % | 5.06 % | 0.52 |
+
+```bash
+make bench-data-summre
+make bench-summre
+```
+
+**This result is bad, and it caught a real defect.** The recorded run used
+`merge_similarity = 0.70`, a value tuned on AMI. On this meeting that threshold
+fused genuinely different people, collapsing four speakers into two and carrying
+cpWER to 89.82 %. The default has since moved; see
+[configuration](configuration.md#minimum_speaker_seconds-and-merge_similarity-the-pair-that-was-retuned)
+for the sweep and [§8](#8-where-we-lose) for what it means.
+
+Two things are worth reading off the row even so. Missed speech is 4.56 %
+against 5.06 % reference overlap, so coverage of the audio is close to the
+structural floor — the pipeline is hearing the meeting. And the confusion
+component is 41.8 % of a 63.78 % DER, which is what a wrong speaker count does
+to every metric downstream of it. This is an attribution failure, not a
+recognition failure.
+
+The corpus is also a harder speaker-count problem than AMI. Its four speakers
+talk for 380, 326, 59 and 12 seconds; AMI's four each talk for minutes. A
+meeting where two participants barely speak is the ordinary case in an
+organisation, and it is exactly the case the synthetic fixtures do not test.
+
+### 2.5 How this compares to Microsoft
 
 | System | Corpus | cpWER |
 | --- | --- | ---: |
