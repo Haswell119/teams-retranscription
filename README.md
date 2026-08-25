@@ -89,11 +89,17 @@ is measured on every release, not assumed to follow from English:
 **Meetings**, scored with cpWER, which penalises both transcription errors and
 speaker confusion:
 
-| Meeting | Speakers detected | cpWER | WDER | DER | RTF | Peak RAM |
-| --- | :---: | ---: | ---: | ---: | ---: | ---: |
-| 3 speakers | 3 / 3 ✓ | **2.52 %** | 0.00 % | 8.64 % | 0.78 | 3209 MB |
-| 6 speakers | 6 / 6 ✓ | **5.56 %** | 1.91 % | 9.40 % | 0.81 | 3551 MB |
-| 9 speakers | 9 / 9 ✓ | **6.51 %** | 1.52 % | 9.94 % | 0.61 | 3594 MB |
+| Meeting | Language | Speakers detected | cpWER | WDER | DER | RTF |
+| --- | --- | :---: | ---: | ---: | ---: | ---: |
+| 3 speakers | English | 3 / 3 ✓ | **2.52 %** | 0.00 % | 8.64 % | 0.78 |
+| 6 speakers | English | 6 / 6 ✓ | **5.56 %** | 1.91 % | 9.40 % | 0.81 |
+| 9 speakers | English | 9 / 9 ✓ | **6.51 %** | 1.52 % | 9.94 % | 0.61 |
+| 3 speakers | **French** | 3 / 3 ✓ | **4.20 %** | 0.00 % | 11.88 % | 0.30 |
+| 6 speakers | **French** | 6 / 6 ✓ | **6.48 %** | 0.69 % | 8.87 % | 0.29 |
+| 9 speakers | **French** | 9 / 9 ✓ | **13.36 %** | 3.42 % | 13.98 % | 0.29 |
+
+The speaker count is detected exactly, in both languages, without being told in
+advance.
 
 RTF is the real-time factor — processing seconds per second of audio, lower is
 better. A 60-minute recording is transcribed and diarized in about 44 minutes on
@@ -115,11 +121,12 @@ English. We would rather leave that cell empty than fill it with an English
 number.
 
 **And the honest caveat.** Those meeting fixtures are clean read speech mixed
-together, which is much easier than a real meeting room. On the AMI meeting
-corpus we are **worse than the published Azure figure**, not better: 49.39 %
-macro cpWER against Azure's published 27.39 %. That is a known open problem, and
-the full numbers are in [benchmarks](docs/benchmarks.md) — including where we
-lose.
+together, which is much easier than a real meeting room. We also measure on two
+corpora of genuine spontaneous meetings — AMI in English and SUMM-RE in French —
+and there we are **worse than the published Azure figure**, not better: 49.39 %
+macro cpWER on AMI against Azure's published 27.39 %. That is a known open
+problem, not a footnote, and the full numbers are in
+[benchmarks](docs/benchmarks.md) — including where we lose and why.
 
 ## Quick start
 
