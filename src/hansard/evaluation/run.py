@@ -122,9 +122,7 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
             continue
         clip = load_clip(Path(str(sample.audio_path)))
         pipeline = Composition(settings).pipeline()
-        request = MeetingRequest(
-            audio_path=Path(str(sample.audio_path)), title=name, language=language
-        )
+        request = MeetingRequest(audio_path=Path(str(sample.audio_path)), title=name, language=language)
         with ResourceProbe() as probe:
             outcome = pipeline.run(clip, request)
         normalizer = normalizer_for(language)

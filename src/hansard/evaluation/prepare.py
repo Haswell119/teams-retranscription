@@ -25,8 +25,7 @@ AMI_AUDIO = (
 AMI_ANNOTATIONS = "https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip"
 AMI_TEST_MEETINGS: tuple[str, ...] = ("ES2004a", "IS1009a", "TS3003a")
 MLS_FRENCH_BASE = (
-    "https://huggingface.co/datasets/facebook/multilingual_librispeech/"
-    "resolve/main/data/mls_french/dev"
+    "https://huggingface.co/datasets/facebook/multilingual_librispeech/resolve/main/data/mls_french/dev"
 )
 MLS_FRENCH_SPEAKERS: tuple[str, ...] = (
     "10087_11650_000",

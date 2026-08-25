@@ -13,9 +13,7 @@ def labels_of(collection):
 
 
 def test_a_speaker_below_the_floor_is_folded_into_its_nearest_stable_neighbour():
-    absorbed = _absorb_marginal_speakers(
-        turns((0.0, 30.0, "a"), (30.0, 32.0, "b"), (32.0, 60.0, "a")), 10.0
-    )
+    absorbed = _absorb_marginal_speakers(turns((0.0, 30.0, "a"), (30.0, 32.0, "b"), (32.0, 60.0, "a")), 10.0)
     assert labels_of(absorbed) == ["a", "a", "a"]
 
 

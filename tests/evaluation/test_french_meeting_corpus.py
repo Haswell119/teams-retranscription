@@ -64,9 +64,7 @@ def test_synthesised_meeting_records_its_language(tmp_path):
     _corpus(corpus, ("101", "202", "303"), per_speaker=4)
     recipe = FRENCH_MEETING_RECIPES[0]
     synthesise_meeting(recipe, _collect_mls_speakers(corpus), tmp_path)
-    reference = json.loads(
-        (tmp_path / "synthetic" / f"{recipe.name}.ref.json").read_text(encoding="utf-8")
-    )
+    reference = json.loads((tmp_path / "synthetic" / f"{recipe.name}.ref.json").read_text(encoding="utf-8"))
     assert reference["language"] == "fr"
     assert len(reference["speakers"]) == recipe.speakers
     assert reference["segments"]
