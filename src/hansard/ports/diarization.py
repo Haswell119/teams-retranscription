@@ -13,6 +13,7 @@ class DiarizationRequest:
     max_speakers: int = 8
     min_speakers: int = 1
     known_speaker_count: int | None = None
+    speaker_ceiling: int | None = None
 
 
 @runtime_checkable

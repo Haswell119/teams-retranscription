@@ -90,6 +90,7 @@ class TranscriptionPipeline:
         self._record_recognition(transcript, prepared.duration, timings["recognise"], request)
         diarization = Diarization()
         acoustic = clip
+        ceiling = _speaker_ceiling(request, roster)
         if self.diarizer is not None:
             with _timed(timings, "diarise", logger) as measured:
                 acoustic = self.diarization_enhancer.enhance(clip) if self.diarization_enhancer else clip
@@ -98,14 +99,15 @@ class TranscriptionPipeline:
                     DiarizationRequest(
                         max_speakers=min(self.max_speakers, self.diarizer.max_supported_speakers),
                         min_speakers=self.min_speakers,
-                        known_speaker_count=_known_speaker_count(request, roster),
+                        known_speaker_count=request.speaker_count,
+                        speaker_ceiling=ceiling,
                     ),
                 )
                 measured["speakers"] = float(diarization.speaker_count)
             record_diarization(diarization.speaker_count)
         if self.consolidator is not None and diarization.speaker_count > 1:
             with _timed(timings, "consolidate", logger) as measured:
-                diarization = self.consolidator.consolidate(diarization, acoustic)
+                diarization = self.consolidator.consolidate(diarization, acoustic, ceiling)
                 measured["speakers"] = float(diarization.speaker_count)
         if self.refiner is not None and diarization.turns and speech:
             with _timed(timings, "refine", logger):
@@ -152,7 +154,7 @@ class TranscriptionPipeline:
         )
 
 
-def _known_speaker_count(request: MeetingRequest, roster: Roster | None) -> int | None:
+def _speaker_ceiling(request: MeetingRequest, roster: Roster | None) -> int | None:
     if request.speaker_count:
         return request.speaker_count
     if roster and roster.participants:

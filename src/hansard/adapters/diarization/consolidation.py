@@ -59,7 +59,9 @@ class EmbeddingClusterConsolidator:
         norm = float(np.linalg.norm(mean))
         return mean / norm if norm > 0 else None
 
-    def consolidate(self, diarization: Diarization, clip: AudioClip) -> Diarization:
+    def consolidate(
+        self, diarization: Diarization, clip: AudioClip, ceiling: int | None = None
+    ) -> Diarization:
         labels = list(diarization.labels or dict.fromkeys(turn.label for turn in diarization.turns))
         if len(labels) < 2:
             return diarization
@@ -76,7 +78,7 @@ class EmbeddingClusterConsolidator:
                 centroids[label] = centroid
         if len(centroids) < 2:
             return diarization
-        merged = _agglomerate(centroids, self.merge_similarity)
+        merged = _agglomerate(centroids, self.merge_similarity, ceiling)
         if len(set(merged.values())) == len(centroids):
             return diarization
         turns = tuple(
@@ -86,9 +88,12 @@ class EmbeddingClusterConsolidator:
         return Diarization(turns=turns, labels=tuple(dict.fromkeys(turn.label for turn in turns)))
 
 
-def _agglomerate(centroids: dict[str, np.ndarray], threshold: float) -> dict[str, str]:
+def _agglomerate(
+    centroids: dict[str, np.ndarray], threshold: float, ceiling: int | None = None
+) -> dict[str, str]:
     labels = list(centroids)
     parent = {label: label for label in labels}
+    groups = len(labels)
 
     def root(label: str) -> str:
         while parent[label] != label:
@@ -99,11 +104,13 @@ def _agglomerate(centroids: dict[str, np.ndarray], threshold: float) -> dict[str
     pairs: list[tuple[float, str, str]] = []
     for index, left in enumerate(labels):
         for right in labels[index + 1 :]:
-            similarity = float(np.dot(centroids[left], centroids[right]))
-            if similarity >= threshold:
-                pairs.append((similarity, left, right))
-    for _, left, right in sorted(pairs, reverse=True):
+            pairs.append((float(np.dot(centroids[left], centroids[right])), left, right))
+    for similarity, left, right in sorted(pairs, reverse=True):
         left_root, right_root = root(left), root(right)
-        if left_root != right_root:
-            parent[max(left_root, right_root)] = min(left_root, right_root)
+        if left_root == right_root:
+            continue
+        if similarity < threshold and (ceiling is None or groups <= ceiling):
+            continue
+        parent[max(left_root, right_root)] = min(left_root, right_root)
+        groups -= 1
     return {label: root(label) for label in labels}
