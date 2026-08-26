@@ -15,10 +15,6 @@ class DriftGuardPolicy:
     ladder: tuple[float, ...] = (15.0, 8.0, 4.0)
     minimum_audio_seconds: float = 45.0
     recovery_share: float = 0.75
-    overlap_fraction: float = 0.1
-
-    def overlap_for(self, rung: float, configured: float) -> float:
-        return min(configured, rung * self.overlap_fraction)
 
     @property
     def probe_budget(self) -> float:

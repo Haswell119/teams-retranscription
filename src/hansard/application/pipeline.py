@@ -201,11 +201,7 @@ class TranscriptionPipeline:
             return transcript
         best, best_share = transcript, self._share(transcript, probed)
         for rung in policy.rungs_below(self.segmentation.max_seconds):
-            tighter = replace(
-                self.segmentation,
-                max_seconds=rung,
-                split_overlap_seconds=policy.overlap_for(rung, self.segmentation.split_overlap_seconds),
-            )
+            tighter = replace(self.segmentation, max_seconds=rung)
             segments = plan_segments(speech, tighter, clip.duration)
             candidate = self._recognise(clip, replace(hints, segments=segments))
             share = self._share(candidate, probed)

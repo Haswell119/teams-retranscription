@@ -137,9 +137,19 @@ Turn the whole thing off with `HANSARD_ASR__LANGUAGE_DRIFT_GUARD=false`.
   6-minute French podcast. The mechanism is exercised by unit tests against
   scripted recognisers, but the ladder values are calibrated on that one file and
   should be re-derived once a French meeting benchmark exists.
-- **Shorter segments cost context.** Punctuation, capitalisation and long-range
-  agreement all suffer when the model sees 4 seconds instead of 120. The guard
-  accepts that cost only on recordings that were already unusable.
+- **Shorter segments cost context.** Punctuation, capitalisation, proper nouns
+  and long-range agreement all suffer when the model sees 4 seconds instead of
+  120 — on the reference recording *"The Debate"* came back as *"Zodipait"*. The
+  guard accepts that cost only on recordings that were already unusable.
+- **The bottom rungs stutter at the seams.** `plan_segments` overlaps split
+  segments, and the stock 2-second overlap is a third of a 4-second segment, so
+  words near a boundary get decoded twice and the seam de-duplication does not
+  always remove them: *"on va se pencher sur sur un cas vraiment vraiment
+  intéressant"*. Scaling the overlap down with the rung was tried and reverted —
+  it removed some duplicates but dropped whole clauses at the seams instead, and
+  for a verbatim record a duplicate is recoverable where an omission is not.
+  Tightening this properly means fixing the seam de-duplication itself, which is
+  not attempted here.
 
 ## Why it matters more than it sounds
 
