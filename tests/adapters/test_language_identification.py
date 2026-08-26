@@ -41,7 +41,7 @@ def test_a_french_sentence_carrying_english_loanwords_stays_french():
 
 
 def test_a_sentence_without_evidence_is_left_undecided():
-    assert IDENTIFIER.identify_text("Right.").language is None
+    assert IDENTIFIER.identify_text("Meridian 42, PostgreSQL.").language is None
     assert IDENTIFIER.identify_text("").language is None
 
 
@@ -94,3 +94,57 @@ def test_an_explicit_default_language_fills_utterances_nothing_decided():
 def test_tagging_an_empty_transcript_is_a_no_op():
     empty = Transcript()
     assert UtteranceLanguageTagger().tag(empty) is empty
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Sprint review jeudi, go/no-go vendredi.", "fr"),
+        ("Kickoff mardi, demo jeudi, no-go vendredi.", "fr"),
+        ("The go/no-go is on Thursday, sprint review on Friday.", "en"),
+    ],
+)
+def test_one_borrowed_token_does_not_flip_a_whole_agenda_sentence(text, expected):
+    assert IDENTIFIER.identify_text(text).language == expected
+
+
+@pytest.mark.parametrize(
+    ("french", "english"),
+    [("Oui.", "Yes."), ("Non.", "Right."), ("Voilà.", "Sure."), ("Merci.", "Agreed.")],
+)
+def test_backchannels_are_recognised_symmetrically_in_both_languages(french, english):
+    assert IDENTIFIER.identify_text(french).language == "fr"
+    assert IDENTIFIER.identify_text(english).language == "en"
+
+
+def test_a_borrowing_shared_by_both_languages_stays_undecided():
+    assert IDENTIFIER.identify_text("Ok.").language is None
+    assert IDENTIFIER.identify_text("Okay.").language is None
+
+
+def test_an_acknowledgement_follows_the_language_its_speaker_switches_into():
+    tagged = UtteranceLanguageTagger().tag(
+        _transcript(
+            [
+                ("Sofia", "Morning everyone, I have pushed the numbers."),
+                ("Aurélie", "Bonjour, on commence par la migration des données."),
+                ("Sofia", "Ok."),
+                ("Sofia", "We will take the staging instance then."),
+            ]
+        )
+    )
+    assert [utterance.language for utterance in tagged.utterances] == ["en", "fr", "en", "en"]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Le pipeline CI est down, on rollback le deploy et on debug le staging.", "fr"),
+        ("Le kickoff meeting du workshop design est un vrai blocker.", "fr"),
+        ("Send the Meridian dossier to Legrand before the Nantes rendez-vous.", "en"),
+        ("C'est valide de mon cote, on gele le contrat d'API jusqu'au pilote.", "fr"),
+        ("ON VALIDE LE PÉRIMÈTRE AVANT VENDREDI PROCHAIN.", "fr"),
+    ],
+)
+def test_borrowings_accents_and_case_do_not_change_the_matrix_language(text, expected):
+    assert IDENTIFIER.identify_text(text).language == expected

@@ -59,11 +59,18 @@ which one it used. Rather than add a second acoustic model and a second pass ove
 the audio, Hansard reads the words that came back. Function words, elisions
 (`l'`, `qu'`, `d'`), diacritics and contractions (`I'll`, `don't`) separate French
 from English decisively and for free. An utterance with too little evidence —
-"Okay.", "Mm." — is not guessed at: it inherits the language of the nearest
-labelled utterance **by the same speaker**, and only then from its neighbours.
+"Okay.", "Mm." — is not guessed at: it inherits from the nearest labelled utterance
+**by the same speaker**, looking forward before back, because a short
+acknowledgement more often opens the speaker's next turn than closes the previous
+one. Only if that speaker says nothing decidable anywhere does it fall back to its
+neighbours.
 
 Turn this off with `HANSARD_ASR__IDENTIFY_LANGUAGE=false` to get the pre-1.1
-behaviour back.
+behaviour back. Note that pinning `HANSARD_ASR__LANGUAGE=fr` does **not** turn it
+off: that tag forces the recogniser's decoding language and supplies the fallback
+for utterances the identifier cannot decide, but an utterance it *can* decide keeps
+the language it was actually spoken in. The two settings answer different
+questions — what to decode with, and whether to label what came back.
 
 ## Why it matters more than it sounds
 
@@ -152,6 +159,12 @@ carries no language labels is labelled by Hansard's own identifier before scorin
 so the comparison measures **the language each system actually produced**, not the
 one it claimed.
 
+Read `language_accuracy` on a third-party system carefully. It scores the language
+of the words that came out. A system that renders a French passage as
+English-sounding nonsense is reported as having produced English — which is true,
+and is *not* the same statement as "it got the language wrong N % of the time".
+The per-language WER is the honest number for that.
+
 The per-language breakdown is the point. A system locked to one language does not
 degrade evenly: its English stays clean and its French collapses, and an overall
 WER averages that away.
@@ -179,3 +192,9 @@ WER averages that away.
   being supported.
 - **Word-level language labelling is not implemented.** The unit is the utterance,
   and within a sentence the matrix language wins.
+- **An utterance with no lexical evidence is inherited, not measured.** A turn made
+  only of proper nouns and figures — *"Meridian 16, Legrand, 42, PostgreSQL."* —
+  carries no signal in either language. It takes the label of the nearest decided
+  turn by the same speaker, which is a reasonable guess and still a guess. Such
+  turns count towards `language_shares` under an inherited label, so a meeting full
+  of telegraphic recaps has slightly softer share figures than its content warrants.

@@ -76,6 +76,7 @@ class TextLanguageIdentifier:
     minimum_margin: float = 0.6
     relative_margin: float = 0.18
     unopposed_evidence: float = 0.9
+    unopposed_tokens: int = 3
 
     @property
     def name(self) -> str:
@@ -89,7 +90,10 @@ class TextLanguageIdentifier:
         french = _french_score(stripped, tokens)
         english = _english_score(stripped, tokens)
         total = french + english
-        if total < self.minimum_evidence and not _is_unopposed(french, english, self.unopposed_evidence):
+        brief = len(tokens) <= self.unopposed_tokens
+        if total < self.minimum_evidence and not (
+            brief and _is_unopposed(french, english, self.unopposed_evidence)
+        ):
             return LanguageVerdict(None, 0.0, french, english)
         margin = abs(french - english)
         if margin < self.minimum_margin or margin / total < self.relative_margin:
@@ -153,17 +157,23 @@ def _smooth(
 
 
 def _inherited(tags: Sequence[str | None], speakers: Sequence[str], index: int) -> str | None:
-    same_speaker = _nearest(tags, index, lambda position: speakers[position] == speakers[index])
-    return same_speaker if same_speaker is not None else _nearest(tags, index, lambda _: True)
+    def same_speaker(position: int) -> bool:
+        return speakers[position] == speakers[index]
+
+    own = _nearest(tags, index, same_speaker, forward_first=True)
+    return own if own is not None else _nearest(tags, index, lambda _: True, forward_first=False)
 
 
 def _nearest(
     tags: Sequence[str | None],
     index: int,
     accepts: Callable[[int], bool],
+    forward_first: bool,
 ) -> str | None:
     for distance in range(1, len(tags)):
-        for position in (index - distance, index + distance):
+        ahead, behind = index + distance, index - distance
+        ordered = (ahead, behind) if forward_first else (behind, ahead)
+        for position in ordered:
             if 0 <= position < len(tags) and tags[position] is not None and accepts(position):
                 return tags[position]
     return None
