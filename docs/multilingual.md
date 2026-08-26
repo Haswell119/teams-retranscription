@@ -66,11 +66,80 @@ one. Only if that speaker says nothing decidable anywhere does it fall back to i
 neighbours.
 
 Turn this off with `HANSARD_ASR__IDENTIFY_LANGUAGE=false` to get the pre-1.1
-behaviour back. Note that pinning `HANSARD_ASR__LANGUAGE=fr` does **not** turn it
-off: that tag forces the recogniser's decoding language and supplies the fallback
-for utterances the identifier cannot decide, but an utterance it *can* decide keeps
-the language it was actually spoken in. The two settings answer different
-questions — what to decode with, and whether to label what came back.
+behaviour back. Pinning `HANSARD_ASR__LANGUAGE=fr` does **not** turn it off, and on
+the default engine it does not steer the recogniser either — see
+[below](#when-the-recogniser-picks-the-wrong-language). It labels the meeting and
+supplies the fallback for utterances the identifier cannot decide; an utterance it
+*can* decide keeps the language it was actually spoken in.
+
+## When the recogniser picks the wrong language
+
+Everything above assumes the recogniser transcribed what was said. On long
+segments it may not.
+
+Parakeet TDT 0.6b v3 carries one shared vocabulary for 25 languages and no
+language conditioning at all — passing a language to it through `onnx-asr` is
+silently ignored, because only Whisper and Canary read that argument. The model
+therefore infers the language acoustically, per decoded segment, and **the longer
+the segment the less reliably it does so.**
+
+Measured on a 6-minute French recording, decoding the same audio at different
+segment ceilings and nothing else changed:
+
+| Segment ceiling | Words transcribed | Share of output in French |
+| ---: | ---: | ---: |
+| 4 s | **858** | **95 %** |
+| 6 s | 829 | 79 % |
+| 8 s | 762 | 57 % |
+| 15 s | 694 | 66 % |
+| 120 s (the default) | 318 | 11 % |
+
+Two failures at once, and they have the same cause. The output drifts into
+English — French speech spelled as English words, *"on va se pencher sur"*
+becoming *"one will pench on"* — and it **deletes more than half the words**.
+
+This is why `AUDIO__MAX_SEGMENT_SECONDS` is not the harmless memory knob it looks
+like. Its default of 120 s was tuned on AMI, an English corpus, where drift
+cannot happen and long context genuinely helps: the repository measures 120 s as
+4.1 WER points better than 28 s there. On French the same setting is
+catastrophic.
+
+### The guard
+
+Lowering the ceiling for everyone would trade a measured English gain for an
+unmeasured one, so the pipeline detects the failure instead of assuming it:
+
+1. Decode normally, at whatever ceiling is configured.
+2. Decode a handful of **short probes** — eight 4-second windows spread across
+   the detected speech, about 1 % of an hour-long meeting.
+3. Identify the language of the probe text and of the full transcript. If they
+   agree, stop: nothing drifted, and nothing was re-decoded.
+4. If they disagree, re-decode at successively shorter ceilings — 15 s, then 8 s,
+   then 4 s — stopping at the first where the probed language accounts for at
+   least 75 % of the transcript.
+
+The probe must run at the ceiling the recogniser is most reliable at, which is
+why it defaults to the lowest rung of the ladder. At 4 s the probe on the
+reference recording returned French with no English evidence whatsoever; at 6 s
+it was wrong often enough to miss the drift completely. That is a real
+sensitivity, not a tuning detail.
+
+Turn the whole thing off with `HANSARD_ASR__LANGUAGE_DRIFT_GUARD=false`.
+
+### What this does not fix
+
+- **The guard only fires when the probe disagrees with the transcript.** If the
+  recogniser drifts so thoroughly that even 4-second windows come out in the
+  wrong language, the probe agrees with the drifted transcript and the guard
+  stays silent. It repairs a wrong decision; it cannot repair audio the model
+  simply cannot read.
+- **It is validated on one recording.** The numbers above come from a single
+  6-minute French podcast. The mechanism is exercised by unit tests against
+  scripted recognisers, but the ladder values are calibrated on that one file and
+  should be re-derived once a French meeting benchmark exists.
+- **Shorter segments cost context.** Punctuation, capitalisation and long-range
+  agreement all suffer when the model sees 4 seconds instead of 120. The guard
+  accepts that cost only on recordings that were already unusable.
 
 ## Why it matters more than it sounds
 

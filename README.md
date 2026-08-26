@@ -214,7 +214,9 @@ Teams meeting
 │  Recognise    Parakeet TDT 0.6B v3, float32 ONNX, 25 languages, │
 │               word-level timestamps, punctuation, no PyTorch    │
 ├─────────────────────────────────────────────────────────────────┤
-│  Identify     every utterance labelled with the language it     │
+│  Identify     short probes catch the recogniser settling on     │
+│               the wrong language and force a re-decode; every   │
+│               utterance is then labelled with the language it   │
 │               was spoken in, so a French/English meeting is     │
 │               read with both languages' rules, not one          │
 ├─────────────────────────────────────────────────────────────────┤

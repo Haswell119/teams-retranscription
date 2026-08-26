@@ -13,6 +13,7 @@ from hansard.adapters.enhancement.segmentation import SegmentationPolicy
 from hansard.adapters.enhancement.vad import EnergyVoiceActivityDetector, SileroVoiceActivityDetector
 from hansard.adapters.language.identification import TextLanguageIdentifier, UtteranceLanguageTagger
 from hansard.adapters.storage.registry import build_artifact_store
+from hansard.application.drift import DriftGuardPolicy
 from hansard.application.pipeline import TranscriptionPipeline
 from hansard.config import Settings, StorageSettings
 from hansard.ports.enhancement import AudioEnhancer, VoiceActivityDetector
@@ -86,6 +87,16 @@ class Composition:
             trust_engine_tags=True,
         )
 
+    def drift_guard(self) -> DriftGuardPolicy | None:
+        asr = self.settings.asr
+        if not asr.language_drift_guard:
+            return None
+        return DriftGuardPolicy(
+            probe_seconds=asr.drift_probe_seconds,
+            probe_count=asr.drift_probe_count,
+            ladder=tuple(asr.drift_ladder_seconds),
+        )
+
     def pipeline(self) -> TranscriptionPipeline:
         settings = self.settings
         diarization = settings.diarization
@@ -120,6 +131,7 @@ class Composition:
                 else None
             ),
             language_tagger=self.language_tagger(),
+            drift_guard=self.drift_guard(),
             refiner=(
                 SpeechCoverageRefiner(maximum_extension=diarization.maximum_turn_extension)
                 if diarization.speech_coverage_refinement

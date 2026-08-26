@@ -42,6 +42,10 @@ class AsrSettings(BaseModel):
     batch_seconds: float = 240.0
     language: str | None = None
     identify_language: bool = True
+    language_drift_guard: bool = True
+    drift_probe_seconds: float = 4.0
+    drift_probe_count: int = 8
+    drift_ladder_seconds: tuple[float, ...] = (15.0, 8.0, 4.0)
     intra_op_threads: int = 0
     inter_op_threads: int = 0
     memory_profile: MemoryProfile = "default"

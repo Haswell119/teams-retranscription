@@ -8,7 +8,8 @@ from dataclasses import dataclass, field, replace
 from hansard.adapters.diarization.consolidation import EmbeddingClusterConsolidator
 from hansard.adapters.diarization.refinement import SpeechCoverageRefiner
 from hansard.adapters.enhancement.segmentation import SegmentationPolicy, plan_segments
-from hansard.adapters.language.identification import UtteranceLanguageTagger
+from hansard.adapters.language.identification import TextLanguageIdentifier, UtteranceLanguageTagger
+from hansard.application.drift import DriftGuardPolicy, has_drifted, language_share, probe_spans
 from hansard.domain.audio import AudioClip
 from hansard.domain.language import MIXED, normalise_tag
 from hansard.domain.meeting import MeetingRequest
@@ -59,6 +60,8 @@ class TranscriptionPipeline:
     diarizer: Diarizer | None = None
     namer: SpeakerNamer | None = None
     language_tagger: UtteranceLanguageTagger | None = None
+    drift_guard: DriftGuardPolicy | None = None
+    identifier: TextLanguageIdentifier = field(default_factory=TextLanguageIdentifier)
     refiner: SpeechCoverageRefiner | None = None
     consolidator: EmbeddingClusterConsolidator | None = None
     segmentation: SegmentationPolicy = field(default_factory=SegmentationPolicy)
@@ -90,6 +93,11 @@ class TranscriptionPipeline:
             transcript = self._recognise(prepared, hints)
             measured["utterances"] = float(len(transcript.utterances))
             measured["words"] = float(transcript.word_count)
+        if self.drift_guard is not None:
+            with _timed(timings, "language_drift", logger) as measured:
+                transcript, drifted = self._guarded(prepared, transcript, hints, speech, logger)
+                measured["redecoded"] = float(drifted)
+                measured["words"] = float(transcript.word_count)
         if self.language_tagger is not None:
             with _timed(timings, "identify_language", logger) as measured:
                 transcript = self._tag_languages(transcript, request)
@@ -145,6 +153,73 @@ class TranscriptionPipeline:
         except Exception as error:
             record_asr_failure(type(error).__name__)
             raise
+
+    def _probe_language(self, clip: AudioClip, spans: tuple[TimeSpan, ...]) -> str | None:
+        if not spans:
+            return None
+        probed = self._recognise(clip, RecognitionHints(segments=spans))
+        return self.identifier.identify_text(probed.text).language
+
+    def _guarded(
+        self,
+        clip: AudioClip,
+        transcript: Transcript,
+        hints: RecognitionHints,
+        speech: tuple[TimeSpan, ...],
+        logger: StageLogger,
+    ) -> tuple[Transcript, bool]:
+        policy = self.drift_guard
+        if policy is None or not transcript.utterances:
+            return transcript, False
+        if clip.duration < policy.minimum_audio_seconds:
+            return transcript, False
+        if not policy.rungs_below(self.segmentation.max_seconds):
+            return transcript, False
+        observed = self.identifier.identify_text(transcript.text).language
+        probed = self._probe_language(clip, probe_spans(speech, clip.duration, policy))
+        if not has_drifted(probed, observed):
+            return transcript, False
+        logger.warning(
+            "recognition.language_drift",
+            probed=probed,
+            observed=observed,
+            segment_seconds=self.segmentation.max_seconds,
+        )
+        return self._descend(clip, transcript, hints, speech, probed, logger), True
+
+    def _descend(
+        self,
+        clip: AudioClip,
+        transcript: Transcript,
+        hints: RecognitionHints,
+        speech: tuple[TimeSpan, ...],
+        probed: str | None,
+        logger: StageLogger,
+    ) -> Transcript:
+        policy = self.drift_guard
+        if policy is None:
+            return transcript
+        best, best_share = transcript, self._share(transcript, probed)
+        for rung in policy.rungs_below(self.segmentation.max_seconds):
+            tighter = replace(
+                self.segmentation,
+                max_seconds=rung,
+                split_overlap_seconds=policy.overlap_for(rung, self.segmentation.split_overlap_seconds),
+            )
+            segments = plan_segments(speech, tighter, clip.duration)
+            candidate = self._recognise(clip, replace(hints, segments=segments))
+            share = self._share(candidate, probed)
+            if share > best_share:
+                best, best_share = candidate, share
+            if share >= policy.recovery_share:
+                logger.info("recognition.language_recovered", segment_seconds=rung, share=round(share, 3))
+                return candidate
+        logger.warning("recognition.language_unrecovered", share=round(best_share, 3))
+        return best
+
+    def _share(self, transcript: Transcript, language: str | None) -> float:
+        verdict = self.identifier.identify_text(transcript.text)
+        return language_share(verdict.french_score, verdict.english_score, language)
 
     def _tag_languages(self, transcript: Transcript, request: MeetingRequest) -> Transcript:
         tagger = self.language_tagger
