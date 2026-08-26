@@ -186,7 +186,7 @@ def _utterance(segment: Mapping[str, object], language: str) -> Utterance:
         span=TimeSpan(start, max(start, end)),
         text=str(segment.get("text") or ""),
         speaker=str(segment.get("speaker") or UNKNOWN_SPEAKER),
-        language=language,
+        language=str(segment.get("language") or language),
     )
 
 

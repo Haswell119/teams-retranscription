@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unicodedata
 
+from hansard.domain.language import MIXED, normalise_tag
+
 _SHARED_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("ph", "f"),
     ("ck", "k"),
@@ -72,10 +74,24 @@ def _soften_c_and_g(text: str) -> str:
 
 
 def sound_key(text: str, language: str = "en") -> str:
+    return _key_with(text, _replacements_for(language))
+
+
+def sound_keys(text: str, language: str = "en") -> tuple[str, ...]:
+    if normalise_tag(language) != MIXED:
+        return (sound_key(text, language),)
+    keys = (_key_with(text, _ENGLISH_REPLACEMENTS), _key_with(text, _FRENCH_REPLACEMENTS))
+    return keys if keys[0] != keys[1] else keys[:1]
+
+
+def _replacements_for(language: str) -> tuple[tuple[str, str], ...]:
+    return _FRENCH_REPLACEMENTS if language.lower().startswith("fr") else _ENGLISH_REPLACEMENTS
+
+
+def _key_with(text: str, replacements: tuple[tuple[str, str], ...]) -> str:
     normalised = strip_accents(text).lower()
     normalised = "".join(char if char.isalnum() else " " for char in normalised)
     tokens: list[str] = []
-    replacements = _FRENCH_REPLACEMENTS if language.lower().startswith("fr") else _ENGLISH_REPLACEMENTS
     for token in normalised.split():
         current = token
         for source, target in replacements:

@@ -3,18 +3,21 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Protocol, cast, runtime_checkable
 
+from hansard.adapters.language.identification import TextLanguageIdentifier
+from hansard.domain.language import MIXED
 from hansard.evaluation.english_numbers import normalize_digit_groups, words_to_digits
 from hansard.evaluation.french_numbers import expand_numbers
 
-NORMALIZER_VERSION = "hansard-normalizers-1.1.0"
+NORMALIZER_VERSION = "hansard-normalizers-1.2.0"
 
 _BRACKETED = re.compile(r"[<\[][^>\]]*[>\]]")
 _PARENTHESISED = re.compile(r"\(([^)]+?)\)")
 _WHITESPACE = re.compile(r"\s+")
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?\u2026])\s+")
 _APOSTROPHES = re.compile("[\u2018\u2019\u02bc\u00b4`\u201b]")
 _ENGLISH_FILLERS = re.compile(r"\b(hmm|mm|mhm|mmm|uh|um)\b")
 _FRENCH_FILLERS = re.compile(r"\b(euh+|heu|hein|ben|bah|hum+|hm+|mmh)\b")
@@ -240,12 +243,52 @@ class FrenchNormalizer:
         return collapse_whitespace(result)
 
 
+@dataclass(frozen=True, slots=True)
+class MixedNormalizer:
+    french: FrenchNormalizer = field(default_factory=FrenchNormalizer)
+    english: EnglishNormalizer = field(default_factory=EnglishNormalizer)
+    identifier: TextLanguageIdentifier = field(default_factory=TextLanguageIdentifier)
+    default_language: str = "en"
+
+    def normalize(self, text: str) -> str:
+        runs = _language_runs(text, self.identifier, self.default_language)
+        normalised = (
+            self.french.normalize(run) if language == "fr" else self.english.normalize(run)
+            for language, run in runs
+        )
+        return collapse_whitespace(" ".join(piece for piece in normalised if piece))
+
+
+def _language_runs(
+    text: str,
+    identifier: TextLanguageIdentifier,
+    default_language: str,
+) -> tuple[tuple[str, str], ...]:
+    pieces = [piece for piece in _SENTENCE_SPLIT.split(text) if piece.strip()]
+    if not pieces:
+        return ()
+    verdicts = [identifier.identify_text(piece).language for piece in pieces]
+    decided = [tag for tag in verdicts if tag is not None]
+    fallback = decided[0] if decided else default_language
+    runs: list[tuple[str, str]] = []
+    current = fallback
+    for piece, tag in zip(pieces, verdicts, strict=True):
+        current = tag or current
+        if runs and runs[-1][0] == current:
+            runs[-1] = (current, f"{runs[-1][1]} {piece}")
+        else:
+            runs.append((current, piece))
+    return tuple(runs)
+
+
 def normalizer_for(language: str | None) -> TextNormalizer:
     code = (language or "").split("-")[0].split("_")[0].strip().lower()
     if code in {"fr", "fra", "fre", "french", "français"}:
         return FrenchNormalizer()
     if code in {"en", "eng", "english"}:
         return EnglishNormalizer()
+    if code in {MIXED, "multi", "multilingual", "bilingual"}:
+        return MixedNormalizer()
     return BasicNormalizer()
 
 

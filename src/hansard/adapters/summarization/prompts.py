@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+
+from hansard.domain.language import MIXED
+from hansard.rendering.i18n import ENGLISH
 
 MAP_SCHEMA: dict[str, object] = {
     "type": "object",
@@ -218,6 +221,50 @@ FRENCH_REDUCE_USER = (
     "- topics : un objet par sujet ci-dessus, avec index, title, summary et key_points."
 )
 
+MIXED_MAP_SYSTEM = (
+    "You are a meeting clerk. This meeting was held in French and in English, often switching "
+    "language within the same discussion. You read one excerpt of the verbatim transcript and you "
+    "write down only what it actually contains.\n"
+    "Absolute rules:\n"
+    "1. Never invent a fact, a name, a number or a date. Everything you write must be supported by "
+    "the excerpt you were given.\n"
+    "2. Every item you produce must carry a verbatim quote copied character for character from the "
+    "excerpt, together with the number in square brackets of the line it comes from. Never translate "
+    "a quote: copy it in the language it was spoken in, accents and all.\n"
+    "3. A DECISION is a commitment the group actually made: it is settled, it is not conditional and "
+    "it is not a proposal. 'We could', 'maybe', 'I suggest', 'on pourrait', 'peut-être', 'je "
+    "propose', 'il faudrait', 'si on' and any open question are NOT decisions. When in doubt, leave "
+    "it out.\n"
+    "4. An ACTION is a task somebody committed to. Give an owner only when the excerpt names the "
+    "person or when the person commits in the first person; otherwise leave the owner empty. Never "
+    "guess an owner. Copy a deadline only when it is said out loud; otherwise leave it empty.\n"
+    "5. A QUESTION is a question that was raised and left without an answer in this excerpt.\n"
+    "6. If a category has nothing in this excerpt, return an empty list. An empty list is a correct "
+    "answer; a plausible invention is a wrong answer.\n"
+    "7. Write every statement, description and question in the language it was spoken in. A French "
+    "exchange is reported in French, an English exchange in English. Do not translate the meeting "
+    "into one language, and do not mix two languages inside a single sentence you write.\n"
+    "8. Answer with a single JSON object and nothing else."
+)
+
+MIXED_REDUCE_SYSTEM = (
+    "You are a meeting clerk consolidating notes taken on successive excerpts of the same meeting. "
+    "The meeting was held in French and in English.\n"
+    "Absolute rules:\n"
+    "1. Use only the material given below. Never add a fact, a name, a number or a date that is not "
+    "in it.\n"
+    "2. Write the abstract as plain prose that a participant could verify line by line against the "
+    "transcript. No adjectives that the transcript does not support.\n"
+    "3. Keep the topic numbering you are given. Summarise each topic with what was actually said "
+    "about it. If a topic contains nothing worth reporting, say that it was mentioned without being "
+    "discussed rather than inventing content.\n"
+    "4. Never turn a suggestion into a decision.\n"
+    "5. Keep each recorded item in the language it was given to you in; never translate one. Write "
+    "the abstract and the topic summaries in {dominant_language}, which is the language most of the "
+    "meeting was held in, while leaving quoted material untouched.\n"
+    "6. Answer with a single JSON object and nothing else."
+)
+
 ENGLISH_CONTEXT_HEADER = (
     "CONTEXT FROM THE PREVIOUS EXCERPT (for continuity only, do not report items from it):\n{context}\n\n"
 )
@@ -225,6 +272,8 @@ ENGLISH_CONTEXT_HEADER = (
 FRENCH_CONTEXT_HEADER = (
     "CONTEXTE DE L'EXTRAIT PRÉCÉDENT (continuité seulement, n'en tirez aucun élément) :\n{context}\n\n"
 )
+
+MIXED_CONTEXT_HEADER = ENGLISH_CONTEXT_HEADER
 
 ENGLISH_NOTHING = "(none)"
 FRENCH_NOTHING = "(aucun)"
@@ -269,11 +318,26 @@ FRENCH_PROMPTS = PromptPack(
     nothing=FRENCH_NOTHING,
 )
 
+MIXED_PROMPTS = PromptPack(
+    language=MIXED,
+    map_system=MIXED_MAP_SYSTEM,
+    map_user=ENGLISH_MAP_USER,
+    reduce_system=MIXED_REDUCE_SYSTEM,
+    reduce_user=ENGLISH_REDUCE_USER,
+    context_header=MIXED_CONTEXT_HEADER,
+    nothing=ENGLISH_NOTHING,
+)
+
 PROMPTS_BY_LANGUAGE: Mapping[str, PromptPack] = {
     ENGLISH_PROMPTS.language: ENGLISH_PROMPTS,
     FRENCH_PROMPTS.language: FRENCH_PROMPTS,
+    MIXED_PROMPTS.language: MIXED_PROMPTS,
 }
 
 
-def prompt_pack_for(language: str) -> PromptPack:
-    return PROMPTS_BY_LANGUAGE.get(language, ENGLISH_PROMPTS)
+def prompt_pack_for(language: str, dominant_language: str = "en") -> PromptPack:
+    pack = PROMPTS_BY_LANGUAGE.get(language, ENGLISH_PROMPTS)
+    if pack.language != MIXED:
+        return pack
+    spoken = ENGLISH.language_name(dominant_language)
+    return replace(pack, reduce_system=pack.reduce_system.format(dominant_language=spoken))

@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
-from hansard.adapters.asr.phonetics import similarity, sound_key
+from hansard.adapters.asr.phonetics import similarity, sound_keys
 from hansard.adapters.summarization.text import (
     capitalised_runs,
     content_terms,
@@ -112,7 +112,7 @@ class TranscriptIndex:
     def keys_of(self, terms: frozenset[str]) -> frozenset[str]:
         if terms is self.global_terms:
             return self.global_keys
-        return frozenset(sound_key(term, self.language) for term in terms)
+        return frozenset(key for term in terms for key in sound_keys(term, self.language))
 
 
 def _normalised_number(value: str) -> str:
@@ -142,7 +142,7 @@ def build_index(
         utterance_spans=tuple(spans),
         utterance_terms=tuple(per_utterance),
         global_terms=global_terms,
-        global_keys=frozenset(sound_key(term, language) for term in global_terms),
+        global_keys=frozenset(key for term in global_terms for key in sound_keys(term, language)),
         surface_tokens=frozenset(surface),
         numbers=frozenset(numbers),
     )
@@ -165,10 +165,10 @@ def _is_supported_term(
 ) -> bool:
     if term in available:
         return True
-    key = sound_key(term, language)
-    if key in keys:
+    variants = sound_keys(term, language)
+    if any(key in keys for key in variants):
         return True
-    return any(similarity(key, candidate) >= fuzzy_threshold for candidate in keys)
+    return any(similarity(key, candidate) >= fuzzy_threshold for key in variants for candidate in keys)
 
 
 def support_ratio(

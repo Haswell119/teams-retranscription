@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+
+from hansard.domain.language import MIXED
 
 DEFAULT_LANGUAGE = "en"
 
@@ -15,6 +17,7 @@ class Phrase(StrEnum):
     PARTICIPANTS = "participants"
     ATTENDEES = "attendees"
     LANGUAGE = "language"
+    AND = "and"
     PRODUCED_WITH = "produced_with"
     GENERATED_AT = "generated_at"
     EXECUTIVE_SUMMARY = "executive_summary"
@@ -79,6 +82,7 @@ ENGLISH_PHRASES: Mapping[Phrase, str] = {
     Phrase.SHARE: "Share",
     Phrase.RATIONALE: "Rationale",
     Phrase.RAISED_BY: "raised by {speaker}",
+    Phrase.AND: "and",
     Phrase.UNASSIGNED: "Unassigned",
     Phrase.UNKNOWN_SPEAKER: "Unidentified speaker",
     Phrase.NO_DECISIONS: "No decision was recorded.",
@@ -131,6 +135,7 @@ FRENCH_PHRASES: Mapping[Phrase, str] = {
     Phrase.SHARE: "Part",
     Phrase.RATIONALE: "Justification",
     Phrase.RAISED_BY: "soulevé par {speaker}",
+    Phrase.AND: "et",
     Phrase.UNASSIGNED: "Non attribué",
     Phrase.UNKNOWN_SPEAKER: "Intervenant non identifié",
     Phrase.NO_DECISIONS: "Aucune décision n'a été consignée.",
@@ -199,6 +204,7 @@ ENGLISH_LANGUAGE_NAMES: Mapping[str, str] = {
     "it": "Italian",
     "nl": "Dutch",
     "pt": "Portuguese",
+    MIXED: "several languages",
 }
 
 FRENCH_LANGUAGE_NAMES: Mapping[str, str] = {
@@ -209,6 +215,7 @@ FRENCH_LANGUAGE_NAMES: Mapping[str, str] = {
     "it": "italien",
     "nl": "néerlandais",
     "pt": "portugais",
+    MIXED: "plusieurs langues",
 }
 
 
@@ -230,6 +237,14 @@ class Translations:
 
     def language_name(self, tag: str) -> str:
         return self.language_names.get(normalise_language(tag), tag)
+
+    def language_names_of(self, tags: Sequence[str]) -> str:
+        return self.join(tuple(self.language_name(tag) for tag in tags))
+
+    def join(self, items: Sequence[str]) -> str:
+        if len(items) < 2:
+            return items[0] if items else ""
+        return f"{', '.join(items[:-1])} {self.text(Phrase.AND)} {items[-1]}"
 
 
 ENGLISH = Translations(

@@ -106,13 +106,13 @@ class HtmlRenderer:
         return HTML_EXTENSION
 
     def render_transcript(self, transcript: Transcript, context: RenderContext) -> str:
-        translations = translations_for(context.language)
+        translations = translations_for(context.display_language)
         document = compose_transcript_document(transcript, context, translations, self.speaker_gap_seconds)
         template = _environment().get_template(TRANSCRIPT_TEMPLATE)
         return template.render(**_shared_variables(document, translations, context))
 
     def render_minutes(self, minutes: Minutes, context: RenderContext) -> str:
-        translations = translations_for(context.language)
+        translations = translations_for(context.display_language)
         document = compose_minutes_document(minutes, context, translations)
         headings = _translated(SECTION_PHRASES, translations)
         template = _environment().get_template(MINUTES_TEMPLATE)

@@ -70,6 +70,10 @@ QUOTE_MATCH_THRESHOLD = 0.45
 CITATION_QUOTE_LIMIT = 240
 
 
+def _dominant(transcript: Transcript, fallback: str) -> str:
+    return transcript.language_profile.dominant or fallback
+
+
 @dataclass(frozen=True, slots=True)
 class MinutesOutcome:
     minutes: Minutes
@@ -236,7 +240,7 @@ class LlmMinutesWriter:
                 (),
             )
         plan = plan_chunks(transcript, self.chunk_options, analysis.language)
-        pack = prompt_pack_for(analysis.language)
+        pack = prompt_pack_for(analysis.language, _dominant(transcript, analysis.language))
         directory = build_directory(transcript, roster)
         notes: list[str] = []
         harvested = self._map(plan, pack, request, analysis, directory, notes)

@@ -12,6 +12,16 @@ from hansard.domain.errors import (
     RecognitionError,
     SummarizationError,
 )
+from hansard.domain.language import (
+    MIXED,
+    SUPPORTED_LANGUAGES,
+    LanguageProfile,
+    is_mixed_tag,
+    languages_of,
+    merge_tags,
+    normalise_tag,
+    resolve_meeting_language,
+)
 from hansard.domain.meeting import (
     Capture,
     DeliveryChannel,
@@ -40,6 +50,8 @@ from hansard.domain.timespan import TimeSpan, merge_adjacent, total_duration
 from hansard.domain.transcript import Transcript, Utterance, Word
 
 __all__ = [
+    "MIXED",
+    "SUPPORTED_LANGUAGES",
     "TARGET_SAMPLE_RATE",
     "UNKNOWN_SPEAKER",
     "ActionItem",
@@ -58,6 +70,7 @@ __all__ = [
     "DiarizationError",
     "HansardError",
     "JobState",
+    "LanguageProfile",
     "MeetingAdmissionTimeout",
     "MeetingJoinRefused",
     "MeetingRecord",
@@ -76,6 +89,11 @@ __all__ = [
     "Utterance",
     "Word",
     "concatenate",
+    "is_mixed_tag",
+    "languages_of",
     "merge_adjacent",
+    "merge_tags",
+    "normalise_tag",
+    "resolve_meeting_language",
     "total_duration",
 ]

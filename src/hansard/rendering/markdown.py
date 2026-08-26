@@ -150,7 +150,7 @@ class MarkdownRenderer:
         return MARKDOWN_EXTENSION
 
     def render_transcript(self, transcript: Transcript, context: RenderContext) -> str:
-        translations = translations_for(context.language)
+        translations = translations_for(context.display_language)
         document = compose_transcript_document(transcript, context, translations, self.speaker_gap_seconds)
         lines = [f"# {document.title}{TITLE_SEPARATOR}{document.subtitle}", ""]
         lines.extend(_metadata_lines(document.metadata, translations))
@@ -160,7 +160,7 @@ class MarkdownRenderer:
         return _document(lines)
 
     def render_minutes(self, minutes: Minutes, context: RenderContext) -> str:
-        translations = translations_for(context.language)
+        translations = translations_for(context.display_language)
         document = compose_minutes_document(minutes, context, translations)
         lines = [f"# {document.title}", "", f"_{document.subtitle}_", ""]
         lines.extend(_metadata_lines(document.metadata, translations))

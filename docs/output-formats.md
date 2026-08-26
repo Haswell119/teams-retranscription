@@ -244,7 +244,7 @@ speaker labels are raw (`unknown` is not translated) — presentation belongs to
 
 ### Versioning
 
-Every document carries `schema_version`, currently **`1.0`**. Additive changes (new optional keys) bump the
+Every document carries `schema_version`, currently **`1.1`**. Additive changes (new optional keys) bump the
 minor version; removing or re-typing a field bumps the major version. Consumers should ignore unknown keys and
 check the major version.
 
@@ -252,14 +252,15 @@ check the major version.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `schema_version` | string | `"1.0"` |
+| `schema_version` | string | `"1.1"` |
 | `kind` | string | `"transcript"` or `"minutes"`; the payload lives under a key of the same name |
 | `generator.name` | string | `RenderContext.generator` |
 | `generator.version` | string | Hansard version that produced the file |
 | `meeting.title` | string | |
 | `meeting.started_at` | string \| null | ISO 8601 |
 | `meeting.timezone` | string | IANA name |
-| `meeting.language` | string | Output language of the render context |
+| `meeting.language` | string | Output language of the render context; `"mixed"` when the meeting was code-switched |
+| `meeting.languages[]` | string | Languages actually spoken, most-spoken first; empty when only one was configured and none observed |
 | `meeting.duration_seconds` | number | Seconds, 3 decimals |
 | `meeting.participants[]` | object | `identifier`, `display_name`, `email`, `is_organizer`, `is_external` |
 | `meeting.provenance[]` | object | `component`, `engine`, `model_id` |
@@ -268,7 +269,10 @@ check the major version.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `language` | string \| null | Detected or configured language of the speech |
+| `language` | string \| null | Detected or configured language of the speech; `"mixed"` when both were spoken |
+| `languages[]` | string | Every language observed above the minority threshold, most-spoken first |
+| `language_shares` | object | Language tag to share of transcribed words, 4 decimals |
+| `code_switched` | boolean | True when more than one language passed the minority threshold |
 | `audio_duration_seconds` | number | |
 | `word_count` | integer | |
 | `speakers[]` | string | Labels in order of first appearance |

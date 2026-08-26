@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from hansard.adapters.asr.phonetics import similarity, sound_key
+from hansard.adapters.asr.phonetics import similarity, sound_keys
+from hansard.domain.language import MIXED, normalise_tag
 from hansard.domain.transcript import Transcript, Utterance, Word
 
 
 @dataclass(frozen=True, slots=True)
 class BoostPhrase:
     surface: str
-    key: str
+    keys: tuple[str, ...]
     word_count: int
 
 
@@ -39,19 +40,19 @@ class VocabularyBiaser:
             cleaned = phrase.strip()
             if not cleaned:
                 continue
-            key = sound_key(cleaned, language)
-            if key:
-                compiled.append(BoostPhrase(cleaned, key, len(key.split())))
+            keys = tuple(key for key in sound_keys(cleaned, language) if key)
+            if keys:
+                compiled.append(BoostPhrase(cleaned, keys, len(keys[0].split())))
         return tuple(sorted(compiled, key=lambda item: -item.word_count))
 
     def _best_match(self, window: str, language: str, phrases: tuple[BoostPhrase, ...]) -> BoostPhrase | None:
-        key = sound_key(window, language)
-        if not key:
+        keys = tuple(key for key in sound_keys(window, language) if key)
+        if not keys:
             return None
         best: BoostPhrase | None = None
         best_score = self.similarity_threshold
         for phrase in phrases:
-            score = similarity(key, phrase.key)
+            score = max(similarity(key, candidate) for key in keys for candidate in phrase.keys)
             if score > best_score:
                 best_score = score
                 best = phrase
@@ -60,10 +61,10 @@ class VocabularyBiaser:
     def apply(
         self, transcript: Transcript, phrases: tuple[str, ...], language: str | None = None
     ) -> tuple[Transcript, BiasingReport]:
-        compiled = self.compile(phrases, language or transcript.language or "en")
+        meeting_language = _meeting_language(language, transcript)
+        compiled = self.compile(phrases, meeting_language)
         if not compiled:
             return transcript, BiasingReport()
-        resolved_language = language or transcript.language or "en"
         exact = {phrase.surface.casefold() for phrase in compiled}
         replacements: list[tuple[str, str]] = []
         utterances: list[Utterance] = []
@@ -71,6 +72,7 @@ class VocabularyBiaser:
             if not utterance.words:
                 utterances.append(utterance)
                 continue
+            spoken = normalise_tag(utterance.language) or meeting_language
             words = list(utterance.words)
             index = 0
             rebuilt: list[Word] = []
@@ -83,7 +85,7 @@ class VocabularyBiaser:
                         break
                     if min(word.confidence for word in window) > self.confidence_ceiling:
                         continue
-                    candidate = self._best_match(surface, resolved_language, compiled)
+                    candidate = self._best_match(surface, spoken, compiled)
                     if candidate is None or candidate.word_count != length:
                         continue
                     replacements.append((surface, candidate.surface))
@@ -98,6 +100,14 @@ class VocabularyBiaser:
                 replace(utterance, words=tuple(rebuilt), text=" ".join(word.text for word in rebuilt))
             )
         return replace(transcript, utterances=tuple(utterances)), BiasingReport(tuple(replacements))
+
+
+def _meeting_language(requested: str | None, transcript: Transcript) -> str:
+    explicit = normalise_tag(requested)
+    if explicit is not None:
+        return explicit
+    profile = transcript.language_profile.tag
+    return profile or normalise_tag(transcript.language) or MIXED
 
 
 def _retext(window: list[Word], surface: str) -> list[Word]:

@@ -115,10 +115,16 @@ identifier.
 | `enhance` | `TranscriptionPipeline` | |
 | `voice_activity` | `TranscriptionPipeline` | `speech_spans` |
 | `recognise` | `TranscriptionPipeline` | `utterances`, `words` |
+| `identify_language` | `TranscriptionPipeline` | `languages`, `code_switched` |
 | `diarise` | `TranscriptionPipeline` | `speakers` |
 | `refine` | `TranscriptionPipeline` | |
 | `attribute` | `TranscriptionPipeline` | |
 | `resolve_names` | `TranscriptionPipeline` | `named_speakers` |
+
+`identify_language` is absent when `HANSARD_ASR__IDENTIFY_LANGUAGE=false`. Its `languages` field
+counts the languages that passed the minority threshold and `code_switched` is `1.0` when more
+than one did — so a dashboard can tell a bilingual meeting from a monolingual one without reading
+the transcript. Neither field carries any text.
 
 Delivery adds `delivery.completed` and `delivery.failed` with the channel and the duration — never
 the recipient.

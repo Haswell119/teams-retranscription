@@ -34,7 +34,7 @@ If the comparison is done naively, a perfectly correct system is punished for pu
 
 Normalization is therefore part of the metric, not a detail. **Two error rates are only
 comparable if they were produced by the same normalizer.** For that reason every report carries a
-`normalizer_version` field (currently `hansard-normalizers-1.1.0`). If that string changes, all
+`normalizer_version` field (currently `hansard-normalizers-1.2.0`). If that string changes, all
 previously recorded baselines must be re-recorded.
 
 ### 2.1 The language-agnostic normalizer
@@ -262,6 +262,32 @@ The signed difference between the number of speakers found and the number really
 (negative = speakers merged, positive = speakers split). Reported per meeting, and aggregated as
 a mean absolute error across the corpus.
 
+### 4.7 Language accuracy — for meetings held in two languages
+
+    language_accuracy = matched_words / scored_words
+
+Every hypothesis utterance is compared against the reference language at the same point in time —
+the reference utterance it overlaps most — and counted as matched when the two agree. Utterances
+are weighted by **word count**, not by count of utterances, so a long French paragraph mislabelled
+as English costs more than a one-word backchannel. A hypothesis utterance that overlaps no labelled
+reference speech is skipped rather than counted wrong; one that overlaps labelled speech but
+carries no label of its own counts as scored-and-unmatched.
+
+The report also lists the confusions themselves — `(expected, observed, words)`, most costly
+first — because *which* direction the identifier fails in tells you where to look. A system locked
+to English shows a single large `fr → en` entry.
+
+Two cautions.
+
+**It measures the language that was produced, not the language that was spoken.** If a recogniser
+renders a French passage as English-sounding words, this metric faithfully reports English. That is
+the correct behaviour when comparing systems and a real limitation for error analysis: a low
+language accuracy tells you a language was lost, not whether it was lost at the acoustic model or
+at the label.
+
+**It is only meaningful on a code-switched corpus.** On a monolingual meeting it is trivially
+1.0 and carries no information, which is why it appears only in the mixed gates.
+
 ---
 
 ## 5. Minutes and summary metrics (no cloud service involved)
@@ -381,6 +407,19 @@ of the bundled synthetic meetings (`meeting_3spk`, `meeting_6spk`, `meeting_9spk
 exact ground truth and are used to unit-test DER, cpWER, tcpWER and WDER against hand-computed
 answers.
 
+A segment may carry its own `language`, which is what makes a code-switched reference possible
+and what `language_accuracy` is scored against. A segment without one inherits the bundle's
+top-level `language`, so every existing reference file loads unchanged:
+
+```json
+{"audio": "/data/meeting_mixed_4spk.wav", "language": "mixed", "duration": 268.0,
+ "speakers": ["Aurélie", "Sofia"],
+ "segments": [{"start": 0.0, "end": 4.5, "speaker": "Aurélie",
+               "language": "fr", "text": "on commence par le déploiement"},
+              {"start": 5.0, "end": 9.0, "speaker": "Sofia",
+               "language": "en", "text": "the staging cluster is green"}]}
+```
+
 ### 7.3 RTTM
 
 The NIST speaker-timeline format, readable and writable:
@@ -450,6 +489,39 @@ Both languages are benchmarked on the same schedule: French read speech (FLEURS 
 the French synthetic meeting fixtures were added, French meetings scored by the same generator and
 the same metrics as the English ones. See [benchmarks](benchmarks.md#2-meeting-transcription-with-speaker-attribution).
 
+### 8.1 A third case: meetings held in both languages at once
+
+French and English are not only two separate corpora. They occur in the same meeting, and a
+corpus of `fr` runs plus a corpus of `en` runs measures nothing about that case. A third language
+tag, `mixed`, is therefore scored on its own terms:
+
+* **A mixed normalizer.** Applying the English normalizer to a French passage inflates its error
+  rate for reasons that have nothing to do with recognition — different contraction expansion,
+  different number spelling. `MixedNormalizer` splits the text into runs of one language and
+  normalises each with its own rules. This is a scoring decision, and it is why
+  `normalizer_version` moved to `1.2.0`.
+* **Its own gates.** `MIXED_MEETING_GATES` mirrors the French thresholds and adds
+  `language_accuracy ≥ 0.95` (stretch 0.98). They are deliberately **not** part of `DEFAULT_GATES`,
+  so a monolingual run is never failed for lacking numbers it was never meant to produce.
+* **Its own fixtures.** `meeting_mixed_4spk`, `_6spk` and `_8spk`, drawn alternately from the
+  English and French speaker pools so the reference knows the language of every segment.
+
+Read that last point with the same suspicion as the rest of this page: those fixtures model
+speakers who each keep to one language. A single speaker switching mid-meeting is exercised by
+unit tests on text, not by an audio benchmark, because the source corpora are monolingual and
+splicing French audio onto an English speaker's voice would corrupt the diarization ground truth.
+**And as of this writing no mixed meeting result has been recorded on real hardware at all** — the
+fixtures and gates exist and run; the numbers do not. See
+[multilingual](multilingual.md).
+
+### 8.2 Comparing against another system
+
+`hansard compare` scores any number of systems against one reference and breaks the result down by
+the language actually spoken. The breakdown is the point: a system locked to one language does not
+degrade evenly, and an overall WER averages a collapse in one language against clean output in the
+other. A hypothesis carrying no language labels — a raw Teams `.vtt`, for instance — is labelled
+with Hansard's own identifier before scoring, with the caveat in §4.7 attached.
+
 ---
 
 ## 9. What we are competing against
@@ -503,6 +575,21 @@ Default meeting gates (`DEFAULT_GATES`, tune them as evidence accumulates):
 | CER | ≤ 8 % | — | ≤ 10 % | — |
 | DER (0.25 s collar) | ≤ 15 % | ≤ 8 % | ≤ 15 % | ≤ 8 % |
 | Speaker count error | ≤ 1 | — | ≤ 1 | — |
+
+A third set, `MIXED_MEETING_GATES`, applies to code-switched meetings. It mirrors the French
+thresholds — a bilingual meeting is at least as hard as a French one — and adds the metric that
+only exists for this case:
+
+| Metric | Mixed must_pass | Mixed stretch |
+| --- | --- | --- |
+| Language accuracy | ≥ 95 % | ≥ 98 % |
+
+These are **not** in `DEFAULT_GATES`. A gate set is a claim about what a run must produce, and
+requiring mixed numbers of every run would fail an English-only benchmark for lacking a
+measurement it was never asked to take. `make gates` routes each observation to the gates for its
+own language tag, so a mixed row is graded against mixed thresholds and nothing else is graded
+against them at all. Before this routing existed, an observation tagged anything other than `en`
+fell through to the French gates — including `mixed`, silently.
 
 System gates apply to the whole run: RTF ≤ 1.0 (stretch ≤ 0.35) and peak memory ≤ 8 GB.
 

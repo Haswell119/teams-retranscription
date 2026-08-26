@@ -64,7 +64,7 @@ Hansard is built to be measured on the second kind of number. See
 | Custom vocabulary (names, jargon, product codes) | **Yes** | Not available |
 | Speakers supported | No architectural limit. Nine detected exactly on clean audio; on spontaneous meeting audio the count is over-estimated and a Teams roster fixes it | Attribution degrades past ~3; guests appear as "Speaker 1" |
 | Maximum meeting length | Unbounded | 4 hours or 1.5 GB, no automatic restart |
-| Languages in one meeting | Automatic, no language tag needed | One language per meeting; multilingual mode needs Teams Premium and discards the transcript afterwards |
+| Languages in one meeting | **Automatic**, no language tag needed; every utterance is labelled with the language it was spoken in, and decisions, actions and deadlines are extracted with that language's rules on both sides of a switch — see [multilingual](docs/multilingual.md) | One language per meeting; multilingual mode needs Teams Premium and discards the transcript afterwards |
 | Verbatim transcript | Yes | Obscenities are always masked |
 | Evidence for every claim in the minutes | **Timestamp, speaker and quote** | No per-claim citations |
 | Decisions register | Structured, separate from suggestions | Not a documented output |
@@ -119,6 +119,16 @@ by the same generator as the English ones and scored in the same run — but no
 French *meeting* result has been recorded yet, so the meeting table above is
 English. We would rather leave that cell empty than fill it with an English
 number.
+
+**Meetings held in both languages at once** are a case of their own, and the same
+honesty applies. Every utterance is labelled with the language it was spoken in,
+and decisions, action items and deadlines are then extracted with that language's
+rules on both sides of a switch — before this, a bilingual meeting was scored as
+one language and the other language's items were silently dropped. Code-switched
+fixtures, a `language_accuracy` metric and its own quality gates all ship and run.
+**No mixed meeting result has been recorded on real hardware yet either**, so
+there is no row for it above. See [multilingual](docs/multilingual.md) for what is
+proven, what is only unit-tested, and where it still falls short.
 
 **Real meetings, not just fixtures.** Those fixtures are clean recordings mixed
 together, which is much easier than a real room, so we also measure on two
@@ -204,6 +214,10 @@ Teams meeting
 │  Recognise    Parakeet TDT 0.6B v3, float32 ONNX, 25 languages, │
 │               word-level timestamps, punctuation, no PyTorch    │
 ├─────────────────────────────────────────────────────────────────┤
+│  Identify     every utterance labelled with the language it     │
+│               was spoken in, so a French/English meeting is     │
+│               read with both languages' rules, not one          │
+├─────────────────────────────────────────────────────────────────┤
 │  Diarize      pyannote segmentation + TitaNet embeddings,       │
 │               unbounded speakers, 46 MB of models               │
 ├─────────────────────────────────────────────────────────────────┤
@@ -277,6 +291,7 @@ configuration.
 | [Output formats](docs/output-formats.md) | Markdown, HTML, JSON, WebVTT, SRT |
 | [Delivery](docs/delivery.md) | Teams, email, webhook |
 | [Minutes](docs/minutes.md) | Running a local LLM, and what the minutes contain |
+| [Multilingual meetings](docs/multilingual.md) | French and English in the same meeting |
 | [Metrics](docs/metrics.md) | Every formula we use to score ourselves |
 | [Benchmarks](docs/benchmarks.md) | The numbers, and how to reproduce them |
 | [Sovereignty](docs/sovereignty.md) | Where your data goes, with citations |

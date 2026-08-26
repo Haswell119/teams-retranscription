@@ -14,7 +14,7 @@ from hansard.rendering.composition import speaking_shares
 from hansard.rendering.ports import RenderContext
 from hansard.rendering.timecode import TimestampStyle, format_timestamp
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 TRANSCRIPT_KIND = "transcript"
 MINUTES_KIND = "minutes"
 JSON_MEDIA_TYPE = "application/json"
@@ -74,6 +74,7 @@ def _envelope(kind: str, context: RenderContext) -> JsonValue:
             "started_at": context.started_at.isoformat() if context.started_at else None,
             "timezone": context.timezone,
             "language": context.language,
+            "languages": list(context.spoken_languages),
             "duration_seconds": _seconds(context.duration_seconds),
             "participants": [_participant(participant) for participant in context.participants],
             "provenance": [
@@ -100,8 +101,12 @@ def _transcript_payload(transcript: Transcript, include_word_timings: bool) -> J
         if include_word_timings and utterance.words:
             payload["words"] = [_word(word) for word in utterance.words]
         utterances.append(payload)
+    profile = transcript.language_profile
     return {
         "language": transcript.language,
+        "languages": list(profile.significant),
+        "language_shares": {tag: round(profile.share_of(tag), 4) for tag in profile.significant},
+        "code_switched": profile.is_mixed,
         "audio_duration_seconds": _seconds(transcript.audio_duration),
         "word_count": transcript.word_count,
         "speakers": list(transcript.speakers),

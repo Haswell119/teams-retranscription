@@ -10,6 +10,7 @@ from hansard.adapters.audio import load_clip
 from hansard.application.jobs import JobRecord
 from hansard.application.pipeline import TranscriptionPipeline
 from hansard.config import Settings
+from hansard.domain.language import MIXED, normalise_tag
 from hansard.domain.meeting import (
     Capture,
     DeliveryChannel,
@@ -138,9 +139,7 @@ class MeetingService:
         outcome = self.pipeline.run(clip, request, captured.roster)
         transcript = outcome.transcript
         if self.biaser is not None and request.vocabulary:
-            transcript, _ = self.biaser.apply(
-                transcript, request.vocabulary, request.language or transcript.language or "en"
-            )
+            transcript, _ = self.biaser.apply(transcript, request.vocabulary, request.language)
         return transcript, captured.roster, outcome.stage_seconds
 
     def _compose(self, transcript: Transcript, roster: Roster, request: MeetingRequest) -> Minutes | None:
@@ -164,7 +163,8 @@ class MeetingService:
             started_at=captured.started_at,
             duration_seconds=captured.duration,
             participants=roster.participants,
-            language=request.language or transcript.language or "en",
+            language=_meeting_language(request, transcript),
+            languages=transcript.language_profile.significant,
             provenance=(
                 ModelProvenance("recognition", self.settings.asr.engine, self.settings.asr.model_id),
                 ModelProvenance(
@@ -193,6 +193,13 @@ class MeetingService:
             target.write_bytes(body if isinstance(body, bytes) else body.encode("utf-8"))
             written.append(target)
         return tuple(written)
+
+
+def _meeting_language(request: MeetingRequest, transcript: Transcript) -> str:
+    explicit = normalise_tag(request.language)
+    if explicit is not None and explicit != MIXED:
+        return explicit
+    return transcript.language_profile.tag or normalise_tag(transcript.language) or "en"
 
 
 def artifact_key(identifier: str, name: str) -> str:

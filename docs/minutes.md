@@ -130,7 +130,7 @@ Every field of `MinutesSettings` is settable through the environment, prefix `HA
 | `HANSARD_MINUTES__MAX_OUTPUT_TOKENS` | `4096` | Upper bound on any single completion. |
 | `HANSARD_MINUTES__CHUNK_TOKENS` | `8192` | Transcript tokens per map step. |
 | `HANSARD_MINUTES__TEMPERATURE` | `0.2` | Keep it low; minutes are not creative writing. |
-| `HANSARD_MINUTES__LANGUAGE` | unset | Forces the minutes language; otherwise taken from the meeting request, then the transcript. |
+| `HANSARD_MINUTES__LANGUAGE` | unset | Forces the minutes language; otherwise taken from the meeting request, then from the languages actually observed in the transcript. Leave it unset for a bilingual meeting: forcing a single tag here makes every sentence be analysed with that language's cue phrases, which is exactly how the other language's decisions and deadlines get dropped. |
 | `HANSARD_MINUTES__INCLUDE_CITATIONS` | `true` | Turning this off removes the grounding evidence; do not. |
 | `HANSARD_MINUTES__INCLUDE_SPEAKING_TIME` | `true` | Per-speaker totals in the minutes. |
 
@@ -214,9 +214,12 @@ when you need bit-for-bit reproducible output, or when policy forbids generative
 
 **Map.** For each excerpt the model receives the numbered lines and returns strict JSON: a summary, and
 lists of decisions, actions, questions and entities, each item carrying a verbatim `quote` and the
-`utterance` number it came from. The system prompt (French or English, chosen by the meeting language)
-forbids invention, requires verbatim quotes, requires an empty list over a plausible guess, and spells out
-the decision-versus-suggestion distinction.
+`utterance` number it came from. The system prompt (French, English, or the bilingual pack, chosen by the
+meeting language) forbids invention, requires verbatim quotes, requires an empty list over a plausible
+guess, and spells out the decision-versus-suggestion distinction. The bilingual pack adds two rules a
+monolingual prompt has no reason to state: never translate a quote, and report each item in the language
+it was spoken in rather than collapsing the meeting into one. Its blocker examples are drawn from both
+languages, and the abstract is written in the dominant language while quoted material is left untouched.
 
 **Resolution.** Every item is re-anchored locally, before anything is believed:
 
@@ -302,6 +305,7 @@ involved at all in the document you are reading.
 | Deadlines | reported to be missed or misheard | re-extracted from the cited utterance and normalised to ISO-8601 |
 | Empty recap ("we didn't find any notes") | documented failure mode | impossible by construction: extractive minutes always exist |
 | Meetings over ~2 hours | degrades; Microsoft advises splitting the meeting | map-reduce with overlap; a four-hour meeting is just more chunks |
+| A meeting held in two languages | one language per meeting; multilingual mode needs Teams Premium | each item extracted with the cues of the language it was spoken in, nothing translated |
 | Where your data goes | Microsoft 365 cloud | your machines only |
 | Works offline / air-gapped | no | yes, with or without a model |
 | Languages | many, quality varies | French and English are first-class and equally tested |
@@ -310,6 +314,9 @@ involved at all in the document you are reading.
 
 - `patterns.py` holds every cue phrase, one list per language and category. Adding
   `on grave dans le marbre` to the decisions of your organisation is a one-line change with a unit test.
+  A `mixed` meeting uses the union of both cue sets, but that union is only a safety net: each sentence
+  is normally matched with the cues of the language *it* was spoken in, carried on `SentenceUnit.language`.
+  See [multilingual](multilingual.md).
 - `stopwords.py` holds the FR/EN stopword lists used by segmentation and ranking.
 - `prompts.py` holds the system and user templates and the JSON schemas, as data, separate from code.
 - `register_minutes_writer(name, factory)` adds an engine to the registry, exactly like the ASR one.

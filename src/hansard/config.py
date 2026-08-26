@@ -41,6 +41,7 @@ class AsrSettings(BaseModel):
     batch_size: int = 4
     batch_seconds: float = 240.0
     language: str | None = None
+    identify_language: bool = True
     intra_op_threads: int = 0
     inter_op_threads: int = 0
     memory_profile: MemoryProfile = "default"

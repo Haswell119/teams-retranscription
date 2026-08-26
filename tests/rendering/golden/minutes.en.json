@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "kind": "minutes",
   "generator": {
     "name": "Hansard",
@@ -10,6 +10,9 @@
     "started_at": "2026-06-03T09:30:00+00:00",
     "timezone": "UTC",
     "language": "en",
+    "languages": [
+      "en"
+    ],
     "duration_seconds": 1500.0,
     "participants": [
       {

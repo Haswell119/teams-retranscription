@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from hansard.domain.language import MIXED, normalise_tag
 from hansard.domain.minutes import Citation, Minutes
 from hansard.domain.speakers import UNKNOWN_SPEAKER
 from hansard.domain.timespan import TimeSpan
@@ -286,12 +287,16 @@ def _metadata(
             format_human_duration(duration_seconds, translations),
         ),
         LabelledValue(translations.text(people_label), join_or_empty(people)),
-        LabelledValue(
-            translations.text(Phrase.LANGUAGE),
-            f"{translations.language_name(language)} ({language})",
-        ),
+        LabelledValue(translations.text(Phrase.LANGUAGE), _language_value(translations, language, context)),
         LabelledValue(translations.text(Phrase.PRODUCED_WITH), provenance_summary(context)),
     )
+
+
+def _language_value(translations: Translations, language: str, context: RenderContext) -> str:
+    spoken = context.spoken_languages
+    if normalise_tag(language) == MIXED and len(spoken) > 1:
+        return f"{translations.language_names_of(spoken)} ({', '.join(spoken)})"
+    return f"{translations.language_name(language)} ({language})"
 
 
 def compose_transcript_document(
@@ -302,7 +307,7 @@ def compose_transcript_document(
 ) -> TranscriptDocument:
     blocks = speaker_blocks(transcript, translations, max_gap)
     people = context.participant_names or transcript_speaker_names(transcript, translations)
-    language = transcript.language or context.language
+    language = transcript.language_profile.tag or transcript.language or context.language
     return TranscriptDocument(
         title=context.title,
         subtitle=translations.text(Phrase.TRANSCRIPT),

@@ -11,6 +11,7 @@ from hansard.adapters.diarization.registry import build_diarizer
 from hansard.adapters.enhancement.ffmpeg_chain import FfmpegEnhancer
 from hansard.adapters.enhancement.segmentation import SegmentationPolicy
 from hansard.adapters.enhancement.vad import EnergyVoiceActivityDetector, SileroVoiceActivityDetector
+from hansard.adapters.language.identification import TextLanguageIdentifier, UtteranceLanguageTagger
 from hansard.adapters.storage.registry import build_artifact_store
 from hansard.application.pipeline import TranscriptionPipeline
 from hansard.config import Settings, StorageSettings
@@ -75,6 +76,16 @@ class Composition:
             padding_seconds=audio.segment_padding_seconds,
         )
 
+    def language_tagger(self) -> UtteranceLanguageTagger | None:
+        asr = self.settings.asr
+        if not asr.identify_language:
+            return None
+        return UtteranceLanguageTagger(
+            identifier=TextLanguageIdentifier(),
+            default_language=asr.language,
+            trust_engine_tags=True,
+        )
+
     def pipeline(self) -> TranscriptionPipeline:
         settings = self.settings
         diarization = settings.diarization
@@ -108,6 +119,7 @@ class Composition:
                 if diarization.cluster_consolidation and diarization.engine != "null"
                 else None
             ),
+            language_tagger=self.language_tagger(),
             refiner=(
                 SpeechCoverageRefiner(maximum_extension=diarization.maximum_turn_extension)
                 if diarization.speech_coverage_refinement

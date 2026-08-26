@@ -142,7 +142,9 @@ class ExtractiveMinutesWriter:
         roster: Roster,
         request: MeetingRequest,
     ) -> TranscriptAnalysis:
-        language = resolve_language(self.language, request.language, transcript.language)
+        language = resolve_language(
+            self.language, request.language, transcript.language_profile.tag, transcript.language
+        )
         reference = _reference_date(request) or self.reference_date or self.clock().date()
         units = sentence_units(transcript)
         segments = segment_topics(transcript, language, self.topic_options)

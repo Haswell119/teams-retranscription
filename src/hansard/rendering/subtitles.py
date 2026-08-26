@@ -81,7 +81,7 @@ class WebVttRenderer:
         return WEB_VTT_EXTENSION
 
     def render_transcript(self, transcript: Transcript, context: RenderContext) -> str:
-        translations: Translations = translations_for(context.language)
+        translations: Translations = translations_for(context.display_language)
         title = _header_text(context)
         blocks = [f"WEBVTT - {title}" if title else "WEBVTT"]
         blocks.append(f"NOTE\n{short_sovereignty_statement(context, translations)}")
@@ -110,7 +110,7 @@ class SubRipRenderer:
         return SUB_RIP_EXTENSION
 
     def render_transcript(self, transcript: Transcript, context: RenderContext) -> str:
-        translations: Translations = translations_for(context.language)
+        translations: Translations = translations_for(context.display_language)
         blocks: list[str] = []
         previous_speaker: str | None = None
         for cue in subtitle_cues(transcript, self.layout):

@@ -315,13 +315,13 @@ environment as your real workload.
 hansard transcribe meeting.m4a --language fr --format markdown,vtt
 ```
 
-The command set is `version`, `doctor`, `transcribe`, `serve` and `join`.
-`transcribe` takes:
+The command set is `version`, `doctor`, `transcribe`, `serve`, `join` and
+`compare`. `transcribe` takes:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--output`, `-o` | `artifacts/<stem>/` | Directory for the artefacts |
-| `--language`, `-l` | unset | `fr`, `en`, … Omit it and Parakeet detects the language itself, including a meeting that switches mid-sentence |
+| `--language`, `-l` | unset | `fr`, `en`, `mixed`, … **Omit it for a meeting held in two languages** — that is the case it is built for. Naming a single language forces it on every segment, so speech in the other one is mis-transcribed. See [multilingual](multilingual.md) |
 | `--format`, `-f` | `markdown,json,vtt` | Comma-separated. Available: `markdown`, `html`, `json`, `vtt`, `srt`, `text` |
 | `--vocabulary` | unset | A file with one phrase per line, applied by phonetic correction after recognition |
 | `--speakers` | unset | Documented as the known participant count. See the note below |
@@ -340,6 +340,31 @@ change the outcome is `HANSARD_DIARIZATION__CLUSTERING_THRESHOLD` — see
 Output formats are documented in [output formats](output-formats.md); minutes
 and the local LLM in [minutes](minutes.md); sending the result somewhere in
 [delivery](delivery.md).
+
+### Comparing two transcripts
+
+`compare` scores any number of transcripts against one reference and breaks the
+result down by the language actually spoken — which is the comparison that
+matters when a meeting was held in two:
+
+```bash
+hansard compare reference.ref.json \
+  --system hansard=artifacts/meeting/transcript.json \
+  --system teams=exports/copilot.vtt \
+  --meeting "board sync" \
+  --report comparison.md --output comparison.json
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--system`, `-s` | required | `name=path`, repeated once per system. `.json` (a Hansard export or a reference bundle), `.vtt` or `.srt` |
+| `--meeting` | `meeting` | Name used in the report |
+| `--output`, `-o` | unset | Write the JSON report here |
+| `--report` | unset | Write the Markdown comparison here |
+
+The reference may be any of the same formats. A Teams `.vtt` fetched from
+Microsoft Graph works as-is: its `<v Name>` voice tags are read as speakers.
+Metrics and their caveats are in [metrics](metrics.md#82-comparing-against-another-system).
 
 ### Joining a live meeting
 

@@ -9,6 +9,7 @@ from pathlib import Path
 from hansard.adapters.asr.onnx_engine import OnnxRecognizer
 from hansard.adapters.audio import load_clip
 from hansard.config import Settings
+from hansard.domain.language import MIXED
 from hansard.domain.meeting import MeetingRequest
 from hansard.domain.speakers import Diarization
 from hansard.domain.transcript import Transcript
@@ -20,6 +21,7 @@ from hansard.evaluation.corpora import (
     read_meeting,
 )
 from hansard.evaluation.datasets import load_manifest, load_reference_json
+from hansard.evaluation.metrics.language import language_identification
 from hansard.evaluation.metrics.speaker import (
     concatenated_minimum_permutation_wer,
     diarization_error_rate,
@@ -49,6 +51,9 @@ MEETING_FIXTURES: tuple[tuple[str, str], ...] = (
     ("meeting_fr_3spk", "fr"),
     ("meeting_fr_6spk", "fr"),
     ("meeting_fr_9spk", "fr"),
+    ("meeting_mixed_4spk", MIXED),
+    ("meeting_mixed_6spk", MIXED),
+    ("meeting_mixed_8spk", MIXED),
 )
 AMI_CONDITION = "Mix-Headset"
 
@@ -152,13 +157,18 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
             continue
         clip = load_clip(Path(str(sample.audio_path)))
         pipeline = Composition(settings).pipeline()
-        request = MeetingRequest(audio_path=Path(str(sample.audio_path)), title=name, language=language)
+        request = MeetingRequest(
+            audio_path=Path(str(sample.audio_path)),
+            title=name,
+            language=None if language == MIXED else language,
+        )
         with ResourceProbe() as probe:
             outcome = pipeline.run(clip, request)
         normalizer = normalizer_for(language)
         reference = sample.reference
         hypothesis = outcome.transcript
         scored = word_error_rate(reference.text, hypothesis.text, normalizer)
+        identified = language_identification(hypothesis, reference)
         strict = diarization_error_rate(reference_diarization, outcome.diarization, collar=0.0)
         lenient = diarization_error_rate(reference_diarization, outcome.diarization, collar=0.25)
         rows.append(
@@ -186,6 +196,12 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
                 "der_false_alarm_percent": _percent(strict.false_alarm_rate),
                 "der_confusion_percent": _percent(strict.confusion_rate),
                 "reference_overlap_percent": _percent(overlap_ratio(reference_diarization)),
+                "language_accuracy_percent": _percent(identified.accuracy),
+                "detected_languages": list(hypothesis.language_profile.significant),
+                "language_confusions": [
+                    {"expected": expected, "observed": observed, "words": words}
+                    for expected, observed, words in identified.confusions
+                ],
                 "real_time_factor": round(outcome.real_time_factor, 4),
                 "speedup": round(1 / outcome.real_time_factor, 1) if outcome.real_time_factor else None,
                 "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),

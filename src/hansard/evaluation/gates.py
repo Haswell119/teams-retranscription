@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from hansard.domain.errors import QualityGateFailed
+from hansard.domain.language import MIXED
 from hansard.evaluation.harness import ALL_LANGUAGES, BenchmarkReport
 
 Comparison = Literal["<=", "<", ">=", ">", "=="]
@@ -114,7 +115,29 @@ FRENCH_MEETING_GATES: tuple[QualityGate, ...] = (
     QualityGate("speaker_count_error", "<=", 1.0, "must_pass", "fr"),
 )
 
-MEETING_GATES: tuple[QualityGate, ...] = ENGLISH_MEETING_GATES + FRENCH_MEETING_GATES + SYSTEM_GATES
+MIXED_MEETING_GATES: tuple[QualityGate, ...] = (
+    QualityGate("cpwer", "<=", 0.30, "must_pass", MIXED),
+    QualityGate("cpwer", "<=", 0.22, "stretch", MIXED),
+    QualityGate("tcpwer", "<=", 0.33, "must_pass", MIXED),
+    QualityGate("wder", "<=", 0.12, "must_pass", MIXED),
+    QualityGate("wder", "<=", 0.06, "stretch", MIXED),
+    QualityGate("wer", "<=", 0.20, "must_pass", MIXED),
+    QualityGate("wer", "<=", 0.17, "stretch", MIXED),
+    QualityGate("cer", "<=", 0.10, "must_pass", MIXED),
+    QualityGate("der", "<=", 0.15, "must_pass", MIXED),
+    QualityGate("der", "<=", 0.08, "stretch", MIXED),
+    QualityGate("speaker_count_error", "<=", 1.0, "must_pass", MIXED),
+    QualityGate("language_accuracy", ">=", 0.95, "must_pass", MIXED),
+    QualityGate("language_accuracy", ">=", 0.98, "stretch", MIXED),
+)
+
+MEETING_GATES: tuple[QualityGate, ...] = (
+    ENGLISH_MEETING_GATES + FRENCH_MEETING_GATES + MIXED_MEETING_GATES + SYSTEM_GATES
+)
+
+MONOLINGUAL_MEETING_GATES: tuple[QualityGate, ...] = (
+    ENGLISH_MEETING_GATES + FRENCH_MEETING_GATES + SYSTEM_GATES
+)
 
 READ_SPEECH_GATES: tuple[QualityGate, ...] = (
     QualityGate("wer", "<=", 0.05, "must_pass", "en"),
@@ -126,7 +149,7 @@ READ_SPEECH_GATES: tuple[QualityGate, ...] = (
     *SYSTEM_GATES,
 )
 
-DEFAULT_GATES: tuple[QualityGate, ...] = MEETING_GATES
+DEFAULT_GATES: tuple[QualityGate, ...] = MONOLINGUAL_MEETING_GATES
 
 
 def gates_for(
