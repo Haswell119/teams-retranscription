@@ -574,12 +574,42 @@ under it needs overlap-aware diarization, which is a different architecture.
 **A real French meeting exposed a default that clean fixtures could not.** On
 SUMM-RE `020c_EBPZ`, the shipped `merge_similarity` of 0.70 fused genuinely
 different speakers and collapsed four people into two, taking cpWER to 89.82 %.
-The synthetic French fixtures, which score 4.20 %, 6.48 % and 13.36 %, gave no
-hint of it: their speakers all talk for minutes, while two of SUMM-RE's talk for
-59 and 12 seconds. The default is now 0.77 and the sweep is published, but the
-general lesson is the durable part — **a default tuned on one corpus is a
-hypothesis, not a result**, and the fixtures that pass are the ones least likely
-to catch its failure.
+The synthetic French fixtures gave no hint of it: their speakers all talk for
+minutes, while two of SUMM-RE's talk for 59 and 12 seconds. The default is now
+0.77 and cpWER is 51.73 %. The durable lesson is not the number — **a default
+tuned on one corpus is a hypothesis, not a result**, and the fixtures that pass
+are the ones least likely to catch its failure.
+
+**On that meeting our own segmentation loses words, and we do not know why.** The
+shipped path hands the recognizer 906.6 seconds in 106 segments and returns 2561
+of 3358 reference words at 37.52 % word error rate. The corpus's own utterance
+boundaries hand it 756.3 seconds — twenty percent *less* audio — in 215 segments,
+and return 2923 words at 26.59 %. We feed it more and receive less, so nothing is
+missed for want of detection. **Four explanations have been measured and all four
+are dead:**
+
+| Hypothesis | Test | Verdict |
+| --- | --- | --- |
+| Segments mix speakers | Single-speaker 4.82 s spans score **32.19 %**; mixed-speaker 4.95 s spans score **25.46 %** | Dead — mixed is *better* |
+| Segments are too long | Full-harness ceiling sweep: 37.52 % at 120 s, **35.62 %** at 20 s, 36.54 % at 8 s | Dead — under two points where the oracle is worth eleven |
+| We feed too much silence | 756 s → 26.59 %, 871 s → **25.46 %**, 907 s → 37.52 %, 1002 s → 32.19 % | Dead — not monotone; adding silence *helped* twice |
+| The overlap and seam mechanism | Removing the overlap entirely: −0.56 points at a 20 s ceiling, **+0.69** at 8 s | Dead — noise |
+
+Every configuration we can reach lands between 35.6 % and 37.5 %. The corpus's
+own boundaries reach 26.59 %. **What is different about them is untested**, and
+the leading remaining candidate is boundary precision — spans that begin and end
+on real speech edges rather than on detector output plus padding. That is written
+here as an open question, not as a finding, and it will stay that way until
+someone measures it.
+
+The floor underneath all of it is the register rather than the machinery. One
+participant's own isolated 32 kHz track, scored against that participant's own
+reference with oracle boundaries and no mixing or segmentation of ours involved,
+still scores **28.05 %**, against 4.63 % on French read speech. Summing the four
+tracks into one stream costs a further 3.3 points, which is the fair price of a
+single-channel mixture and not a corpus defect. Expect the mid-twenties on casual
+multi-party French, and treat any claim that a segmentation change alone will
+reach read-speech numbers as unsupported.
 
 **We also do not beat Azure on read speech.** Azure Speech reports 2.78 % on
 FLEURS `fr_fr`; we measure 4.63 %. Read-speech benchmarks are not what a meeting
