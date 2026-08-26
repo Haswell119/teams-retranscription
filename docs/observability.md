@@ -115,11 +115,19 @@ identifier.
 | `enhance` | `TranscriptionPipeline` | |
 | `voice_activity` | `TranscriptionPipeline` | `speech_spans` |
 | `recognise` | `TranscriptionPipeline` | `utterances`, `words` |
+| `language_drift` | `TranscriptionPipeline` | `redecoded`, `words` |
 | `identify_language` | `TranscriptionPipeline` | `languages`, `code_switched` |
 | `diarise` | `TranscriptionPipeline` | `speakers` |
 | `refine` | `TranscriptionPipeline` | |
 | `attribute` | `TranscriptionPipeline` | |
 | `resolve_names` | `TranscriptionPipeline` | `named_speakers` |
+
+`language_drift` is absent when `HANSARD_ASR__LANGUAGE_DRIFT_GUARD=false`. Its `redecoded` field is
+`1.0` when the recogniser was found to have settled on the wrong language and the audio was decoded
+again on shorter segments; on that path the stage also emits `recognition.language_drift` at WARNING
+with the two disagreeing language tags, then either `recognition.language_recovered` at INFO with the
+segment ceiling that fixed it, or `recognition.language_unrecovered` at WARNING when no rung reached
+the required share. A meeting that emits `language_unrecovered` should be treated as suspect output.
 
 `identify_language` is absent when `HANSARD_ASR__IDENTIFY_LANGUAGE=false`. Its `languages` field
 counts the languages that passed the minority threshold and `code_switched` is `1.0` when more
