@@ -83,6 +83,7 @@ class StopReason(StrEnum):
     MAX_DURATION = "max_duration"
     SILENCE_TIMEOUT = "silence_timeout"
     ALONE_TIMEOUT = "alone_timeout"
+    STATE_LOST = "state_lost"
     RECORDER_FAILED = "recorder_failed"
 
 
@@ -287,8 +288,10 @@ class TeamsBrowserCapture:
         limit_ms = self._duration_limit(request) * 1000
         silence_ms = self.settings.silence_timeout_seconds * 1000
         alone_ms = self.settings.alone_timeout_seconds * 1000
+        state_ms = self.settings.state_timeout_seconds * 1000
         poll = max(self.settings.roster_poll_seconds, 0.1)
         seen: MeetingState | None = None
+        live_epoch_ms = origin_epoch_ms
         while True:
             await recorder.ensure_progressing()
             end_event = reducer.call_end or session.call_end
@@ -303,6 +306,11 @@ class TeamsBrowserCapture:
             if state in {MeetingState.ENDED, MeetingState.DENIED}:
                 return StopReason.MEETING_ENDED
             now_ms = self._epoch_ms()
+            if state is MeetingState.IN_MEETING:
+                live_epoch_ms = now_ms
+            elif state_ms > 0 and now_ms - live_epoch_ms >= state_ms:
+                LOGGER.warning("capture.meeting_state_lost", state=str(state))
+                return StopReason.STATE_LOST
             if now_ms - origin_epoch_ms >= limit_ms:
                 return StopReason.MAX_DURATION
             if now_ms - self._last_speech_epoch_ms >= silence_ms:

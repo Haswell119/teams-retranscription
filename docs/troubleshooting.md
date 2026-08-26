@@ -391,6 +391,7 @@ The bot leaves as soon as one of these fires, checked once per
 | --- | --- | --- |
 | A `call_end` termination in the Teams signalling traffic | — | immediate |
 | The page reports *Meeting ended* / *La réunion est terminée*, or the notetaker was removed | — | immediate |
+| The page has stopped looking like a live meeting | `HANSARD_CAPTURE__STATE_TIMEOUT_SECONDS` | 90 |
 | Nobody has spoken | `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` | 600 |
 | The notetaker is the only one left in the roster | `HANSARD_CAPTURE__ALONE_TIMEOUT_SECONDS` | 120 |
 | The meeting has run too long | `HANSARD_CAPTURE__MAX_DURATION_SECONDS` | 14400 |
@@ -416,8 +417,22 @@ capture.meeting_state state=in_meeting saw_roster=True
 
 If that line stays on `in_meeting` after the meeting is visibly over, Teams is
 still reporting an active call to the page. If it reads `unknown`, the page is
-showing something Hansard does not recognise. Either way the capture is not
-lost: it stops at the silence or duration timeout and transcribes what it has.
+showing something Hansard does not recognise — most often an end-of-meeting
+screen whose wording is not in `MEETING_ENDED_TEXTS`.
+
+`unknown` is not a dead end. Any state other than `in_meeting` that persists for
+`HANSARD_CAPTURE__STATE_TIMEOUT_SECONDS` ends the capture with
+`stop_reason=state_lost`, logged as:
+
+```
+capture.meeting_state_lost state=unknown
+```
+
+That is a normal end, not an error: the recording is finalised and transcribed
+like any other. The guard tolerates the brief `unknown` that Teams shows while
+it re-renders, which is why it is a timeout rather than an immediate stop. Set
+it to `0` only if you would rather the bot sit through an unrecognised page
+until the silence or duration timeout.
 
 Lower `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` for short test meetings — with
 the 600s default a bot that misses the end signal keeps recording silence for

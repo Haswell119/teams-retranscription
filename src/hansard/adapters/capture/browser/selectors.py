@@ -111,22 +111,30 @@ CHAT_PANEL_TOGGLE: Final[tuple[str, ...]] = (
 )
 
 ROSTER_PANEL_TOGGLE: Final[tuple[str, ...]] = (
+    "button#roster-button",
     '[data-tid="roster-button"]',
     '[data-tid="toggle-roster"]',
-    'button[aria-label="People"]',
-    'button[aria-label="Show participants"]',
-    'button[aria-label="Participants"]',
-    'button[aria-label="Personnes"]',
-    'button[aria-label="Afficher les participants"]',
+    '[data-inp="roster-button"]',
+    'button[aria-label^="People"]',
+    'button[aria-label^="Participants"]',
+    'button[aria-label^="Show participants"]',
+    'button[aria-label^="Personnes"]',
+    'button[aria-label^="Afficher les participants"]',
+    'button[title^="People"]',
+    'button[title^="Personnes"]',
 )
 
 ROSTER_PANEL: Final[tuple[str, ...]] = (
     '[data-tid="roster"]',
     '[data-tid="roster-list"]',
+    '[data-tid="roster-section"]',
+    '[data-tid="participantsList"]',
+    '[data-tid="calling-roster-section"]',
 )
 
 ROSTER_PARTICIPANT_ROW: Final[tuple[str, ...]] = (
     '[data-tid="roster-participant"]',
+    '[data-tid="participant-item"]',
     '[role="treeitem"]',
 )
 

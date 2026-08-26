@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pathlib
 from typing import Any
 
 import pytest
@@ -13,6 +14,7 @@ from conftest import (
 )
 
 from hansard.adapters.capture.browser import selectors
+from hansard.adapters.capture.browser import session as session_module
 from hansard.adapters.capture.browser.session import (
     DEFAULT_UI_LOCALE,
     FALLBACK_UI_LOCALE,
@@ -104,8 +106,21 @@ def test_every_clickable_group_starts_with_a_locale_independent_selector():
         selectors.HANGUP_BUTTON,
         selectors.ROSTER_PANEL,
         selectors.ROSTER_PARTICIPANT_ROW,
+        selectors.ROSTER_PANEL_TOGGLE,
     ):
         assert "data-tid" in group[0] or group[0].startswith("button#")
+
+
+def test_the_roster_toggle_offers_a_french_label():
+    assert any(
+        "Personnes" in candidate or "participants" in candidate for candidate in selectors.ROSTER_PANEL_TOGGLE
+    )
+
+
+def test_the_browser_script_reads_the_same_roster_selectors_as_python():
+    script = (pathlib.Path(session_module.__file__).parent / "instrumentation.js").read_text(encoding="utf-8")
+    for group in (selectors.ROSTER_PANEL, selectors.ROSTER_PARTICIPANT_ROW):
+        assert selectors.any_of(group) in script
 
 
 async def test_join_works_against_a_french_teams_ui():

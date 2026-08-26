@@ -142,12 +142,19 @@ meeting content.
 | Event | Level | Fields | Meaning |
 | --- | --- | --- | --- |
 | `capture.meeting_state` | INFO | `state`, `saw_roster` | The notetaker's reading of the page changed |
+| `capture.meeting_state_lost` | WARNING | `state` | The page stopped looking like a live meeting, and the capture ended |
 | `capture.roster_panel_unavailable` | WARNING | | The participants panel could not be opened |
 
 `capture.meeting_state` is emitted on transitions only, not on every poll, so a healthy meeting
 produces one line at admission and one when it ends. It is the first thing to read when a bot stays
 in a call that is visibly over: `in_meeting` means Teams is still presenting an active call to the
 page, `unknown` means the page is showing something Hansard does not recognise.
+
+`capture.meeting_state_lost` is the backstop for a page Hansard cannot read: any state other than
+`in_meeting` that survives `HANSARD_CAPTURE__STATE_TIMEOUT_SECONDS` ends the capture with
+`stop_reason=state_lost`. It is a WARNING rather than an INFO because the meeting ended without
+Hansard recognising how — the recording itself is finalised and transcribed normally, and the
+`state` field says what the page was showing so the missing text or selector can be added.
 
 `saw_roster` reports whether any roster has been observed yet. It matters because
 `HANSARD_CAPTURE__ALONE_TIMEOUT_SECONDS` arms only once a roster has been seen — a notetaker that

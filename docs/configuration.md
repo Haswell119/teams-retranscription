@@ -425,6 +425,7 @@ of this works is in [Teams setup](teams-setup.md).
 | `LOBBY_TIMEOUT_SECONDS` | int | `600` | How long the bot waits to be admitted before raising `MeetingAdmissionTimeout`. Raise it for meetings that start late; the better fix is usually a lobby policy change. |
 | `SILENCE_TIMEOUT_SECONDS` | int | `600` | Leaves after this much continuous silence. |
 | `ALONE_TIMEOUT_SECONDS` | int | `120` | Leaves this long after the last other participant disappears from the roster. |
+| `STATE_TIMEOUT_SECONDS` | int | `90` | Leaves after the page has stopped looking like a live meeting for this long, whatever it shows instead. `0` disables the guard. |
 | `MAX_DURATION_SECONDS` | int | `14400` (4 h) | Hard stop. Raise it for all-day sessions; the transcription pipeline itself has no length limit. |
 | `HEADLESS` | bool | `true` | `false` renders a visible window, which is useful when debugging selectors against a real display. |
 | `BROWSER_BINARY` | path \| null | unset | Path to a specific Chromium. Unset lets Playwright pick the one it installed. |
