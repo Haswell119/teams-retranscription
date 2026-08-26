@@ -97,6 +97,24 @@ jobs:
       - name: Assert transcription opens no sockets
         run: .venv/bin/python scripts/check_no_egress.py
 
+  dependency-audit:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Create environment
+        run: |
+          uv venv --python 3.11 .venv
+          uv pip install --python .venv/bin/python -e ".[api,asr-onnx,asr-whisper,diarization,capture,delivery,delivery-msal,metrics,observability,storage-s3,dev]"
+          uv pip install --python .venv/bin/python pip-audit
+
+      - name: Audit every shipped dependency
+        run: .venv/bin/pip-audit --strict --progress-spinner off
+
   chart:
     name: Helm chart
     runs-on: ubuntu-latest

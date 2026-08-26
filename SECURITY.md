@@ -49,6 +49,26 @@ a security bug:
 - **No telemetry.** There is no analytics code. The `telemetry_enabled` setting
   exists only to raise an error if anyone attempts to turn it on.
 
+## Dependency auditing
+
+Every dependency the project ships is audited against the [PyPI advisory
+database](https://github.com/pypa/advisory-database) on each commit, by the
+`dependency-audit` job in CI. The job is blocking: a known vulnerability in any
+package installed by a supported extra fails the build.
+
+One extra is deliberately excluded from that job. `diarization-torch` pulls
+`nemo-toolkit`, which pins `hydra-core<=1.3.2` and `lightning<=2.4.0`; both
+carry advisories (GHSA-2cp2-2r3c-7p7r, CVE-2026-58659) that no release
+reachable under those pins fixes. The extra is not imported by any adapter, is
+not installed by any container image, and is not part of a default
+configuration — `diarization` (sherpa-onnx, ONNX only) is the supported
+diarization path. Both advisories require loading an attacker-controlled Hydra
+config or Lightning checkpoint, which Hansard never does.
+
+Model weights are a separate supply chain. They are declared in
+`deploy/docker/models.manifest`, pinned to a commit rather than a branch, and
+verified against a SHA-256 digest at build time; a mismatch fails the build.
+
 ## Supported versions
 
 Until a 1.0 release, security fixes land on `main` and in the next tagged
