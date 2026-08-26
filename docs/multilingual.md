@@ -126,6 +126,36 @@ sensitivity, not a tuning detail.
 
 Turn the whole thing off with `HANSARD_ASR__LANGUAGE_DRIFT_GUARD=false`.
 
+### De-duplicating the seams
+
+Overlapping segments mean the same word is decoded twice, once at the end of one
+segment and once at the start of the next. Two mechanisms remove the copy.
+
+`trim_to_regions` cuts on **time**: each segment is given an authoritative region
+starting where the previous one ended, and words outside it are dropped. That
+works whenever the two decodes agree on when the word was spoken.
+
+They often do not. Measured on the reference recording, the word *"sur"* comes
+back as `[6.35 → 6.67]` from one segment and `[6.77 → …]` from the next — the same
+utterance of the same word, timed 0.1 s apart, straddling the boundary. Neither
+copy overlaps the other, so a purely temporal rule keeps both, and the transcript
+reads *"on va se pencher sur sur un cas"*. The trailing word is also clamped to
+the segment end, which guarantees the earlier copy survives.
+
+`drop_seam_repeats` therefore cuts on **text**: it compares the trailing words of
+one utterance with the leading words of the next, ignoring case and punctuation,
+and removes the repeated run from the **earlier** one. The later copy is kept
+deliberately — the earlier copy is the truncated one, and carries the sentence-final
+punctuation the model invented when the audio was cut, so *"imaginez un peu."*
+followed by *"peu, vous vous enfilez"* resolves to *"imaginez un peu, vous vous
+enfilez"* rather than the reverse.
+
+Two guards keep it from eating real speech. It only compares **across** utterance
+boundaries, so a genuine repetition inside one utterance — *"c'est très très
+bien"* — is never touched. And it only fires when the two utterances are within a
+second of each other, which a seam always is and a genuine echo across a pause is
+not.
+
 ### What this does not fix
 
 - **The guard only fires when the probe disagrees with the transcript.** If the
@@ -141,15 +171,13 @@ Turn the whole thing off with `HANSARD_ASR__LANGUAGE_DRIFT_GUARD=false`.
   and long-range agreement all suffer when the model sees 4 seconds instead of
   120 — on the reference recording *"The Debate"* came back as *"Zodipait"*. The
   guard accepts that cost only on recordings that were already unusable.
-- **The bottom rungs stutter at the seams.** `plan_segments` overlaps split
-  segments, and the stock 2-second overlap is a third of a 4-second segment, so
-  words near a boundary get decoded twice and the seam de-duplication does not
-  always remove them: *"on va se pencher sur sur un cas vraiment vraiment
-  intéressant"*. Scaling the overlap down with the rung was tried and reverted —
-  it removed some duplicates but dropped whole clauses at the seams instead, and
-  for a verbatim record a duplicate is recoverable where an omission is not.
-  Tightening this properly means fixing the seam de-duplication itself, which is
-  not attempted here.
+- **The bottom rungs still lose words at the seams.** `plan_segments` overlaps
+  split segments, so a word near a boundary is decoded twice. Duplicates are
+  removed — see [seams](#de-duplicating-the-seams) — but the mirror failure is
+  not: when both copies of a word land on the dropped side of the boundary, the
+  word disappears. Scaling the overlap down with the rung was tried and reverted;
+  it traded duplicates for whole missing clauses, which is the wrong direction for
+  a verbatim record.
 
 ## Why it matters more than it sounds
 
