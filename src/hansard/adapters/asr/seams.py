@@ -13,16 +13,9 @@ def authoritative_regions(spans: list[TimeSpan]) -> list[TimeSpan]:
     regions: list[TimeSpan] = []
     for index, span in enumerate(ordered):
         start = span.start
-        end = span.end
         if index > 0:
-            previous = ordered[index - 1]
-            if previous.end > span.start:
-                start = max(start, (span.start + previous.end) / 2.0)
-        if index + 1 < len(ordered):
-            following = ordered[index + 1]
-            if span.end > following.start:
-                end = min(end, (following.start + span.end) / 2.0)
-        regions.append(TimeSpan(start, max(start, end)))
+            start = max(start, ordered[index - 1].end)
+        regions.append(TimeSpan(start, max(start, span.end)))
     return regions
 
 
