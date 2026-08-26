@@ -242,6 +242,51 @@ async def test_a_roster_panel_that_will_not_open_does_not_stop_the_capture(tmp_p
     assert capture.last_diagnostics is not None
 
 
+async def test_a_page_that_stops_looking_like_a_meeting_stops_the_capture(tmp_path):
+    capture, _, _, _ = build_capture(
+        states=[MeetingState.IN_MEETING, MeetingState.UNKNOWN, MeetingState.UNKNOWN],
+        settings=capture_settings(
+            max_duration_seconds=3_600,
+            silence_timeout_seconds=3_600,
+            alone_timeout_seconds=3_600,
+            state_timeout_seconds=1,
+        ),
+    )
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert capture.last_diagnostics is not None
+    assert capture.last_diagnostics.stop_reason is StopReason.STATE_LOST
+
+
+async def test_a_momentary_unknown_state_does_not_stop_the_capture(tmp_path):
+    capture, _, _, _ = build_capture(
+        states=[MeetingState.IN_MEETING, MeetingState.UNKNOWN, MeetingState.IN_MEETING],
+        settings=capture_settings(
+            max_duration_seconds=4,
+            silence_timeout_seconds=3_600,
+            alone_timeout_seconds=3_600,
+            state_timeout_seconds=3,
+        ),
+    )
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert capture.last_diagnostics is not None
+    assert capture.last_diagnostics.stop_reason is StopReason.MAX_DURATION
+
+
+async def test_the_lost_state_guard_can_be_switched_off(tmp_path):
+    capture, _, _, _ = build_capture(
+        states=[MeetingState.UNKNOWN],
+        settings=capture_settings(
+            max_duration_seconds=3,
+            silence_timeout_seconds=3_600,
+            alone_timeout_seconds=3_600,
+            state_timeout_seconds=0,
+        ),
+    )
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert capture.last_diagnostics is not None
+    assert capture.last_diagnostics.stop_reason is StopReason.MAX_DURATION
+
+
 async def test_meeting_end_state_stops_the_capture(tmp_path):
     capture, _, _, _ = build_capture(
         states=[MeetingState.IN_MEETING, MeetingState.ENDED],

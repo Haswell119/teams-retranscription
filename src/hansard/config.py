@@ -99,6 +99,7 @@ class CaptureSettings(BaseModel):
     lobby_timeout_seconds: int = 600
     silence_timeout_seconds: int = 600
     alone_timeout_seconds: int = 120
+    state_timeout_seconds: int = 90
     max_duration_seconds: int = 4 * 3600
     headless: bool = True
     ui_locale: str = "en-US"

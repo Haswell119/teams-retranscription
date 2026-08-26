@@ -20,8 +20,8 @@
 
   const SPEAKING_INDICATOR = '[data-tid="voice-level-stream-outline"]';
   const SPEAKING_CONTAINER = "[data-stream-type][data-tid]";
-  const ROSTER_PANEL = '[data-tid="roster"], [data-tid="roster-list"]';
-  const ROSTER_ROW = '[data-tid="roster-participant"], [role="treeitem"]';
+  const ROSTER_PANEL = '[data-tid="roster"], [data-tid="roster-list"], [data-tid="roster-section"], [data-tid="participantsList"], [data-tid="calling-roster-section"]';
+  const ROSTER_ROW = '[data-tid="roster-participant"], [data-tid="participant-item"], [role="treeitem"]';
   const CHAIN_ID_HEADERS = ["X-Microsoft-Skype-Chain-ID", "x-microsoft-skype-chain-id"];
 
   const counters = {
