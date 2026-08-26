@@ -339,6 +339,49 @@ buttons are not found, pin the Teams interface language — see
 
 ---
 
+## The meeting ended but the bot stayed in it
+
+The bot leaves as soon as one of these fires, checked once per
+`HANSARD_CAPTURE__ROSTER_POLL_SECONDS` (default 1s):
+
+| Signal | Setting | Default |
+| --- | --- | --- |
+| A `call_end` termination in the Teams signalling traffic | — | immediate |
+| The page reports *Meeting ended* / *La réunion est terminée*, or the notetaker was removed | — | immediate |
+| Nobody has spoken | `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` | 600 |
+| The notetaker is the only one left in the roster | `HANSARD_CAPTURE__ALONE_TIMEOUT_SECONDS` | 120 |
+| The meeting has run too long | `HANSARD_CAPTURE__MAX_DURATION_SECONDS` | 14400 |
+
+The alone timeout arms only once the notetaker has actually seen a roster, so
+Hansard opens the participants panel right after joining. If that panel cannot
+be opened — a Teams interface language whose *People* button carries a label
+Hansard does not know — the log carries:
+
+```
+capture.roster_panel_unavailable
+```
+
+and the alone timeout stays disarmed. Pin the interface language
+([Teams setup §3](teams-setup.md#3-pinning-the-teams-interface-language)); the
+silence and duration timeouts still apply.
+
+The state the bot believes it is in is logged on every transition:
+
+```
+capture.meeting_state state=in_meeting saw_roster=True
+```
+
+If that line stays on `in_meeting` after the meeting is visibly over, Teams is
+still reporting an active call to the page. If it reads `unknown`, the page is
+showing something Hansard does not recognise. Either way the capture is not
+lost: it stops at the silence or duration timeout and transcribes what it has.
+
+Lower `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` for short test meetings — with
+the 600s default a bot that misses the end signal keeps recording silence for
+ten minutes.
+
+---
+
 ## It is too slow, or runs out of memory
 
 Expected figures on 4 vCPU with no GPU, with the shipped float32 recogniser,

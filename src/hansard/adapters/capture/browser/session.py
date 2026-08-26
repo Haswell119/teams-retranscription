@@ -519,10 +519,20 @@ class TeamsBrowserSession:
         if locator is None:
             return False
         try:
+            if not await locator.is_visible(timeout=self._timing.element_timeout_ms):
+                return False
             disabled = await locator.get_attribute("aria-disabled")
         except Exception:
-            disabled = None
+            return False
         return disabled != "true"
+
+    async def open_roster(self) -> bool:
+        if await self._present(selectors.ROSTER_PANEL) is not None:
+            return True
+        if not await self._click(selectors.ROSTER_PANEL_TOGGLE):
+            return False
+        await self._sleep(self._timing.prejoin_settle_seconds)
+        return await self._present(selectors.ROSTER_PANEL) is not None
 
     async def detect_state(self) -> MeetingState:
         if await self._hangup_visible():

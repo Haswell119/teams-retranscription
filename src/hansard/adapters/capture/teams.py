@@ -39,10 +39,13 @@ from hansard.domain.errors import (
     MeetingJoinRefusedError,
 )
 from hansard.domain.meeting import Capture, MeetingRequest
+from hansard.observability.logging import get_logger
 from hansard.observability.metrics import bot_session, record_bot_join
 
 SessionBuilder = Callable[[Callable[[CaptureEvent], None]], TeamsBrowserSession]
 RecorderBuilder = Callable[[str], FfmpegRecorder]
+
+LOGGER = get_logger(__name__)
 
 JOIN_ADMITTED: Final[str] = "admitted"
 JOIN_REFUSED: Final[str] = "refused"
@@ -204,6 +207,7 @@ class TeamsBrowserCapture:
             await recorder.start(output)
             outcome = await self._join(session, request.join_url)
             announced = await self._announce(session, request)
+            await self._open_roster(session)
             with bot_session():
                 reason = await self._monitor(session, recorder, reducer, request, origin_epoch_ms)
             await session.leave()
@@ -244,6 +248,12 @@ class TeamsBrowserCapture:
         record_bot_join(JOIN_ADMITTED, time.monotonic() - started)
         return outcome
 
+    async def _open_roster(self, session: TeamsBrowserSession) -> bool:
+        opened = await session.open_roster()
+        if not opened:
+            LOGGER.warning("capture.roster_panel_unavailable")
+        return opened
+
     async def _announce(self, session: TeamsBrowserSession, request: MeetingRequest) -> bool:
         if not self.settings.announce_recording:
             return False
@@ -278,12 +288,16 @@ class TeamsBrowserCapture:
         silence_ms = self.settings.silence_timeout_seconds * 1000
         alone_ms = self.settings.alone_timeout_seconds * 1000
         poll = max(self.settings.roster_poll_seconds, 0.1)
+        seen: MeetingState | None = None
         while True:
             await recorder.ensure_progressing()
             end_event = reducer.call_end or session.call_end
             if end_event is not None and end_event.is_termination:
                 return StopReason.MEETING_ENDED
             state = await session.detect_state()
+            if state is not seen:
+                seen = state
+                LOGGER.info("capture.meeting_state", state=str(state), saw_roster=self._saw_roster)
             if state is MeetingState.REMOVED:
                 return StopReason.REMOVED
             if state in {MeetingState.ENDED, MeetingState.DENIED}:
