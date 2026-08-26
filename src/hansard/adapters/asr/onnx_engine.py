@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from hansard.adapters.asr.seams import trim_to_regions
+from hansard.adapters.asr.seams import drop_seam_repeats, trim_to_regions
 from hansard.adapters.asr.tokens import TokenStream, tokens_to_words, words_to_text
 from hansard.domain.audio import AudioClip
 from hansard.domain.errors import RecognitionError
@@ -177,6 +177,7 @@ class OnnxRecognizer:
             utterances.extend(self._decode_batch(model, waves, covered, language))
         utterances.sort(key=lambda utterance: utterance.span.start)
         utterances = trim_to_regions(utterances, [utterance.span for utterance in utterances])
+        utterances = drop_seam_repeats(utterances)
         return Transcript(
             utterances=tuple(utterances),
             language=language,
