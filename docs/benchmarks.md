@@ -531,24 +531,37 @@ Two things about that comparison need saying plainly:
 So: treat the gap as real until proven otherwise, and treat the size of the gap
 as uncertain.
 
-**Most of the AMI error is words we never produce at all.** The reference for
-ES2004a has 2614 words and our transcript has 1517. Across the three meetings we
-produce **roughly 58 % of the reference words**; the rest are deletions, not
-mistakes. Two obvious explanations have been measured and ruled out:
+**The words we were not producing were a quantization failure, not a pipeline
+failure.** An earlier version of this page reported that we produced roughly
+58 % of the reference words on AMI and called it the largest defect in the
+project. It was real, and it was the INT8 weights. Measured on ES2004a with
+everything else held fixed — same audio, same enhancement, the same 107 Silero
+spans covering 766 seconds, the same 93 planned segments, the same batching —
+float32 produces **2239 words at 18.87 %** word error rate and INT8 produces
+**1410 at 47.23 %**. Deletions go from 386 to 1210, and eleven segments come back
+as empty strings instead of two. INT8 does not mostly get this audio *wrong*; it
+stops producing words. The same weights cost between 0.1 and 2.0 points on
+FLEURS and LibriSpeech, which is exactly why read-speech benchmarks signed them
+off, and it is why this page now insists that **a quantized recogniser is never
+qualified on read speech alone**.
 
-- *Voice activity detection is not dropping them.* Measured against the
-  reference turns, Silero covers 91.9 %, 97.9 % and 83.4 % of reference speech
-  time. IS1009a is decisive: 97.9 % coverage and still 40 % of the words
-  missing.
-- *Disfluencies in the reference are not the explanation either.* Filled pauses
-  and backchannels (uh, um, mm-hmm, yeah, okay and friends) are 8.8 %, 10.2 %
-  and 9.2 % of the reference words, and that count generously includes words the
-  recognizer does emit.
+Two things were ruled out before the weights were found, and both are worth
+recording because both are the obvious first guess:
 
-On IS1009a we hand the recognizer 658 seconds of audio and get back 1187 words —
-**1.80 words per second**, against 3.16 in the reference. The words are being
-lost inside recognition, on audio the pipeline demonstrably heard. That is the
-single largest defect in this project and it is unresolved.
+- *Voice activity detection was not dropping them.* Silero covers 91.9 %, 97.9 %
+  and 83.4 % of reference speech time, and the segments already handed to the
+  recognizer contain 98.0 %, 99.5 % and 96.1 % of the reference words. The most
+  aggressive VAD retune tried reaches 99.0 / 100.0 / 99.1 — worth about one point
+  of macro word error rate for five changed defaults and 10–18 % more
+  recognition time. It was not adopted.
+- *Disfluencies in the reference were not it either.* Filled pauses and
+  backchannels are 8.8 %, 10.2 % and 9.2 % of the reference words, and that count
+  generously includes words the recognizer does emit.
+
+Of the deletions that remain under float32, **67 %, 81 % and 39 % fall inside
+reference-overlap regions** against base rates of 29 %, 28 % and 16 %. A
+recognizer that emits one stream cannot emit two people talking at once. That
+floor is architectural, not a tuning exercise.
 
 **Some of the diarization error is structural and cannot be tuned away.** A
 system that names one speaker per instant cannot label two people talking at
