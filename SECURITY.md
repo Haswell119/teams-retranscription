@@ -56,7 +56,18 @@ database](https://github.com/pypa/advisory-database) on each commit, by the
 `dependency-audit` job in CI. The job is blocking: a known vulnerability in any
 package installed by a supported extra fails the build.
 
-One extra is deliberately excluded from that job. `diarization-torch` pulls
+Two extras are deliberately excluded from that job.
+
+`asr-onnx-gpu` swaps `onnxruntime` for `onnxruntime-gpu`, which drags in several
+gigabytes of CUDA runtime wheels that no GitHub-hosted runner can usefully
+exercise. It differs from the audited `asr-onnx` extra by that one package. If
+you deploy on GPU, audit it yourself against your own pinned set:
+
+```bash
+uv pip install -e ".[asr-onnx-gpu]" && pip-audit --strict
+```
+
+`diarization-torch` pulls
 `nemo-toolkit`, which pins `hydra-core<=1.3.2` and `lightning<=2.4.0`; both
 carry advisories (GHSA-2cp2-2r3c-7p7r, CVE-2026-58659) that no release
 reachable under those pins fixes. The extra is not imported by any adapter, is

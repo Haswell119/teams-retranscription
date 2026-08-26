@@ -40,7 +40,7 @@ x-common-env: &common-env
   HANSARD_STORAGE__BACKEND: filesystem
   HANSARD_STORAGE__ROOT: /artifacts
   HANSARD_DELIVERY__OUTPUT_DIR: /artifacts
-  HANSARD_DELIVERY__DEFAULT_CHANNELS: filesystem
+  HANSARD_DELIVERY__DEFAULT_CHANNELS: '["filesystem"]'
   HANSARD_QUEUE_URL: redis://redis:6379/0
 
 x-security: &security
@@ -65,7 +65,11 @@ services:
     profiles: ["build", "setup"]
     environment:
       HANSARD_MODELS_TARGET: /models
-    user: "10001:10001"
+    # Root, unlike every other service here. Docker creates the `models` volume
+    # owned by root:root on first use, so an unprivileged copier cannot write
+    # into it. The copy hands the directory to 10001:10001 on its way out, and
+    # every service that reads it mounts it read-only.
+    user: "0:0"
     volumes:
       - models:/models
     restart: "no"

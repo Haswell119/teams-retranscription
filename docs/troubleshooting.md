@@ -109,6 +109,49 @@ In Kubernetes, this error means the init container did not populate the models
 volume, or the worker mounted a different volume than the one it filled. See
 [deployment](deployment.md).
 
+### `cp: can't create directory '/models/./silero': Permission denied`
+
+From `docker compose run --rm models`, on a compose stack older than this fix.
+Docker creates the `models` volume owned by `root:root` the first time it is
+mounted, and the copier ran unprivileged, so it could not write into it. The
+compose file now runs that one service as root and the copier hands the
+directory back to `10001:10001` before it exits; every service that reads the
+weights mounts them read-only.
+
+Pull the current `deploy/compose/docker-compose.yml` and re-run. To repair a
+volume left behind by the old file without re-downloading:
+
+```bash
+docker run --rm -v hansard_models:/models busybox chown -R 10001:10001 /models
+```
+
+---
+
+## It will not start at all
+
+### `SettingsError: error parsing value for field "delivery" from source "EnvSettingsSource"`
+
+Wrapped around a `json.decoder.JSONDecodeError`. A setting whose type is a list
+or tuple was given a bare word. pydantic-settings parses complex types as JSON,
+so every one of them needs JSON syntax in the environment:
+
+```bash
+HANSARD_DELIVERY__DEFAULT_CHANNELS='["filesystem"]'      # right
+HANSARD_DELIVERY__DEFAULT_CHANNELS=filesystem            # JSONDecodeError
+```
+
+The shipped `deploy/compose/docker-compose.yml` had the bare form and has been
+fixed. If you are running an older copy, either update it or drop the line
+entirely — `("filesystem",)` is already the default.
+
+The same rule covers `HANSARD_ASR__DRIFT_LADDER_SECONDS`,
+`HANSARD_RUNTIME__*` tuples and any other list-valued setting. The full list is
+in [configuration](configuration.md).
+
+Note that the error names the top-level section, `delivery`, not the field
+inside it, so read the whole section's environment rather than only the setting
+you last changed.
+
 ---
 
 ## Speakers are wrong

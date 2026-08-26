@@ -105,4 +105,8 @@ COPY --from=fetch /out/models /opt/hansard-models
 
 USER 10001:10001
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["set -eu; cp -R /opt/hansard-models/. \"${HANSARD_MODELS_TARGET:-/models}/\"; cd \"${HANSARD_MODELS_TARGET:-/models}\"; sha256sum -c SHA256SUMS >/dev/null; echo 'model artifact verified'"]
+# The chown is a no-op under Kubernetes, where this runs as 10001 into an
+# emptyDir the kubelet has already made writable. It matters under compose,
+# where the target is a named volume Docker creates owned by root:root: the
+# copy has to run as root, and the weights must not stay that way.
+CMD ["set -eu; target=\"${HANSARD_MODELS_TARGET:-/models}\"; cp -R /opt/hansard-models/. \"$target/\"; cd \"$target\"; sha256sum -c SHA256SUMS >/dev/null; if [ \"$(id -u)\" = 0 ]; then chown -R 10001:10001 .; fi; echo 'model artifact verified'"]
