@@ -476,9 +476,12 @@ make bench-data       # fetch the evaluation corpora
 make bench            # run everything, write bench/results/*.json
 ```
 
-`make bench-data` builds both the English and the French meeting fixtures, and
-`make bench-meetings` scores all six in one run. Add `make bench-data-ami` and
-`make bench-ami` for the AMI corpus.
+`make bench-data` builds the English, French and code-switched meeting fixtures,
+and `make bench-meetings` scores all nine in one run; `make bench-mixed` scores
+the three bilingual ones on their own. Add `make bench-data-ami` and
+`make bench-ami` for the AMI corpus. The code-switched fixtures need both speaker
+pools, so they are skipped when the French corpus could not be fetched, and
+`--skip-mixed-meetings` suppresses them explicitly.
 
 Raw result files live in [`bench/results/`](../bench/results/) and carry the
 normalizer version, the hardware, and the per-stage timings. A file with a
@@ -643,15 +646,27 @@ Being explicit about this is part of the point.
   handles a French meeting room. No vendor has published a French meeting number,
   and published results for other open models sit at 19–23 % WER. Preparation
   code ships in `hansard.evaluation.corpora`.
+- **A code-switched French/English meeting run.** This is the newest empty cell
+  and the most conspicuous, because the feature it measures shipped without it.
+  The fixtures exist (`meeting_mixed_4spk`, `_6spk`, `_8spk`), `make bench-mixed`
+  scores them, `MIXED_MEETING_GATES` grades them and `language_accuracy` is
+  implemented — but no result file has been committed, so this page carries no
+  mixed cpWER and no measured language accuracy. Everything currently known about
+  bilingual behaviour comes from unit tests on text, which prove the extraction
+  logic and prove nothing about the audio. See [multilingual](multilingual.md).
 - **A recorded head-to-head against a live Teams transcript.** The protocol is
   written up in [metrics.md](metrics.md); it needs real meetings and real consent.
+  `hansard compare` is the tool for it: it scores several systems against one
+  reference and breaks the result down by the language actually spoken, which is
+  the comparison that matters for a bilingual meeting. The tool is tested; the
+  head-to-head is not run.
 - **Minutes quality against Copilot's recap**, blind and rated by humans.
 
 ## 10. Checking the gates
 
 The project defines quality gates in `src/hansard/evaluation/gates.py`: a
 must-pass threshold and a stretch target for every headline metric, separately
-for French and for English. They exist so that "is this good enough?" has an
+for French, for English and for meetings held in both at once. They exist so that "is this good enough?" has an
 answer that does not depend on anyone's opinion.
 
 ```bash
@@ -750,5 +765,6 @@ note in this page saying what changed and why.
 ## Related reading
 
 - [Metrics](metrics.md) — every formula and how it is computed
+- [Multilingual](multilingual.md) — the code-switched fixtures, gates and comparison harness
 - [Architecture](architecture.md) — what runs where
 - [Sovereignty](sovereignty.md) — the other reason to run this

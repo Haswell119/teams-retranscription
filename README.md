@@ -120,6 +120,16 @@ French *meeting* result has been recorded yet, so the meeting table above is
 English. We would rather leave that cell empty than fill it with an English
 number.
 
+**Meetings held in both languages at once** are a case of their own, and the same
+honesty applies. Every utterance is labelled with the language it was spoken in,
+and decisions, action items and deadlines are then extracted with that language's
+rules on both sides of a switch — before this, a bilingual meeting was scored as
+one language and the other language's items were silently dropped. Code-switched
+fixtures, a `language_accuracy` metric and its own quality gates all ship and run.
+**No mixed meeting result has been recorded on real hardware yet either**, so
+there is no row for it above. See [multilingual](docs/multilingual.md) for what is
+proven, what is only unit-tested, and where it still falls short.
+
 **Real meetings, not just fixtures.** Those fixtures are clean recordings mixed
 together, which is much easier than a real room, so we also measure on two
 corpora of genuine spontaneous meetings — AMI in English, SUMM-RE in French:
@@ -203,6 +213,10 @@ Teams meeting
 ├─────────────────────────────────────────────────────────────────┤
 │  Recognise    Parakeet TDT 0.6B v3, float32 ONNX, 25 languages, │
 │               word-level timestamps, punctuation, no PyTorch    │
+├─────────────────────────────────────────────────────────────────┤
+│  Identify     every utterance labelled with the language it     │
+│               was spoken in, so a French/English meeting is     │
+│               read with both languages' rules, not one          │
 ├─────────────────────────────────────────────────────────────────┤
 │  Diarize      pyannote segmentation + TitaNet embeddings,       │
 │               unbounded speakers, 46 MB of models               │

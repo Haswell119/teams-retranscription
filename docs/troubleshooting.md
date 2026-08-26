@@ -553,6 +553,76 @@ read.
 
 ---
 
+## A bilingual meeting comes out wrong
+
+### Half the meeting is transcribed as gibberish
+
+**Cause.** A single language was pinned. `HANSARD_ASR__LANGUAGE=fr` or
+`--language fr` forces French decoding onto *every* segment, so the English
+speech is decoded as French-sounding nonsense — and the reverse. The symptom is
+distinctive: one language is clean and the other is word-salad that almost
+rhymes with what was said.
+
+**Fix.** Unset it, or set it to `mixed`. Both leave the recogniser free to switch,
+which is what Parakeet does natively.
+
+```bash
+hansard transcribe meeting.m4a                    # let it switch
+hansard transcribe meeting.m4a --language mixed   # the same thing, said out loud
+```
+
+### The decisions and actions from one language are missing
+
+**Cause.** The minutes were composed against one language. Check the `language`
+field of the minutes: if it says `fr` or `en` on a meeting that was genuinely
+bilingual, every sentence was matched against that language's cue phrases and the
+other language's decisions, actions and deadlines were never looked for.
+
+Two settings cause this. `HANSARD_MINUTES__LANGUAGE` forces the minutes language
+outright. `HANSARD_ASR__IDENTIFY_LANGUAGE=false` turns off per-utterance labelling,
+after which the whole meeting falls back to one tag.
+
+**Fix.** Unset both. Then confirm from the JSON export:
+
+```bash
+python -c "import json,sys; t=json.load(open(sys.argv[1]))['transcript']; \
+print(t['language'], t['languages'], t['code_switched'])" \
+  artifacts/meeting/transcript.json
+```
+
+On a bilingual meeting expect `mixed`, both tags, and `True`. The tags are ordered
+most-spoken first, so which comes first tells you which language dominated.
+
+### The meeting is bilingual but `code_switched` is `false`
+
+**Cause.** The second language did not clear the minority threshold: a language
+must carry at least 10 % of the transcribed words or at least 20 seconds of speech
+before the meeting is marked `mixed`. A meeting that is 95 % French with one short
+English aside is French with a borrowing, and calling it bilingual would be
+misleading.
+
+**This does not mean the aside was mishandled.** The threshold governs how the
+meeting is *labelled*, not how it is *analysed* — extraction always uses each
+sentence's own language, so a decision taken in that English aside is still
+extracted with English cues. Check the per-utterance `language` fields in the JSON
+export before concluding anything was lost.
+
+### Short utterances have the wrong language
+
+**Cause.** "Ok.", "Mm.", "Meridian 42" — some utterances carry no evidence in
+either language. They are not guessed at from nothing: they inherit from the
+nearest labelled utterance by the same speaker, looking forward before back. At a
+language switch this is right most of the time and wrong some of the time.
+
+**Impact.** Usually none that matters: these utterances carry no extractable
+content, and `language_accuracy` weights by word count, so a one-word turn costs
+almost nothing. If a *long* utterance is mislabelled, that is a real defect worth
+reporting — include the exact text, per [filing a good bug report](#filing-a-good-bug-report).
+
+Background and known limits: [multilingual](multilingual.md).
+
+---
+
 ## Configuration errors
 
 | Error | Meaning |
@@ -643,5 +713,6 @@ issue and ask the maintainers for a private channel rather than posting it.
 - [Teams setup](teams-setup.md) — tenant policy, lobby, consent
 - [Delivery](delivery.md) — channels, addresses, Graph limitations
 - [Minutes](minutes.md) — running a local model
+- [Multilingual](multilingual.md) — meetings held in French and English at once
 - [Deployment](deployment.md) — Docker Compose and Kubernetes
 - [Architecture](architecture.md) — why the pipeline is shaped this way

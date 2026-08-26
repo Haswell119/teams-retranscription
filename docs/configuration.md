@@ -738,3 +738,4 @@ validate and appear in `model_dump()`, but no code reads them today:
 - [Minutes](minutes.md) — the `minutes` section in depth
 - [Delivery](delivery.md) — the `delivery` section in depth
 - [Troubleshooting](troubleshooting.md) — symptom-first
+- [Multilingual](multilingual.md) — what the language settings do to a bilingual meeting

@@ -10,7 +10,7 @@ what actually runs during a meeting, and where the seams are.
 
 | Package | Contains | Rule |
 | --- | --- | --- |
-| `domain/` | `AudioClip`, `TimeSpan`, `Word`, `Utterance`, `Transcript`, `SpeakerTurn`, `Diarization`, `Roster`, `Minutes`, the error hierarchy, and a Hungarian-algorithm assignment solver | Frozen dataclasses and pure functions. No I/O, no models, no third-party clients. `numpy` is the only external import. |
+| `domain/` | `AudioClip`, `TimeSpan`, `Word`, `Utterance`, `Transcript`, `SpeakerTurn`, `Diarization`, `Roster`, `Minutes`, `LanguageProfile`, the error hierarchy, and a Hungarian-algorithm assignment solver | Frozen dataclasses and pure functions. No I/O, no models, no third-party clients. `numpy` is the only external import. |
 | `ports/` | `Protocol` interfaces: `SpeechRecognizer`, `Diarizer`, `SpeakerAttributor`, `SpeakerNamer`, `AudioEnhancer`, `VoiceActivityDetector`, `MeetingCapture`, `MinutesWriter`, `TextGenerator`, `MinutesPublisher`, `ArtifactStore` | Types and signatures only. Every one is `runtime_checkable`, so conformance is testable without inheritance. |
 | `adapters/` | The implementations: ONNX, sherpa-onnx, ffmpeg, Playwright, SMTP, Microsoft Graph, an OpenAI-compatible HTTP client | Each subpackage carries its own registry and imports its heavy dependency **inside** the factory function, so an install without an extra still imports cleanly. |
 | `application/` | `TranscriptionPipeline`, which sequences enhancement, detection, recognition, diarization, refinement, attribution and naming; `MeetingService`, which wraps it with capture, minutes and rendering; and `JobRecord`/`JobStore`/`JobQueue` | Depends on ports only. It has never heard of ONNX. |
@@ -60,7 +60,7 @@ Everything below is what is in the tree today.
 | Port | Module | Implementations |
 | --- | --- | --- |
 | `SpeechRecognizer` | `ports/asr.py` | `OnnxRecognizer` (`adapters/asr/onnx_engine.py`), `WhisperRecognizer` (`adapters/asr/whisper_engine.py`), `NullRecognizer` (`adapters/asr/null_engine.py`) |
-| `LanguageIdentifier` | `ports/asr.py` | None. Parakeet detects language internally, so nothing has needed it. |
+| `LanguageIdentifier` | `ports/asr.py` | None. This port identifies language from *audio* and nothing implements it. Parakeet switches language internally but never reports which one it used, so `TextLanguageIdentifier` (`adapters/language/identification.py`) reads the transcribed text instead — no second model, no second pass over the audio. See [multilingual](multilingual.md). |
 | `Diarizer` | `ports/diarization.py` | `SherpaDiarizer` (`adapters/diarization/sherpa.py`), `NullDiarizer` |
 | `SpeakerAttributor` | `ports/diarization.py` | `WordLevelAttributor` (`adapters/attribution/fusion.py`) |
 | `SpeakerNamer` | `ports/diarization.py` | `RosterSpeakerNamer` (`adapters/attribution/naming.py`) |
@@ -107,6 +107,10 @@ join URL
    │
    ├── recognise ────────► Parakeet TDT, batched, word timestamps,
    │                       duplicate words removed at segment seams
+   │
+   ├── identify language ► every utterance labelled fr or en from the
+   │                       text that came back; the meeting is marked
+   │                       mixed when both cross the minority threshold
    │
    ├── enhance (again) ──► high pass only ───────────► DIARIZATION CHAIN
    │
@@ -472,4 +476,5 @@ rewrite the code.
 - [Output formats](output-formats.md) — the rendering layer
 - [Delivery](delivery.md) — channels, addresses and Graph limitations
 - [Minutes](minutes.md) — the summarisation adapters and grounding
+- [Multilingual](multilingual.md) — how a bilingual meeting flows through this pipeline
 - [Sovereignty](sovereignty.md) — where every byte goes
