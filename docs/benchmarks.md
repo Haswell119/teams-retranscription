@@ -531,24 +531,37 @@ Two things about that comparison need saying plainly:
 So: treat the gap as real until proven otherwise, and treat the size of the gap
 as uncertain.
 
-**Most of the AMI error is words we never produce at all.** The reference for
-ES2004a has 2614 words and our transcript has 1517. Across the three meetings we
-produce **roughly 58 % of the reference words**; the rest are deletions, not
-mistakes. Two obvious explanations have been measured and ruled out:
+**The words we were not producing were a quantization failure, not a pipeline
+failure.** An earlier version of this page reported that we produced roughly
+58 % of the reference words on AMI and called it the largest defect in the
+project. It was real, and it was the INT8 weights. Measured on ES2004a with
+everything else held fixed — same audio, same enhancement, the same 107 Silero
+spans covering 766 seconds, the same 93 planned segments, the same batching —
+float32 produces **2239 words at 18.87 %** word error rate and INT8 produces
+**1410 at 47.23 %**. Deletions go from 386 to 1210, and eleven segments come back
+as empty strings instead of two. INT8 does not mostly get this audio *wrong*; it
+stops producing words. The same weights cost between 0.1 and 2.0 points on
+FLEURS and LibriSpeech, which is exactly why read-speech benchmarks signed them
+off, and it is why this page now insists that **a quantized recogniser is never
+qualified on read speech alone**.
 
-- *Voice activity detection is not dropping them.* Measured against the
-  reference turns, Silero covers 91.9 %, 97.9 % and 83.4 % of reference speech
-  time. IS1009a is decisive: 97.9 % coverage and still 40 % of the words
-  missing.
-- *Disfluencies in the reference are not the explanation either.* Filled pauses
-  and backchannels (uh, um, mm-hmm, yeah, okay and friends) are 8.8 %, 10.2 %
-  and 9.2 % of the reference words, and that count generously includes words the
-  recognizer does emit.
+Two things were ruled out before the weights were found, and both are worth
+recording because both are the obvious first guess:
 
-On IS1009a we hand the recognizer 658 seconds of audio and get back 1187 words —
-**1.80 words per second**, against 3.16 in the reference. The words are being
-lost inside recognition, on audio the pipeline demonstrably heard. That is the
-single largest defect in this project and it is unresolved.
+- *Voice activity detection was not dropping them.* Silero covers 91.9 %, 97.9 %
+  and 83.4 % of reference speech time, and the segments already handed to the
+  recognizer contain 98.0 %, 99.5 % and 96.1 % of the reference words. The most
+  aggressive VAD retune tried reaches 99.0 / 100.0 / 99.1 — worth about one point
+  of macro word error rate for five changed defaults and 10–18 % more
+  recognition time. It was not adopted.
+- *Disfluencies in the reference were not it either.* Filled pauses and
+  backchannels are 8.8 %, 10.2 % and 9.2 % of the reference words, and that count
+  generously includes words the recognizer does emit.
+
+Of the deletions that remain under float32, **67 %, 81 % and 39 % fall inside
+reference-overlap regions** against base rates of 29 %, 28 % and 16 %. A
+recognizer that emits one stream cannot emit two people talking at once. That
+floor is architectural, not a tuning exercise.
 
 **Some of the diarization error is structural and cannot be tuned away.** A
 system that names one speaker per instant cannot label two people talking at
@@ -561,12 +574,42 @@ under it needs overlap-aware diarization, which is a different architecture.
 **A real French meeting exposed a default that clean fixtures could not.** On
 SUMM-RE `020c_EBPZ`, the shipped `merge_similarity` of 0.70 fused genuinely
 different speakers and collapsed four people into two, taking cpWER to 89.82 %.
-The synthetic French fixtures, which score 4.20 %, 6.48 % and 13.36 %, gave no
-hint of it: their speakers all talk for minutes, while two of SUMM-RE's talk for
-59 and 12 seconds. The default is now 0.77 and the sweep is published, but the
-general lesson is the durable part — **a default tuned on one corpus is a
-hypothesis, not a result**, and the fixtures that pass are the ones least likely
-to catch its failure.
+The synthetic French fixtures gave no hint of it: their speakers all talk for
+minutes, while two of SUMM-RE's talk for 59 and 12 seconds. The default is now
+0.77 and cpWER is 51.73 %. The durable lesson is not the number — **a default
+tuned on one corpus is a hypothesis, not a result**, and the fixtures that pass
+are the ones least likely to catch its failure.
+
+**On that meeting our own segmentation loses words, and we do not know why.** The
+shipped path hands the recognizer 906.6 seconds in 106 segments and returns 2561
+of 3358 reference words at 37.52 % word error rate. The corpus's own utterance
+boundaries hand it 756.3 seconds — twenty percent *less* audio — in 215 segments,
+and return 2923 words at 26.59 %. We feed it more and receive less, so nothing is
+missed for want of detection. **Four explanations have been measured and all four
+are dead:**
+
+| Hypothesis | Test | Verdict |
+| --- | --- | --- |
+| Segments mix speakers | Single-speaker 4.82 s spans score **32.19 %**; mixed-speaker 4.95 s spans score **25.46 %** | Dead — mixed is *better* |
+| Segments are too long | Full-harness ceiling sweep: 37.52 % at 120 s, **35.62 %** at 20 s, 36.54 % at 8 s | Dead — under two points where the oracle is worth eleven |
+| We feed too much silence | 756 s → 26.59 %, 871 s → **25.46 %**, 907 s → 37.52 %, 1002 s → 32.19 % | Dead — not monotone; adding silence *helped* twice |
+| The overlap and seam mechanism | Removing the overlap entirely: −0.56 points at a 20 s ceiling, **+0.69** at 8 s | Dead — noise |
+
+Every configuration we can reach lands between 35.6 % and 37.5 %. The corpus's
+own boundaries reach 26.59 %. **What is different about them is untested**, and
+the leading remaining candidate is boundary precision — spans that begin and end
+on real speech edges rather than on detector output plus padding. That is written
+here as an open question, not as a finding, and it will stay that way until
+someone measures it.
+
+The floor underneath all of it is the register rather than the machinery. One
+participant's own isolated 32 kHz track, scored against that participant's own
+reference with oracle boundaries and no mixing or segmentation of ours involved,
+still scores **28.05 %**, against 4.63 % on French read speech. Summing the four
+tracks into one stream costs a further 3.3 points, which is the fair price of a
+single-channel mixture and not a corpus defect. Expect the mid-twenties on casual
+multi-party French, and treat any claim that a segmentation change alone will
+reach read-speech numbers as unsupported.
 
 **We also do not beat Azure on read speech.** Azure Speech reports 2.78 % on
 FLEURS `fr_fr`; we measure 4.63 %. Read-speech benchmarks are not what a meeting

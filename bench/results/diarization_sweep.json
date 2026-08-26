@@ -465,5 +465,57 @@
       "reference_speakers": 4
     }
   ],
-  "operating_window": "AMI degrades above 0.77; SUMM-RE degrades below 0.77"
+  "operating_window": "AMI degrades above 0.77; SUMM-RE degrades below 0.77",
+  "summ_re_segmentation_rows": [
+    {
+      "max_segment_seconds": 120,
+      "split_overlap_seconds": 2.0,
+      "wer_percent": 37.52,
+      "cpwer_percent": 53.16,
+      "hypothesis_words": 2356,
+      "reference_words": 3283
+    },
+    {
+      "max_segment_seconds": 20,
+      "split_overlap_seconds": 2.0,
+      "wer_percent": 35.62,
+      "cpwer_percent": 51.73,
+      "hypothesis_words": 2407,
+      "reference_words": 3283
+    },
+    {
+      "max_segment_seconds": 20,
+      "split_overlap_seconds": 0.0,
+      "wer_percent": 36.18,
+      "cpwer_percent": 52.17,
+      "hypothesis_words": 2377,
+      "reference_words": 3283
+    },
+    {
+      "max_segment_seconds": 8,
+      "split_overlap_seconds": 2.0,
+      "wer_percent": 36.54,
+      "cpwer_percent": 51.58,
+      "hypothesis_words": 2448,
+      "reference_words": 3283
+    },
+    {
+      "max_segment_seconds": 8,
+      "split_overlap_seconds": 0.0,
+      "wer_percent": 35.85,
+      "cpwer_percent": 50.86,
+      "hypothesis_words": 2420,
+      "reference_words": 3283
+    }
+  ],
+  "summ_re_oracle_reference": {
+    "wer_percent": 26.59,
+    "note": "corpus utterance boundaries, unexplained gap"
+  },
+  "eliminated_hypotheses": [
+    "speaker homogeneity: single-speaker 4.82s spans score 32.19 vs mixed-speaker 4.95s at 25.46",
+    "segment duration: full harness sweep spans 35.62 to 37.52 across ceilings of 8, 20 and 120 seconds",
+    "silence fed to the recogniser: 756s->26.59, 871s->25.46, 907s->37.52, 1002s->32.19, not monotone",
+    "the overlap and seam mechanism: removing it moves WER by -0.56 at 20s and +0.69 at 8s"
+  ]
 }

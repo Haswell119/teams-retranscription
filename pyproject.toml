@@ -87,7 +87,6 @@ ignore = ["ANN401", "B008"]
 ban-relative-imports = "parents"
 
 [tool.mypy]
-python_version = "3.11"
 strict = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
