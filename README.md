@@ -7,7 +7,7 @@ Runs entirely on your own infrastructure. Nothing leaves your network.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-979%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1011%20passing-brightgreen.svg)](tests/)
 [![Languages](https://img.shields.io/badge/languages-fran%C3%A7ais%20%7C%20english-blue.svg)](docs/benchmarks.md)
 
 </div>
