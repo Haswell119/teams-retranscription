@@ -10,6 +10,7 @@ import numpy as np
 
 from hansard.domain.audio import AudioClip
 from hansard.domain.errors import RecognitionError
+from hansard.domain.language import MIXED, merge_tags, normalise_tag
 from hansard.domain.timespan import TimeSpan
 from hansard.domain.transcript import Transcript, Utterance, Word
 from hansard.ports.asr import EngineProfile, RecognitionHints
@@ -234,22 +235,24 @@ class WhisperRecognizer:
 
     def transcribe(self, clip: AudioClip, hints: RecognitionHints) -> Transcript:
         model = self._load()
-        requested = hints.language or self.language
+        requested = _decoder_language(hints.language or self.language)
         spans = list(hints.segments) or [clip.span]
         utterances: list[Utterance] = []
-        detected = requested
+        observed: list[str] = []
         for span in spans:
             piece = clip.extract(span)
             if piece.frame_count == 0:
                 continue
             samples = np.ascontiguousarray(piece.samples, dtype=np.float32)
             segments, info = self._recognise(model, samples, requested, hints)
-            detected = detected or _detected_language(info)
-            utterances.extend(self._utterances(segments, piece.span, requested or detected))
+            spoken = requested or _detected_language(info)
+            if spoken:
+                observed.append(spoken)
+            utterances.extend(self._utterances(segments, piece.span, spoken))
         utterances.sort(key=lambda utterance: utterance.span.start)
         return Transcript(
             utterances=tuple(utterances),
-            language=detected,
+            language=merge_tags(observed),
             audio_duration=clip.duration,
         )
 
@@ -366,6 +369,11 @@ def _words(emitted: Iterable[Any], span: TimeSpan) -> tuple[Word, ...]:
 def _bounded(start: float, end: float, span: TimeSpan) -> TimeSpan:
     shifted = TimeSpan(span.start + start, span.start + max(end, start))
     return shifted.clamped(span.start, span.end)
+
+
+def _decoder_language(tag: str | None) -> str | None:
+    resolved = normalise_tag(tag)
+    return None if resolved == MIXED else resolved
 
 
 def _detected_language(info: Any) -> str | None:

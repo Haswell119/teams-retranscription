@@ -5,15 +5,22 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from hansard.domain.language import MIXED
 from hansard.evaluation.gates import (
     ENGLISH_MEETING_GATES,
     FRENCH_MEETING_GATES,
+    MIXED_MEETING_GATES,
     READ_SPEECH_GATES,
     SYSTEM_GATES,
     QualityGate,
 )
 
 PERCENT_METRICS = frozenset({"wer", "cer", "cpwer", "tcpwer", "wder", "der", "jer"})
+MEETING_GATES_BY_LANGUAGE: dict[str, tuple[QualityGate, ...]] = {
+    "en": ENGLISH_MEETING_GATES,
+    "fr": FRENCH_MEETING_GATES,
+    MIXED: MIXED_MEETING_GATES,
+}
 RESULTS_DIRECTORY = Path("bench/results")
 
 
@@ -84,7 +91,7 @@ def observations(directory: Path) -> tuple[Observation, ...]:
 def gates_for(observation: Observation) -> tuple[QualityGate, ...]:
     if observation.kind == "read":
         return tuple(gate for gate in READ_SPEECH_GATES if gate.language in {observation.language, "all"})
-    meeting = ENGLISH_MEETING_GATES if observation.language == "en" else FRENCH_MEETING_GATES
+    meeting = MEETING_GATES_BY_LANGUAGE.get(observation.language, FRENCH_MEETING_GATES)
     return tuple(meeting) + tuple(SYSTEM_GATES)
 
 

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from hansard.adapters.summarization.citations import SentenceUnit
+from hansard.adapters.summarization.extraction import language_of
 from hansard.adapters.summarization.patterns import cues_for, matches_any
 from hansard.adapters.summarization.text import content_terms, fold_for_matching, jaccard
 from hansard.adapters.summarization.topics import TopicSegment
@@ -84,13 +85,14 @@ def pagerank(
 def rank_sentences(units: Sequence[SentenceUnit], language: str) -> tuple[RankedSentence, ...]:
     term_sets = _term_sets(units, language)
     scores = pagerank(similarity_matrix(term_sets))
-    boilerplate = cues_for(language).boilerplate
     return tuple(
         RankedSentence(
             unit=unit,
             score=float(score),
             terms=terms,
-            is_boilerplate=matches_any(fold_for_matching(unit.text), boilerplate),
+            is_boilerplate=matches_any(
+                fold_for_matching(unit.text), cues_for(language_of(unit, language)).boilerplate
+            ),
         )
         for unit, score, terms in zip(units, scores, term_sets, strict=True)
     )

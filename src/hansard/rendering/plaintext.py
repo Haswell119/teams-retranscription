@@ -34,7 +34,7 @@ class PlainTextRenderer:
         return PLAIN_TEXT_EXTENSION
 
     def render_transcript(self, transcript: Transcript, context: RenderContext) -> str:
-        translations = translations_for(context.language)
+        translations = translations_for(context.display_language)
         document = compose_transcript_document(transcript, context, translations, self.speaker_gap_seconds)
         lines: list[str] = []
         if self.include_header:

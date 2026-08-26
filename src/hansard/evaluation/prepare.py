@@ -6,12 +6,15 @@ import json
 import random
 import tarfile
 import urllib.request
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import soundfile as sf
+
+from hansard.domain.language import MIXED
 
 TARGET_SAMPLE_RATE = 16_000
 LIBRISPEECH_DEV_CLEAN = "https://www.openslr.org/resources/12/dev-clean.tar.gz"
@@ -53,6 +56,7 @@ class TimelineEntry:
     end: float
     text: str
     samples: np.ndarray
+    language: str = "en"
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +69,8 @@ class MeetingRecipe:
     language: str = "en"
 
 
+DEFAULT_FIXTURE_LANGUAGE = "en"
+
 MEETING_RECIPES: tuple[MeetingRecipe, ...] = (
     MeetingRecipe("meeting_3spk", 3, 0.10, 11),
     MeetingRecipe("meeting_6spk", 6, 0.18, 22),
@@ -75,6 +81,12 @@ FRENCH_MEETING_RECIPES: tuple[MeetingRecipe, ...] = (
     MeetingRecipe("meeting_fr_3spk", 3, 0.10, 11, language="fr"),
     MeetingRecipe("meeting_fr_6spk", 6, 0.18, 22, language="fr"),
     MeetingRecipe("meeting_fr_9spk", 9, 0.20, 33, utterances_per_speaker=6, language="fr"),
+)
+
+MIXED_MEETING_RECIPES: tuple[MeetingRecipe, ...] = (
+    MeetingRecipe("meeting_mixed_4spk", 4, 0.12, 44, language=MIXED),
+    MeetingRecipe("meeting_mixed_6spk", 6, 0.18, 55, language=MIXED),
+    MeetingRecipe("meeting_mixed_8spk", 8, 0.20, 66, utterances_per_speaker=6, language=MIXED),
 )
 
 
@@ -277,11 +289,53 @@ def _resampled_mono(raw: Any) -> np.ndarray:
     return np.asarray(np.interp(target, source, samples), dtype=np.float32)
 
 
+def merge_speaker_pools(
+    pools: Mapping[str, dict[str, list[tuple[Path, str]]]],
+) -> tuple[dict[str, list[tuple[Path, str]]], dict[str, str]]:
+    combined: dict[str, list[tuple[Path, str]]] = {}
+    languages: dict[str, str] = {}
+    for language, speakers in sorted(pools.items()):
+        for speaker, items in speakers.items():
+            key = f"{language}-{speaker}"
+            combined[key] = items
+            languages[key] = language
+    return combined, languages
+
+
+def _balanced_sample(
+    generator: random.Random,
+    speakers: Mapping[str, str],
+    candidates: Sequence[str],
+    count: int,
+) -> list[str]:
+    by_language: dict[str, list[str]] = {}
+    for speaker in candidates:
+        by_language.setdefault(speakers.get(speaker, DEFAULT_FIXTURE_LANGUAGE), []).append(speaker)
+    tags = sorted(by_language)
+    for pool in by_language.values():
+        generator.shuffle(pool)
+    chosen: list[str] = []
+    while len(chosen) < count:
+        drawn = [by_language[tag].pop() for tag in tags if by_language[tag]]
+        if not drawn:
+            break
+        chosen.extend(drawn[: count - len(chosen)])
+    return chosen
+
+
 def synthesise_meeting(
-    recipe: MeetingRecipe, speakers: dict[str, list[tuple[Path, str]]], output: Path
+    recipe: MeetingRecipe,
+    speakers: dict[str, list[tuple[Path, str]]],
+    output: Path,
+    languages: Mapping[str, str] | None = None,
 ) -> Path:
     generator = random.Random(recipe.seed)
-    chosen = generator.sample(sorted(speakers), recipe.speakers)
+    spoken = dict(languages or {})
+    chosen = (
+        _balanced_sample(generator, spoken, sorted(speakers), recipe.speakers)
+        if recipe.language == MIXED
+        else generator.sample(sorted(speakers), recipe.speakers)
+    )
     pools: dict[str, list[tuple[Path, str]]] = {}
     for speaker in chosen:
         items = list(speakers[speaker])
@@ -308,7 +362,16 @@ def synthesise_meeting(
             if overlapping
             else position + generator.uniform(0.15, 0.8)
         )
-        timeline.append(TimelineEntry(speaker, start, start + duration, text, samples))
+        timeline.append(
+            TimelineEntry(
+                speaker,
+                start,
+                start + duration,
+                text,
+                samples,
+                spoken.get(speaker, recipe.language),
+            )
+        )
         position = max(position, start + duration)
     total = position + 1.0
     mixture = np.zeros(int(total * TARGET_SAMPLE_RATE) + TARGET_SAMPLE_RATE, dtype=np.float32)
@@ -342,6 +405,7 @@ def synthesise_meeting(
                 "start": round(item.start, 3),
                 "end": round(item.end, 3),
                 "text": item.text,
+                "language": item.language,
             }
             for item in ordered
         ],
@@ -375,6 +439,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skip-fleurs", action="store_true")
     parser.add_argument("--skip-meetings", action="store_true")
     parser.add_argument("--skip-french-meetings", action="store_true")
+    parser.add_argument("--skip-mixed-meetings", action="store_true")
     parser.add_argument("--ami", action="store_true", help="also fetch the AMI test meetings")
     parser.add_argument(
         "--summ-re", action="store_true", help="also fetch a real French meeting from SUMM-RE"
@@ -408,6 +473,8 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as error:
             print(f"summ-re failed: {type(error).__name__}: {error}")
 
+    speakers: dict[str, list[tuple[Path, str]]] = {}
+    french_speakers: dict[str, list[tuple[Path, str]]] = {}
     if not arguments.skip_meetings:
         root = prepare_librispeech_corpus(output)
         speakers = _collect_speakers(root)
@@ -419,13 +486,21 @@ def main(argv: list[str] | None = None) -> int:
     if not arguments.skip_meetings and not arguments.skip_french_meetings:
         try:
             root = prepare_mls_french_corpus(output)
-            speakers = _collect_mls_speakers(root)
-            print(f"mls french dev: {len(speakers)} speakers")
+            french_speakers = _collect_mls_speakers(root)
+            print(f"mls french dev: {len(french_speakers)} speakers")
             for recipe in FRENCH_MEETING_RECIPES:
-                path = synthesise_meeting(recipe, speakers, output)
+                path = synthesise_meeting(recipe, french_speakers, output)
                 print(f"{recipe.name} -> {path}")
         except Exception as error:
+            french_speakers = {}
             print(f"french meetings failed: {type(error).__name__}: {error}")
+
+    if not arguments.skip_meetings and not arguments.skip_mixed_meetings and french_speakers:
+        combined, spoken = merge_speaker_pools({"en": speakers, "fr": french_speakers})
+        print(f"code-switched pool: {len(combined)} speakers")
+        for recipe in MIXED_MEETING_RECIPES:
+            path = synthesise_meeting(recipe, combined, output, spoken)
+            print(f"{recipe.name} -> {path}")
     return 0
 
 

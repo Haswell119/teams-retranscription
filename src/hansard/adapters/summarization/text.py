@@ -5,6 +5,7 @@ from collections.abc import Iterable, Mapping, Sequence
 
 from hansard.adapters.asr.phonetics import strip_accents
 from hansard.adapters.summarization.stopwords import stopwords_for
+from hansard.domain.language import MIXED
 from hansard.rendering.i18n import normalise_language
 
 MINIMUM_CONTENT_LENGTH = 3
@@ -44,9 +45,22 @@ FRENCH_SUFFIXES: tuple[tuple[str, int], ...] = (
     ("x", 3),
 )
 
+MIXED_SUFFIXES: tuple[tuple[str, int], ...] = tuple(
+    sorted(
+        {
+            suffix: max(
+                minimum for candidate, minimum in ENGLISH_SUFFIXES + FRENCH_SUFFIXES if candidate == suffix
+            )
+            for suffix, _ in ENGLISH_SUFFIXES + FRENCH_SUFFIXES
+        }.items(),
+        key=lambda item: (-len(item[0]), item[0]),
+    )
+)
+
 SUFFIXES_BY_LANGUAGE: Mapping[str, tuple[tuple[str, int], ...]] = {
     "en": ENGLISH_SUFFIXES,
     "fr": FRENCH_SUFFIXES,
+    MIXED: MIXED_SUFFIXES,
 }
 
 

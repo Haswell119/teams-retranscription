@@ -134,7 +134,7 @@ def transcribe(
         outcome = pipeline.run(clip, request)
     transcript = outcome.transcript
     if phrases:
-        transcript, report = VocabularyBiaser().apply(transcript, phrases, language or "en")
+        transcript, report = VocabularyBiaser().apply(transcript, phrases, language)
         if report.count:
             console.print(f"vocabulary corrections applied: {report.count}")
 
@@ -142,7 +142,8 @@ def transcribe(
         title=title,
         started_at=datetime.now(UTC),
         duration_seconds=clip.duration,
-        language=language or transcript.language or "en",
+        language=language or transcript.language_profile.tag or transcript.language or "en",
+        languages=transcript.language_profile.significant,
         provenance=_provenance(settings),
     )
     written: list[Path] = []
@@ -296,6 +297,66 @@ def join(
             console.print(f"  wrote {artifact}")
 
     asyncio.run(run())
+
+
+@application.command()
+def compare(
+    reference: Annotated[Path, typer.Argument(help="Ground-truth transcript (.json, .vtt or .srt)")],
+    hypothesis: Annotated[
+        list[str], typer.Option("--system", "-s", help="name=path for each system to score")
+    ],
+    meeting: Annotated[str, typer.Option("--meeting", help="Meeting name used in the report")] = "meeting",
+    output: Annotated[Path | None, typer.Option("--output", "-o", help="Write the JSON report here")] = None,
+    report: Annotated[
+        Path | None, typer.Option("--report", help="Write the Markdown comparison here")
+    ] = None,
+) -> None:
+    from hansard.evaluation.comparison import compare as compare_systems
+    from hansard.evaluation.comparison import (
+        comparison_markdown,
+        comparison_payload,
+        load_transcript,
+    )
+
+    truth = load_transcript(reference)
+    systems: list[tuple[str, object]] = []
+    for entry in hypothesis:
+        name, separator, location = entry.partition("=")
+        if not separator:
+            raise typer.BadParameter(f"expected name=path, got {entry!r}")
+        systems.append((name, load_transcript(Path(location))))
+    comparison = compare_systems(meeting, truth, systems)  # type: ignore[arg-type]
+    payload = comparison_payload(comparison)
+    markdown = comparison_markdown(comparison)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        console.print(f"  wrote {output}")
+    if report is not None:
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text(markdown, encoding="utf-8")
+        console.print(f"  wrote {report}")
+    table = Table(title=f"{meeting} — {', '.join(comparison.reference_languages) or 'one language'}")
+    table.add_column("system")
+    table.add_column("WER", justify="right")
+    table.add_column("cpWER", justify="right")
+    table.add_column("WDER", justify="right")
+    table.add_column("language accuracy", justify="right")
+    for language in comparison.reference_languages:
+        table.add_column(f"WER {language}", justify="right")
+    for score in comparison.scores:
+        cells = [
+            score.name,
+            f"{score.wer * 100:.2f} %",
+            f"{score.cpwer * 100:.2f} %",
+            f"{score.wder * 100:.2f} %",
+            f"{score.language_accuracy * 100:.2f} %",
+        ]
+        for language in comparison.reference_languages:
+            item = score.slice_for(language)
+            cells.append(f"{item.wer * 100:.2f} %" if item is not None else "n/a")
+        table.add_row(*cells)
+    console.print(table)
 
 
 def main() -> None:

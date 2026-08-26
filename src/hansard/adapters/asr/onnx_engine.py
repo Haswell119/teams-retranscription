@@ -10,6 +10,7 @@ from hansard.adapters.asr.seams import trim_to_regions
 from hansard.adapters.asr.tokens import TokenStream, tokens_to_words, words_to_text
 from hansard.domain.audio import AudioClip
 from hansard.domain.errors import RecognitionError
+from hansard.domain.language import MIXED, normalise_tag
 from hansard.domain.timespan import TimeSpan
 from hansard.domain.transcript import Transcript, Utterance
 from hansard.ports.asr import EngineProfile, RecognitionHints
@@ -163,7 +164,7 @@ class OnnxRecognizer:
 
     def transcribe(self, clip: AudioClip, hints: RecognitionHints) -> Transcript:
         model = self._load()
-        language = hints.language or self.language
+        language = _decoder_language(hints.language or self.language)
         spans = list(hints.segments) or [clip.span]
         utterances: list[Utterance] = []
         for chunk in _batches(spans, max(1, self.batch_size), self.batch_seconds):
@@ -181,6 +182,11 @@ class OnnxRecognizer:
             language=language,
             audio_duration=clip.duration,
         )
+
+
+def _decoder_language(tag: str | None) -> str | None:
+    resolved = normalise_tag(tag)
+    return None if resolved == MIXED else resolved
 
 
 def _batches(spans: list[TimeSpan], size: int, seconds: float) -> list[list[TimeSpan]]:

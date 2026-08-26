@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
+from hansard.domain.language import (
+    LanguageProfile,
+    normalise_tag,
+    profile_from_counts,
+)
 from hansard.domain.speakers import UNKNOWN_SPEAKER
 from hansard.domain.timespan import TimeSpan
 
@@ -39,6 +45,9 @@ class Utterance:
     def attributed_to(self, speaker: str) -> Utterance:
         return replace(self, speaker=speaker, words=tuple(w.attributed_to(speaker) for w in self.words))
 
+    def spoken_in(self, language: str | None) -> Utterance:
+        return replace(self, language=normalise_tag(language))
+
     @property
     def word_count(self) -> int:
         return len(self.words) if self.words else len(self.text.split())
@@ -72,6 +81,30 @@ class Transcript:
     @property
     def speech_duration(self) -> float:
         return sum(utterance.span.duration for utterance in self.utterances)
+
+    @property
+    def language_profile(self) -> LanguageProfile:
+        counts: dict[str, float] = {}
+        seconds: dict[str, float] = {}
+        for utterance in self.utterances:
+            tag = normalise_tag(utterance.language)
+            if tag is None:
+                continue
+            counts[tag] = counts.get(tag, 0.0) + float(utterance.word_count)
+            seconds[tag] = seconds.get(tag, 0.0) + utterance.span.duration
+        return profile_from_counts(counts, seconds)
+
+    @property
+    def is_code_switched(self) -> bool:
+        return self.language_profile.is_mixed
+
+    def with_languages(self, tags: Sequence[str | None]) -> Transcript:
+        if len(tags) != len(self.utterances):
+            raise ValueError("one language tag is required per utterance")
+        relabelled = tuple(
+            utterance.spoken_in(tag) for utterance, tag in zip(self.utterances, tags, strict=True)
+        )
+        return replace(self, utterances=relabelled)
 
     def renamed(self, mapping: dict[str, str]) -> Transcript:
         return replace(

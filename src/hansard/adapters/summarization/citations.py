@@ -19,6 +19,7 @@ class SentenceUnit:
     text: str
     span: TimeSpan
     speaker: str
+    language: str | None = None
 
     @property
     def is_question(self) -> bool:
@@ -79,6 +80,7 @@ def utterance_sentences(
             text=sentence,
             span=span,
             speaker=utterance.speaker,
+            language=utterance.language,
         )
         for position, (sentence, span) in enumerate(zip(sentences, spans, strict=True))
     )

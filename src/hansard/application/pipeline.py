@@ -3,12 +3,14 @@ from __future__ import annotations
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from hansard.adapters.diarization.consolidation import EmbeddingClusterConsolidator
 from hansard.adapters.diarization.refinement import SpeechCoverageRefiner
 from hansard.adapters.enhancement.segmentation import SegmentationPolicy, plan_segments
+from hansard.adapters.language.identification import UtteranceLanguageTagger
 from hansard.domain.audio import AudioClip
+from hansard.domain.language import MIXED, normalise_tag
 from hansard.domain.meeting import MeetingRequest
 from hansard.domain.speakers import Diarization, Roster
 from hansard.domain.timespan import TimeSpan
@@ -56,6 +58,7 @@ class TranscriptionPipeline:
     detector: VoiceActivityDetector | None = None
     diarizer: Diarizer | None = None
     namer: SpeakerNamer | None = None
+    language_tagger: UtteranceLanguageTagger | None = None
     refiner: SpeechCoverageRefiner | None = None
     consolidator: EmbeddingClusterConsolidator | None = None
     segmentation: SegmentationPolicy = field(default_factory=SegmentationPolicy)
@@ -87,6 +90,12 @@ class TranscriptionPipeline:
             transcript = self._recognise(prepared, hints)
             measured["utterances"] = float(len(transcript.utterances))
             measured["words"] = float(transcript.word_count)
+        if self.language_tagger is not None:
+            with _timed(timings, "identify_language", logger) as measured:
+                transcript = self._tag_languages(transcript, request)
+                profile = transcript.language_profile
+                measured["languages"] = float(len(profile.significant))
+                measured["code_switched"] = float(profile.is_mixed)
         self._record_recognition(transcript, prepared.duration, timings["recognise"], request)
         diarization = Diarization()
         acoustic = clip
@@ -137,6 +146,14 @@ class TranscriptionPipeline:
             record_asr_failure(type(error).__name__)
             raise
 
+    def _tag_languages(self, transcript: Transcript, request: MeetingRequest) -> Transcript:
+        tagger = self.language_tagger
+        if tagger is None:
+            return transcript
+        requested = normalise_tag(request.language)
+        tagged = replace(tagger, default_language=None if requested == MIXED else requested).tag(transcript)
+        return _stamped(tagged, requested)
+
     def _record_recognition(
         self,
         transcript: Transcript,
@@ -153,6 +170,12 @@ class TranscriptionPipeline:
             audio_seconds=audio_seconds,
             language=transcript.language or request.language,
         )
+
+
+def _stamped(transcript: Transcript, requested: str | None) -> Transcript:
+    if requested is not None and requested != MIXED:
+        return replace(transcript, language=requested)
+    return replace(transcript, language=transcript.language_profile.tag or transcript.language)
 
 
 def _speaker_ceiling(request: MeetingRequest, roster: Roster | None) -> int | None:

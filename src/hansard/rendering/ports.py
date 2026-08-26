@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
+from hansard.domain.language import MIXED, normalise_tag
 from hansard.domain.minutes import Minutes
 from hansard.domain.speakers import Participant
 from hansard.domain.transcript import Transcript
@@ -30,6 +31,7 @@ class RenderContext:
     duration_seconds: float = 0.0
     participants: tuple[Participant, ...] = ()
     language: str = "en"
+    languages: tuple[str, ...] = ()
     timezone: str = DEFAULT_TIMEZONE
     provenance: tuple[ModelProvenance, ...] = ()
     generator: str = DEFAULT_GENERATOR
@@ -37,6 +39,23 @@ class RenderContext:
     @property
     def participant_names(self) -> tuple[str, ...]:
         return tuple(participant.display_name for participant in self.participants)
+
+    @property
+    def is_multilingual(self) -> bool:
+        return normalise_tag(self.language) == MIXED or len(self.languages) > 1
+
+    @property
+    def display_language(self) -> str:
+        if normalise_tag(self.language) == MIXED:
+            return self.languages[0] if self.languages else "en"
+        return self.language
+
+    @property
+    def spoken_languages(self) -> tuple[str, ...]:
+        if self.languages:
+            return self.languages
+        resolved = normalise_tag(self.language)
+        return () if resolved in (None, MIXED) else (resolved,)
 
 
 @runtime_checkable

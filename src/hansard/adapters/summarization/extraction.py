@@ -22,11 +22,16 @@ from hansard.adapters.summarization.text import (
     jaccard,
     tokenise,
 )
+from hansard.domain.language import normalise_tag
 from hansard.domain.speakers import UNKNOWN_SPEAKER, Roster
 from hansard.domain.transcript import Transcript
 
 MINIMUM_DECISION_TERMS = 2
 MINIMUM_ACTION_TERMS = 2
+
+
+def language_of(unit: SentenceUnit, fallback: str) -> str:
+    return normalise_tag(unit.language) or fallback
 
 
 @dataclass(frozen=True, slots=True)
@@ -435,16 +440,17 @@ class CandidateExtractor:
         return cues_for(self.language)
 
     def extract(self, units: Sequence[SentenceUnit]) -> CandidateSet:
-        cues = self.cues
         decisions: list[DecisionCandidate] = []
         actions: list[ActionCandidate] = []
         questions: list[QuestionCandidate] = []
         for unit in units:
+            spoken = language_of(unit, self.language)
+            cues = cues_for(spoken)
             folded = fold_for_matching(unit.text)
-            decision = _decision_of(unit, folded, cues, self.language)
+            decision = _decision_of(unit, folded, cues, spoken)
             if decision is not None:
                 statement, rationale, rationale_unit = split_rationale(
-                    unit, units, cues, self.options.rationale_window, self.language
+                    unit, units, cues, self.options.rationale_window, spoken
                 )
                 decisions.append(
                     DecisionCandidate(
@@ -457,12 +463,10 @@ class CandidateExtractor:
                     )
                 )
                 continue
-            action = _action_of(
-                unit, units, self.directory, cues, self.options, self.language, self.reference_date
-            )
+            action = _action_of(unit, units, self.directory, cues, self.options, spoken, self.reference_date)
             if action is not None:
                 actions.append(action)
-            question = _question_of(unit, units, cues, self.options, self.language)
+            question = _question_of(unit, units, cues, self.options, spoken)
             if question is not None and not question.answered:
                 questions.append(question)
         return CandidateSet(

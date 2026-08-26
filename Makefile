@@ -4,7 +4,7 @@ MODELS_DIR ?= $(CURDIR)/models
 EVAL_DIR ?= $(CURDIR)/bench/data
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev models bench bench-all bench-ami bench-summre bench-data-summre gates bench-asr bench-meetings bench-data bench-data-ami test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
+.PHONY: help install install-dev models bench bench-all bench-ami bench-summre bench-data-summre gates bench-asr bench-meetings bench-mixed bench-data bench-data-ami test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
 
 help:
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -32,6 +32,9 @@ bench-asr: ## Benchmark speech recognition in French and English
 
 bench-meetings: ## Benchmark meeting transcription with speaker attribution
 	$(PYTHON) -m hansard.evaluation.run meetings --output bench/results/synthetic_meetings.json
+
+bench-mixed: ## Benchmark the code-switched French/English meetings only
+	$(PYTHON) -m hansard.evaluation.run meetings --language mixed --output bench/results/mixed_meetings.json
 
 bench-data-summre: ## Fetch a real French meeting from the SUMM-RE corpus
 	$(PYTHON) -m hansard.evaluation.prepare --output $(EVAL_DIR) --summ-re --skip-fleurs --skip-meetings
