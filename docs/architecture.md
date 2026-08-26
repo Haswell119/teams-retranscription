@@ -92,6 +92,10 @@ join URL
 ┌──────────────────────────────────────────────────────────────────┐
 │ PulseAudio null sink is created; Chromium starts under Xvfb and  │
 │ plays into it. ffmpeg records the sink's monitor source to WAV.  │
+│ On admission every playback stream is claimed for that sink, and │
+│ the level of the growing WAV is probed throughout the meeting:   │
+│ silence re-runs the claim, a dead recorder restarts into a new   │
+│ segment and the segments are stitched back together at the end.  │
 │ In parallel the browser session reports roster changes and the   │
 │ active-speaker signal, which a reducer folds into a timeline.    │
 └──────────────────────────────────────────────────────────────────┘

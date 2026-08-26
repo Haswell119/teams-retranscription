@@ -390,3 +390,44 @@ async def test_a_missing_roster_toggle_is_reported_rather_than_raised():
     session, _ = build_session([screen])
     await session._start_runtime(CLASSIC_LINK)
     assert not await session.open_roster()
+
+
+async def test_a_navigation_that_fails_once_is_retried_rather_than_losing_the_meeting():
+    flaky = launcher_screen()
+    flaky.failed_navigations = 1
+    healthy = launcher_screen()
+    session, factory = build_session([flaky, healthy])
+    outcome = await session.join(CLASSIC_LINK)
+    assert outcome.attempts == 2
+    assert outcome.state is MeetingState.IN_MEETING
+    assert factory.runtimes[0].closed
+
+
+async def test_navigation_retries_are_bounded_and_report_the_original_failure():
+    flaky = launcher_screen()
+    flaky.failed_navigations = 5
+    session, factory = build_session([flaky], max_join_attempts=2)
+    with pytest.raises(CaptureError, match="could not open the meeting link"):
+        await session.join(CLASSIC_LINK)
+    assert len(factory.runtimes) == 2
+
+
+async def test_a_hangup_button_hidden_by_the_fading_toolbar_still_reads_as_in_meeting():
+    screen = FakeScreen(hidden={HANGUP}, text="")
+    session, _ = build_session([screen])
+    await session._start_runtime(CLASSIC_LINK)
+    assert await session.detect_state() is MeetingState.IN_MEETING
+
+
+async def test_a_hidden_hangup_button_does_not_outvote_a_page_that_says_the_meeting_ended():
+    screen = FakeScreen(hidden={HANGUP}, text="This meeting has ended")
+    session, _ = build_session([screen])
+    await session._start_runtime(CLASSIC_LINK)
+    assert await session.detect_state() is MeetingState.ENDED
+
+
+def test_chromium_is_told_not_to_throttle_the_instrumentation_timers():
+    assert "--disable-background-timer-throttling" in CHROMIUM_ARGUMENTS
+    assert "--disable-backgrounding-occluded-windows" in CHROMIUM_ARGUMENTS
+    assert "--disable-renderer-backgrounding" in CHROMIUM_ARGUMENTS
+    assert "--disable-ipc-flooding-protection" in CHROMIUM_ARGUMENTS

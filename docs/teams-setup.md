@@ -263,11 +263,11 @@ Every failure below is reported by Hansard with a specific message; nothing fail
 | `CaptureError: the meeting ended before the notetaker was admitted` (subCode 5000) | the meeting finished first | none needed |
 | `CaptureError: the notetaker was removed from the meeting` (subCode 5300) | someone removed it | expected behaviour: respect the decision |
 | `MeetingJoinRefused: tenant policy blocked the notetaker` | an organisation policy page was shown | check meeting policy and sensitivity labels on the meeting |
-| `CaptureError: Teams kept redirecting to the light experience` | Teams pushed the browser to its reduced web experience | usually transient; Hansard already retries once with a fresh browser. Persisting: check the Chromium version in the image |
+| `CaptureError: Teams kept redirecting to the light experience` | Teams pushed the browser to its reduced web experience | usually transient; Hansard already retries with a fresh browser, `HANSARD_CAPTURE__JOIN_ATTEMPTS` times. Persisting: check the Chromium version in the image |
 | `CaptureError: ... no audible audio` | an hour of silence was recorded | the container's PulseAudio null sink is not the default output, or Chromium was started with `--mute-audio`. Use the shipped Dockerfile/entrypoint |
 | `CaptureError: PulseAudio is not reachable` | no sound server in the container | start `pulseaudio` before the worker; the shipped entrypoint does this |
 | `CaptureError: pactl is not installed` | image missing `pulseaudio-utils` | use the shipped image |
-| `CaptureError: ffmpeg stopped writing ...` | the monitor source disappeared mid-capture | check that nothing else unloaded the null sink |
+| `CaptureError: ffmpeg stopped writing ...` | the monitor source disappeared mid-capture | check that nothing else unloaded the null sink. The recorder restarts into a fresh segment first and only surfaces this once `HANSARD_CAPTURE__RECORDER_RESTART_ATTEMPTS` is spent |
 | Transcript has speakers but no names | the roster signal never arrived (Teams changed the signalling format) | the capture still succeeds; diarisation labels speakers generically. Check the health counters in the capture diagnostics |
 | Names attached to the wrong speaker near turn changes | metadata trails the audio | Hansard marks close calls as *contested* rather than guessing; tune `metadata_lag_seconds` (measured 1.25–2.0 s in the wild) |
 
@@ -317,6 +317,19 @@ PulseAudio → null sink + muted virtual microphone → the worker**. Points wor
 - The browser runs **headful** under Xvfb, not `--headless`. Headless Chromium behaves differently
   for WebRTC media and is treated as a bot signal.
 - Playwright's default `--mute-audio` flag is explicitly removed. Without that, you record silence.
+- Nothing ever raises or focuses that window, so Chromium is entitled to decide it is occluded and
+  clamp the page's timers to roughly once a minute. The instrumentation that attributes speech runs
+  on a 100 ms interval; clamped, it reports a meeting nobody spoke in. The browser is therefore
+  launched with `--disable-background-timer-throttling`,
+  `--disable-backgrounding-occluded-windows` and `--disable-renderer-backgrounding`. The same
+  instrumentation calls its exposed binding far more often than an ordinary page would — which is
+  exactly what Chromium's IPC flood protection exists to throttle — so
+  `--disable-ipc-flooding-protection` goes with them.
+- The moment the bot is admitted, every PulseAudio playback stream is moved onto the capture sink
+  and the sink is unmuted. Setting the default sink is not enough on its own: PulseAudio restores
+  each stream to whichever sink it played to last, and a sink created after the browser started is
+  not adopted at all. See
+  [troubleshooting](troubleshooting.md#the-capture-recorded-silence-and-you-want-to-know-before-the-meeting-ends).
 - The entrypoint runs the worker as a **child process** and forwards `SIGTERM`/`SIGINT`/`SIGHUP` to
   it, then waits in a loop. A pod deletion therefore stops the capture cleanly instead of escalating
   to `SIGKILL` in the middle of a meeting.

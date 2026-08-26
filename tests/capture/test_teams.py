@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -10,6 +11,7 @@ from conftest import (
     VOLUMEDETECT_SILENT,
     FakeLauncher,
     FakePactl,
+    FakeProcess,
     ProbeRunner,
     StepClock,
     capture_settings,
@@ -17,7 +19,7 @@ from conftest import (
 )
 
 from hansard.adapters.capture.audio.pulse import PulseAudioSink, PulseSinkPlan
-from hansard.adapters.capture.audio.recorder import FfmpegRecorder
+from hansard.adapters.capture.audio.recorder import FfmpegRecorder, RecorderSettings
 from hansard.adapters.capture.browser.events import CaptureEvent, TimelineSettings
 from hansard.adapters.capture.browser.session import JoinOutcome, MeetingState
 from hansard.adapters.capture.teams import StopReason, TeamsBrowserCapture
@@ -110,7 +112,7 @@ class FakeSession:
 
 
 def build_capture(volumedetect: str = VOLUMEDETECT_LOUD, **session_kwargs):
-    pactl = FakePactl()
+    pactl = session_kwargs.pop("pactl", None) or FakePactl()
     pulse = PulseAudioSink(
         plan=PulseSinkPlan(sink_name="hansard_sink"),
         runner=pactl,
@@ -118,8 +120,8 @@ def build_capture(volumedetect: str = VOLUMEDETECT_LOUD, **session_kwargs):
         sleep=nosleep,
         poll_seconds=0.0,
     )
-    launcher = FakeLauncher()
-    recorder = FfmpegRecorder(
+    launcher = session_kwargs.pop("launcher", None) or FakeLauncher()
+    recorder = session_kwargs.pop("recorder", None) or FfmpegRecorder(
         source=pulse.monitor_source,
         launcher=launcher,
         runner=ProbeRunner(volumedetect),
@@ -364,3 +366,136 @@ async def test_announcement_falls_back_to_the_forced_ui_locale(tmp_path):
     capture.ui_locale = "fr-FR"
     await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
     assert sessions[0].announced == [DEFAULT_ANNOUNCEMENTS["fr"]]
+
+
+def pcm(sample: int, count: int = 16_000) -> bytes:
+    return int(sample).to_bytes(2, "little", signed=True) * count
+
+
+def build_recorder(pactl: FakePactl, *, tail: bytes, launcher=None, **overrides) -> FfmpegRecorder:
+    sizes = iter(range(1_000_000, 100_000_000, 1_000))
+    runner = ProbeRunner(VOLUMEDETECT_LOUD)
+
+    def stitch(command: Sequence[str]) -> None:
+        if "concat" in command:
+            Path(command[-1]).write_bytes(b"\0" * 200_000)
+
+    runner.on_run = stitch
+    return FfmpegRecorder(
+        source="hansard_sink.monitor",
+        launcher=launcher or FakeLauncher(),
+        runner=runner,
+        clock=StepClock(step=1.0),
+        sleep=nosleep,
+        size_of=lambda _path: next(sizes),
+        read_tail=lambda _path, _count: tail,
+        **overrides,
+    )
+
+
+async def test_the_browser_playback_stream_is_claimed_as_soon_as_the_bot_is_admitted(tmp_path):
+    pactl = FakePactl(sink_inputs={"5": "99"})
+    capture, _, _, _ = build_capture(pactl=pactl)
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert pactl.sink_inputs["5"] == pactl.sink_index("hansard_sink")
+
+
+async def test_a_capture_that_records_silence_has_its_routing_repaired_during_the_meeting(tmp_path):
+    pactl = FakePactl()
+    capture, _, _, _ = build_capture(
+        pactl=pactl,
+        recorder=build_recorder(pactl, tail=pcm(0)),
+        settings=capture_settings(
+            max_duration_seconds=6,
+            silence_timeout_seconds=3_600,
+            alone_timeout_seconds=3_600,
+            audio_probe_seconds=1.0,
+            audio_repair_after_seconds=0,
+        ),
+    )
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    diagnostics = capture.last_diagnostics
+    assert diagnostics is not None
+    assert diagnostics.audio_repairs >= 1
+    assert diagnostics.last_level is not None and diagnostics.last_level.is_silent
+
+
+async def test_audible_audio_is_not_repaired_and_is_reported(tmp_path):
+    pactl = FakePactl()
+    capture, _, _, _ = build_capture(
+        pactl=pactl,
+        recorder=build_recorder(pactl, tail=pcm(12_000)),
+        settings=capture_settings(
+            max_duration_seconds=6,
+            silence_timeout_seconds=3_600,
+            alone_timeout_seconds=3_600,
+            audio_probe_seconds=1.0,
+            audio_repair_after_seconds=0,
+        ),
+    )
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    diagnostics = capture.last_diagnostics
+    assert diagnostics is not None
+    assert diagnostics.audio_repairs == 0
+    assert diagnostics.last_level is not None and diagnostics.last_level.is_audible
+
+
+async def test_a_meeting_that_is_still_audible_is_not_left_for_silence(tmp_path):
+    pactl = FakePactl()
+    capture, _, _, _ = build_capture(
+        pactl=pactl,
+        recorder=build_recorder(pactl, tail=pcm(12_000)),
+        settings=capture_settings(
+            max_duration_seconds=6,
+            silence_timeout_seconds=2,
+            alone_timeout_seconds=3_600,
+            audio_probe_seconds=1.0,
+        ),
+    )
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert capture.last_diagnostics is not None
+    assert capture.last_diagnostics.stop_reason is StopReason.MAX_DURATION
+
+
+async def test_a_recorder_that_dies_mid_meeting_is_restarted_instead_of_losing_the_capture(tmp_path):
+    pactl = FakePactl()
+    launcher = FakeLauncher(processes=[FakeProcess(returncode=1), FakeProcess()])
+    capture, _, _, _ = build_capture(
+        pactl=pactl,
+        recorder=build_recorder(pactl, tail=pcm(12_000), launcher=launcher),
+        settings=capture_settings(
+            max_duration_seconds=4,
+            silence_timeout_seconds=3_600,
+            alone_timeout_seconds=3_600,
+        ),
+    )
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    diagnostics = capture.last_diagnostics
+    assert diagnostics is not None
+    assert diagnostics.stop_reason is StopReason.MAX_DURATION
+    assert diagnostics.recorder_restarts == 1
+    assert len(launcher.commands) == 2
+
+
+async def test_a_recorder_that_cannot_be_restarted_stops_the_capture_and_keeps_the_audio(tmp_path):
+    pactl = FakePactl()
+    launcher = FakeLauncher(processes=[FakeProcess(returncode=1)])
+    capture, sessions, _, _ = build_capture(
+        pactl=pactl,
+        recorder=build_recorder(
+            pactl,
+            tail=pcm(12_000),
+            launcher=launcher,
+            settings=RecorderSettings(max_restarts=0),
+        ),
+        settings=capture_settings(
+            max_duration_seconds=3_600,
+            silence_timeout_seconds=3_600,
+            alone_timeout_seconds=3_600,
+        ),
+    )
+    result = await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert capture.last_diagnostics is not None
+    assert capture.last_diagnostics.stop_reason is StopReason.RECORDER_FAILED
+    assert result.audio_path.name.endswith(".wav")
+    assert sessions[0].left

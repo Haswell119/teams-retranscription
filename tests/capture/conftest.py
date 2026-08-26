@@ -36,6 +36,7 @@ class FakeScreen:
     navigations: list[str] = field(default_factory=list)
     polls: int = 0
     redirect_to: str | None = None
+    failed_navigations: int = 0
     on_click: Callable[[FakeScreen, str], None] | None = None
     on_poll: Callable[[FakeScreen], None] | None = None
     snapshot: dict[str, Any] = field(default_factory=dict)
@@ -121,6 +122,9 @@ class FakePage:
 
     async def goto(self, url: str, timeout: float | None = None) -> None:
         self.screen.navigations.append(url)
+        if self.screen.failed_navigations > 0:
+            self.screen.failed_navigations -= 1
+            raise RuntimeError("net::ERR_NAME_NOT_RESOLVED")
         self.screen.url = self.screen.redirect_to or url
 
     async def inner_text(self, selector: str, timeout: float | None = None) -> str:
@@ -246,15 +250,31 @@ def capture_settings(**overrides: Any) -> CaptureSettings:
 
 
 class FakePactl:
-    def __init__(self, sinks=(), sources=(), server_ok=True, installed=True, monitor_ready=True):
+    def __init__(
+        self,
+        sinks=(),
+        sources=(),
+        server_ok=True,
+        installed=True,
+        monitor_ready=True,
+        sink_inputs=None,
+        sink_muted=False,
+    ):
         self.sinks = set(sinks)
         self.sources = set(sources)
         self.server_ok = server_ok
         self.installed = installed
         self.monitor_ready = monitor_ready
+        # {sink-input index: sink index it is currently attached to}
+        self.sink_inputs: dict[str, str] = dict(sink_inputs or {})
+        self.sink_muted = sink_muted
+        self.unmuted_inputs: list[str] = []
         self.calls: list[tuple[str, ...]] = []
         self.unloaded: list[str] = []
         self._next_module = 100
+
+    def sink_index(self, name: str) -> str:
+        return str(sorted(self.sinks).index(name) + 1)
 
     def loaded_modules(self) -> list[str]:
         return [call[2] for call in self.calls if call[1] == "load-module"]
@@ -272,6 +292,12 @@ class FakePactl:
             for index, name in enumerate(sorted(names), start=1)
         )
 
+    def _input_table(self) -> str:
+        return "".join(
+            f"{stream}\t{sink}\t12\tprotocol-native.c\ts16le 2ch 48000Hz\n"
+            for stream, sink in sorted(self.sink_inputs.items())
+        )
+
     async def run(self, command: Sequence[str], timeout: float | None = None) -> CommandResult:
         self.calls.append(tuple(command))
         if not self.installed:
@@ -283,8 +309,24 @@ class FakePactl:
                 return CommandResult(1, stderr="Connection refused")
             return CommandResult(0, stdout="Server Name: pulseaudio\n")
         if verb == "list":
+            if arguments[2] == "sink-inputs":
+                return CommandResult(0, stdout=self._input_table())
             names = self.sinks if arguments[2] == "sinks" else self.sources
             return CommandResult(0, stdout=self._table(names))
+        if verb == "move-sink-input":
+            stream, sink = arguments[1], arguments[2]
+            if sink not in self.sinks:
+                return CommandResult(1, stderr=f"no such sink {sink}")
+            self.sink_inputs[stream] = self.sink_index(sink)
+            return CommandResult(0)
+        if verb == "set-sink-input-mute":
+            self.unmuted_inputs.append(arguments[1])
+            return CommandResult(0)
+        if verb == "get-sink-mute":
+            return CommandResult(0, stdout=f"Mute: {'yes' if self.sink_muted else 'no'}\n")
+        if verb == "set-sink-mute":
+            self.sink_muted = arguments[2] != "0"
+            return CommandResult(0)
         if verb == "load-module":
             module = arguments[1]
             if module == "module-null-sink":
@@ -330,23 +372,32 @@ class FakeProcess:
 
 
 class FakeLauncher:
-    def __init__(self, process: FakeProcess | None = None) -> None:
+    def __init__(self, process: FakeProcess | None = None, processes: Sequence[FakeProcess] = ()) -> None:
         self.process = process or FakeProcess()
+        self.queued = list(processes)
+        self.spawned: list[FakeProcess] = []
         self.commands: list[tuple[str, ...]] = []
 
     async def spawn(self, command: Sequence[str]) -> FakeProcess:
         self.commands.append(tuple(command))
+        if self.queued:
+            self.process = self.queued.pop(0)
+        self.spawned.append(self.process)
         return self.process
 
 
 class ProbeRunner:
     def __init__(self, stderr: str = "") -> None:
         self.stderr = stderr
+        self.returncode = 0
+        self.on_run: Callable[[Sequence[str]], None] | None = None
         self.commands: list[tuple[str, ...]] = []
 
     async def run(self, command: Sequence[str], timeout: float | None = None) -> CommandResult:
         self.commands.append(tuple(command))
-        return CommandResult(returncode=0, stderr=self.stderr)
+        if self.on_run is not None:
+            self.on_run(command)
+        return CommandResult(returncode=self.returncode, stderr=self.stderr)
 
 
 VOLUMEDETECT_LOUD = (

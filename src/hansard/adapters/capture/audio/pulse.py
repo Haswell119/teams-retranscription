@@ -14,6 +14,18 @@ REMAP_SOURCE_MODULE: Final[str] = "module-remap-source"
 
 
 @dataclass(frozen=True, slots=True)
+class RoutingReport:
+    playback_streams: int = 0
+    moved: tuple[str, ...] = ()
+    unmuted: tuple[str, ...] = ()
+    sink_unmuted: bool = False
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.moved or self.unmuted or self.sink_unmuted)
+
+
+@dataclass(frozen=True, slots=True)
 class CommandResult:
     returncode: int
     stdout: str = ""
@@ -163,6 +175,57 @@ class PulseAudioSink:
                     f"{self.readiness_timeout_seconds:g}s; the null sink was not created correctly"
                 )
             await self.sleep(self.poll_seconds)
+
+    @staticmethod
+    def _rows(stdout: str) -> list[list[str]]:
+        rows: list[list[str]] = []
+        for line in stdout.splitlines():
+            columns = [column.strip() for column in line.split("\t")]
+            if len(columns) >= 2 and columns[0]:
+                rows.append(columns)
+        return rows
+
+    async def _short(self, kind: str) -> list[list[str]]:
+        result = await self._pactl("list", "short", kind)
+        if not result.ok:
+            return []
+        return self._rows(result.stdout)
+
+    async def _sink_index(self, name: str) -> str | None:
+        for columns in await self._short("sinks"):
+            if columns[1] == name:
+                return columns[0]
+        return None
+
+    async def route_playback_to_capture(self) -> RoutingReport:
+        sink = self.plan.sink_name
+        index = await self._sink_index(sink)
+        if index is None:
+            return RoutingReport()
+        moved: list[str] = []
+        unmuted: list[str] = []
+        streams = await self._short("sink-inputs")
+        for columns in streams:
+            stream = columns[0]
+            if columns[1] == index:
+                continue
+            if not (await self._pactl("move-sink-input", stream, sink)).ok:
+                continue
+            moved.append(stream)
+            if (await self._pactl("set-sink-input-mute", stream, "0")).ok:
+                unmuted.append(stream)
+        return RoutingReport(
+            playback_streams=len(streams),
+            moved=tuple(moved),
+            unmuted=tuple(unmuted),
+            sink_unmuted=await self._unmute_sink(sink),
+        )
+
+    async def _unmute_sink(self, sink: str) -> bool:
+        state = await self._pactl("get-sink-mute", sink)
+        was_muted = state.ok and "yes" in state.stdout.strip().casefold()
+        applied = (await self._pactl("set-sink-mute", sink, "0")).ok
+        return was_muted and applied
 
     async def start(self) -> None:
         if self._started:

@@ -98,3 +98,55 @@ async def test_context_manager_starts_and_stops():
     async with build_sink(pactl) as sink:
         assert sink.started
     assert pactl.unloaded
+
+
+async def test_a_stray_playback_stream_is_moved_onto_the_capture_sink():
+    pactl = FakePactl(
+        sinks={"hansard_sink", "hansard_tts"},
+        sources={"hansard_sink.monitor", "hansard_tts.monitor", "hansard_mic"},
+        sink_inputs={"7": "9"},
+    )
+    sink = build_sink(pactl)
+    await sink.start()
+    report = await sink.route_playback_to_capture()
+    assert report.moved == ("7",)
+    assert report.playback_streams == 1
+    assert report.changed
+    assert pactl.sink_inputs["7"] == pactl.sink_index("hansard_sink")
+    assert pactl.unmuted_inputs == ["7"]
+
+
+async def test_a_stream_already_on_the_capture_sink_is_left_alone():
+    pactl = FakePactl(
+        sinks={"hansard_sink", "hansard_tts"},
+        sources={"hansard_sink.monitor", "hansard_tts.monitor", "hansard_mic"},
+    )
+    sink = build_sink(pactl)
+    await sink.start()
+    pactl.sink_inputs = {"3": pactl.sink_index("hansard_sink")}
+    report = await sink.route_playback_to_capture()
+    assert report.moved == ()
+    assert not report.changed
+    assert "move-sink-input" not in {call[1] for call in pactl.calls}
+
+
+async def test_a_muted_capture_sink_is_unmuted_because_its_monitor_records_the_mute():
+    pactl = FakePactl(
+        sinks={"hansard_sink", "hansard_tts"},
+        sources={"hansard_sink.monitor", "hansard_tts.monitor", "hansard_mic"},
+        sink_muted=True,
+    )
+    sink = build_sink(pactl)
+    await sink.start()
+    report = await sink.route_playback_to_capture()
+    assert report.sink_unmuted
+    assert report.changed
+    assert not pactl.sink_muted
+
+
+async def test_routing_without_a_capture_sink_reports_nothing_rather_than_failing():
+    pactl = FakePactl(sinks=set(), sources=set())
+    sink = build_sink(pactl)
+    report = await sink.route_playback_to_capture()
+    assert report.playback_streams == 0
+    assert not report.changed
