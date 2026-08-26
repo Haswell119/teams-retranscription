@@ -340,3 +340,53 @@ async def test_instrumentation_ready_flag_is_set_from_the_binding():
     assert not session.instrumentation_ready
     factory.latest.emit({"kind": "ready", "at_epoch_ms": 5, "href": "https://teams.microsoft.com"})
     assert session.instrumentation_ready
+
+
+async def test_a_hangup_button_left_mounted_but_hidden_no_longer_reads_as_in_meeting():
+    screen = FakeScreen(present={HANGUP})
+    session, _ = build_session([screen])
+    await session._start_runtime(CLASSIC_LINK)
+    assert await session.detect_state() is MeetingState.IN_MEETING
+    screen.present.discard(HANGUP)
+    screen.hidden.add(HANGUP)
+    screen.text = "La réunion est terminée"
+    assert await session.detect_state() is MeetingState.ENDED
+
+
+async def test_a_disabled_hangup_button_still_does_not_read_as_in_meeting():
+    screen = FakeScreen(present={HANGUP}, attributes={HANGUP: {"aria-disabled": "true"}})
+    session, _ = build_session([screen])
+    await session._start_runtime(CLASSIC_LINK)
+    assert await session.detect_state() is MeetingState.UNKNOWN
+
+
+async def test_opening_the_roster_clicks_the_toggle_and_confirms_the_panel():
+    toggle = selectors.ROSTER_PANEL_TOGGLE[0]
+    panel = selectors.ROSTER_PANEL[0]
+    screen = FakeScreen(present={HANGUP, toggle})
+
+    def on_click(current: FakeScreen, selector: str) -> None:
+        if selector == toggle:
+            current.show(panel)
+
+    screen.on_click = on_click
+    session, _ = build_session([screen])
+    await session._start_runtime(CLASSIC_LINK)
+    assert await session.open_roster()
+    assert toggle in screen.clicks
+
+
+async def test_an_already_open_roster_is_left_alone():
+    panel = selectors.ROSTER_PANEL[0]
+    screen = FakeScreen(present={HANGUP, panel})
+    session, _ = build_session([screen])
+    await session._start_runtime(CLASSIC_LINK)
+    assert await session.open_roster()
+    assert not screen.clicks
+
+
+async def test_a_missing_roster_toggle_is_reported_rather_than_raised():
+    screen = FakeScreen(present={HANGUP})
+    session, _ = build_session([screen])
+    await session._start_runtime(CLASSIC_LINK)
+    assert not await session.open_roster()

@@ -109,6 +109,49 @@ In Kubernetes, this error means the init container did not populate the models
 volume, or the worker mounted a different volume than the one it filled. See
 [deployment](deployment.md).
 
+### `cp: can't create directory '/models/./silero': Permission denied`
+
+From `docker compose run --rm models`, on a compose stack older than this fix.
+Docker creates the `models` volume owned by `root:root` the first time it is
+mounted, and the copier ran unprivileged, so it could not write into it. The
+compose file now runs that one service as root and the copier hands the
+directory back to `10001:10001` before it exits; every service that reads the
+weights mounts them read-only.
+
+Pull the current `deploy/compose/docker-compose.yml` and re-run. To repair a
+volume left behind by the old file without re-downloading:
+
+```bash
+docker run --rm -v hansard_models:/models busybox chown -R 10001:10001 /models
+```
+
+---
+
+## It will not start at all
+
+### `SettingsError: error parsing value for field "delivery" from source "EnvSettingsSource"`
+
+Wrapped around a `json.decoder.JSONDecodeError`. A setting whose type is a list
+or tuple was given a bare word. pydantic-settings parses complex types as JSON,
+so every one of them needs JSON syntax in the environment:
+
+```bash
+HANSARD_DELIVERY__DEFAULT_CHANNELS='["filesystem"]'      # right
+HANSARD_DELIVERY__DEFAULT_CHANNELS=filesystem            # JSONDecodeError
+```
+
+The shipped `deploy/compose/docker-compose.yml` had the bare form and has been
+fixed. If you are running an older copy, either update it or drop the line
+entirely — `("filesystem",)` is already the default.
+
+The same rule covers `HANSARD_ASR__DRIFT_LADDER_SECONDS`,
+`HANSARD_RUNTIME__*` tuples and any other list-valued setting. The full list is
+in [configuration](configuration.md).
+
+Note that the error names the top-level section, `delivery`, not the field
+inside it, so read the whole section's environment rather than only the setting
+you last changed.
+
 ---
 
 ## Speakers are wrong
@@ -336,6 +379,49 @@ join still fails, wait and retry before changing anything else.
 If the bot joins but the interface is in an unexpected language and the join
 buttons are not found, pin the Teams interface language — see
 [Teams setup §3](teams-setup.md#3-pinning-the-teams-interface-language).
+
+---
+
+## The meeting ended but the bot stayed in it
+
+The bot leaves as soon as one of these fires, checked once per
+`HANSARD_CAPTURE__ROSTER_POLL_SECONDS` (default 1s):
+
+| Signal | Setting | Default |
+| --- | --- | --- |
+| A `call_end` termination in the Teams signalling traffic | — | immediate |
+| The page reports *Meeting ended* / *La réunion est terminée*, or the notetaker was removed | — | immediate |
+| Nobody has spoken | `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` | 600 |
+| The notetaker is the only one left in the roster | `HANSARD_CAPTURE__ALONE_TIMEOUT_SECONDS` | 120 |
+| The meeting has run too long | `HANSARD_CAPTURE__MAX_DURATION_SECONDS` | 14400 |
+
+The alone timeout arms only once the notetaker has actually seen a roster, so
+Hansard opens the participants panel right after joining. If that panel cannot
+be opened — a Teams interface language whose *People* button carries a label
+Hansard does not know — the log carries:
+
+```
+capture.roster_panel_unavailable
+```
+
+and the alone timeout stays disarmed. Pin the interface language
+([Teams setup §3](teams-setup.md#3-pinning-the-teams-interface-language)); the
+silence and duration timeouts still apply.
+
+The state the bot believes it is in is logged on every transition:
+
+```
+capture.meeting_state state=in_meeting saw_roster=True
+```
+
+If that line stays on `in_meeting` after the meeting is visibly over, Teams is
+still reporting an active call to the page. If it reads `unknown`, the page is
+showing something Hansard does not recognise. Either way the capture is not
+lost: it stops at the silence or duration timeout and transcribes what it has.
+
+Lower `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` for short test meetings — with
+the 600s default a bot that misses the end signal keeps recording silence for
+ten minutes.
 
 ---
 

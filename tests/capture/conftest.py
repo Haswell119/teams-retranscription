@@ -28,6 +28,7 @@ class FakeScreen:
     url: str = "https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc/0"
     text: str = ""
     present: set[str] = field(default_factory=set)
+    hidden: set[str] = field(default_factory=set)
     attributes: dict[str, dict[str, str]] = field(default_factory=dict)
     clicks: list[str] = field(default_factory=list)
     fills: list[tuple[str, str]] = field(default_factory=list)
@@ -66,16 +67,24 @@ class FakeLocator:
         return self
 
     def _matched(self) -> str | None:
+        mounted = self._screen.present | self._screen.hidden
+        for candidate in self._selectors:
+            if candidate in mounted:
+                return candidate
+        return None
+
+    def _shown(self) -> str | None:
         for candidate in self._selectors:
             if candidate in self._screen.present:
                 return candidate
         return None
 
     async def count(self) -> int:
-        return sum(1 for candidate in self._selectors if candidate in self._screen.present)
+        mounted = self._screen.present | self._screen.hidden
+        return sum(1 for candidate in self._selectors if candidate in mounted)
 
     async def is_visible(self, timeout: float | None = None) -> bool:
-        return self._matched() is not None
+        return self._shown() is not None
 
     async def get_attribute(self, name: str, timeout: float | None = None) -> str | None:
         matched = self._matched()

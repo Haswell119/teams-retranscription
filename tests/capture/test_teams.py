@@ -50,6 +50,7 @@ class FakeSession:
         tick_events: Sequence[Mapping[str, Any]] = (),
         join_error: Exception | None = None,
         can_announce: bool = True,
+        can_open_roster: bool = True,
     ) -> None:
         self.sink = sink
         self.states = list(states)
@@ -57,6 +58,8 @@ class FakeSession:
         self.tick_events = list(tick_events)
         self.join_error = join_error
         self.can_announce = can_announce
+        self.can_open_roster = can_open_roster
+        self.roster_opened = 0
         self.announced: list[str] = []
         self.joined: list[str] = []
         self.left = False
@@ -87,6 +90,10 @@ class FakeSession:
     async def announce(self, message: str) -> bool:
         self.announced.append(message)
         return self.can_announce
+
+    async def open_roster(self) -> bool:
+        self.roster_opened += 1
+        return self.can_open_roster
 
     async def detect_state(self) -> MeetingState:
         if self.tick_events:
@@ -220,6 +227,19 @@ async def test_alone_timeout_stops_the_capture(tmp_path):
     await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
     assert capture.last_diagnostics is not None
     assert capture.last_diagnostics.stop_reason is StopReason.ALONE_TIMEOUT
+
+
+async def test_the_roster_panel_is_opened_so_the_alone_timeout_can_arm(tmp_path):
+    capture, sessions, _, _ = build_capture()
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert sessions[0].roster_opened == 1
+
+
+async def test_a_roster_panel_that_will_not_open_does_not_stop_the_capture(tmp_path):
+    capture, sessions, _, _ = build_capture(can_open_roster=False)
+    await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert sessions[0].roster_opened == 1
+    assert capture.last_diagnostics is not None
 
 
 async def test_meeting_end_state_stops_the_capture(tmp_path):

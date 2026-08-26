@@ -110,6 +110,16 @@ CHAT_PANEL_TOGGLE: Final[tuple[str, ...]] = (
     'button[aria-label="Conversation"]',
 )
 
+ROSTER_PANEL_TOGGLE: Final[tuple[str, ...]] = (
+    '[data-tid="roster-button"]',
+    '[data-tid="toggle-roster"]',
+    'button[aria-label="People"]',
+    'button[aria-label="Show participants"]',
+    'button[aria-label="Participants"]',
+    'button[aria-label="Personnes"]',
+    'button[aria-label="Afficher les participants"]',
+)
+
 ROSTER_PANEL: Final[tuple[str, ...]] = (
     '[data-tid="roster"]',
     '[data-tid="roster-list"]',

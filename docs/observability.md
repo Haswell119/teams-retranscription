@@ -134,6 +134,28 @@ counts the languages that passed the minority threshold and `code_switched` is `
 than one did — so a dashboard can tell a bilingual meeting from a monolingual one without reading
 the transcript. Neither field carries any text.
 
+### Capture events
+
+A live Teams capture emits two events of its own, from `TeamsBrowserCapture`. Neither carries any
+meeting content.
+
+| Event | Level | Fields | Meaning |
+| --- | --- | --- | --- |
+| `capture.meeting_state` | INFO | `state`, `saw_roster` | The notetaker's reading of the page changed |
+| `capture.roster_panel_unavailable` | WARNING | | The participants panel could not be opened |
+
+`capture.meeting_state` is emitted on transitions only, not on every poll, so a healthy meeting
+produces one line at admission and one when it ends. It is the first thing to read when a bot stays
+in a call that is visibly over: `in_meeting` means Teams is still presenting an active call to the
+page, `unknown` means the page is showing something Hansard does not recognise.
+
+`saw_roster` reports whether any roster has been observed yet. It matters because
+`HANSARD_CAPTURE__ALONE_TIMEOUT_SECONDS` arms only once a roster has been seen — a notetaker that
+cannot see who else is in the meeting cannot conclude it is alone. Roster observations come from the
+participants panel, which Hansard opens after joining; `capture.roster_panel_unavailable` says that
+open failed, and that the alone timeout is therefore disarmed for this meeting. The silence and
+duration timeouts are unaffected.
+
 Delivery adds `delivery.completed` and `delivery.failed` with the channel and the duration — never
 the recipient.
 
