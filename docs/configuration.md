@@ -431,6 +431,13 @@ of this works is in [Teams setup](teams-setup.md).
 | `BROWSER_BINARY` | path \| null | unset | Path to a specific Chromium. Unset lets Playwright pick the one it installed. |
 | `PULSE_SINK_NAME` | str | `hansard_sink` | The PulseAudio null sink the browser plays into; the recorder reads `<name>.monitor`. Change it only if you run more than one bot per audio server. |
 | `ROSTER_POLL_SECONDS` | float | `1.0` | How often the roster and meeting state are re-read. Lowering it sharpens the active-speaker timeline and costs CPU. |
+| `JOIN_ATTEMPTS` | int | `3` | How many times the bot restarts Chromium and tries the link again when a join attempt fails for a reason worth retrying — a lost navigation, a browser that would not launch, a redirect into the Teams light experience. A refusal, a denied request and a lobby timeout are answers, not failures, and are never retried. |
+| `AUDIO_PROBE_SECONDS` | float | `15.0` | How often the level of the audio being recorded is measured while the meeting runs. `0` disables the probe, and with it the repair below. |
+| `AUDIO_PROBE_WINDOW_SECONDS` | float | `8.0` | How much of the tail of the recording each probe reads. |
+| `AUDIO_SILENCE_FLOOR_DBFS` | float | `-60.0` | Peak level at or below which a probe counts as silence. Also the floor used by the post-meeting `volumedetect` check. |
+| `AUDIO_REPAIR_AFTER_SECONDS` | int | `45` | How long the recording has to stay flat before the browser's playback stream is moved back onto the capture sink. |
+| `AUDIO_REPAIR_ATTEMPTS` | int | `4` | How many such repairs one meeting may attempt. Past that the capture keeps running and the failure is left to the diagnostics. |
+| `RECORDER_RESTART_ATTEMPTS` | int | `3` | How many times ffmpeg may be restarted into a fresh segment after it dies or stalls mid-meeting. The segments are stitched back together at the end. `0` restores the old behaviour: one failure ends the capture. |
 
 ---
 

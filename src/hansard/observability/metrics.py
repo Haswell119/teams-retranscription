@@ -357,6 +357,26 @@ OBJECT_STORAGE_REACHABLE: Final[Gauge] = _gauge(
     "object_storage_reachable", "1 when the artifact store answered its last health probe"
 )
 
+CAPTURE_AUDIO_LEVEL: Final[Gauge] = _gauge(
+    "capture_audio_peak_dbfs", "Peak level of the most recent meeting-audio probe, in dBFS"
+)
+
+CAPTURE_AUDIO_REPAIRS: Final[Counter] = _counter(
+    "capture_audio_repairs_total",
+    "Attempts to re-route browser playback into the capture sink, by outcome",
+    ("result",),
+)
+
+CAPTURE_RECORDER_RESTARTS: Final[Counter] = _counter(
+    "capture_recorder_restarts_total",
+    "Recorder restarts after ffmpeg died or stalled mid-meeting, by outcome",
+    ("result",),
+)
+
+CAPTURE_STOPS: Final[Counter] = _counter(
+    "capture_stops_total", "Captures that finished, counted by why the bot stopped", ("reason",)
+)
+
 
 def set_build_info(
     version: str,
@@ -440,6 +460,22 @@ def record_delivery(channel: str, result: str) -> None:
 
 def record_object_storage_reachable(reachable: bool) -> None:
     OBJECT_STORAGE_REACHABLE.set(1.0 if reachable else 0.0)
+
+
+def record_audio_level(peak_dbfs: float) -> None:
+    CAPTURE_AUDIO_LEVEL.set(float(peak_dbfs))
+
+
+def record_audio_repair(result: str) -> None:
+    CAPTURE_AUDIO_REPAIRS.labels(result=result).inc()
+
+
+def record_recorder_restart(result: str) -> None:
+    CAPTURE_RECORDER_RESTARTS.labels(result=result).inc()
+
+
+def record_capture_stop(reason: str) -> None:
+    CAPTURE_STOPS.labels(reason=reason).inc()
 
 
 def render_latest() -> tuple[bytes, str]:

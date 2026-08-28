@@ -290,16 +290,60 @@ capture = TeamsBrowserCapture(settings=settings)
 await capture.capture(request, workspace)
 
 diagnostics = capture.last_diagnostics
-print(diagnostics.stop_reason)         # meeting_ended, silence_timeout, alone_timeout, …
+print(diagnostics.stop_reason)         # meeting_ended, silence_timeout, recorder_failed, …
 print(diagnostics.silence)             # SilenceReport(mean_dbfs, max_dbfs, floor_dbfs)
+print(diagnostics.last_level)          # LevelReading from the last in-meeting probe
 print(diagnostics.degraded_signals)    # which roster/speaker signals produced nothing
+print(diagnostics.audio_repairs)       # times the playback routing had to be repaired
+print(diagnostics.recorder_restarts)   # times ffmpeg was restarted into a new segment
+print(diagnostics.segment_join_error)  # set when those segments could not be stitched
 print(diagnostics.waited_in_lobby, diagnostics.join_attempts, diagnostics.announced)
 ```
 
 A `stop_reason` of `silence_timeout` with `announced=True` means the bot joined,
 announced itself, and then heard nothing for the whole
 `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` window. That is an audio-routing
-failure, not a transcription failure.
+failure, not a transcription failure — and the section below is about finding
+that out during the meeting instead of after it.
+
+### The capture recorded silence, and you want to know before the meeting ends
+
+Measuring the finished file is too late: an hour of meeting is already gone. So
+the recorder is measured while it runs. Every
+`HANSARD_CAPTURE__AUDIO_PROBE_SECONDS` the last
+`HANSARD_CAPTURE__AUDIO_PROBE_WINDOW_SECONDS` of the growing WAV are read
+directly off disk and reduced to a peak, which is published as
+`hansard_capture_audio_peak_dbfs`. A capture that is recording nothing shows up
+there within the first minute.
+
+When the peak stays at or below `HANSARD_CAPTURE__AUDIO_SILENCE_FLOOR_DBFS` for
+`HANSARD_CAPTURE__AUDIO_REPAIR_AFTER_SECONDS`, the bot logs
+`capture.audio_silent` and tries to repair the most likely cause itself: every
+PulseAudio playback stream that is not on the capture sink is moved onto it, and
+the sink is unmuted. The same pass runs once unconditionally the moment the bot
+is admitted.
+
+That repair exists because setting the default sink is not enough to guarantee
+Chromium uses it. PulseAudio restores each stream to whichever sink it played to
+last, and a sink created after the browser started is not adopted at all. Either
+way the monitor records digital silence while the browser, the meeting and
+ffmpeg all report perfect health. A muted sink does the same thing, because a
+sink's monitor carries its mute.
+
+Watch for it in the logs and the metrics:
+
+```
+capture.audio_silent      silent_seconds=45.0 peak_dbfs=-120.0 attempt=1
+capture.audio_rerouted    occasion=silence moved=1 streams=1 sink_unmuted=False
+```
+
+```promql
+hansard_capture_audio_peak_dbfs                     # -120 while a bot is active is the alarm
+increase(hansard_capture_audio_repairs_total{result="moved"}[1h])
+```
+
+If `capture.audio_rerouted` never appears and the peak stays flat, the routing
+was already correct and the cause is elsewhere in the list below.
 
 ### `CaptureError: the capture contains no audible audio ...`
 
@@ -329,6 +373,26 @@ they are worth taking in that order:
 The audio server went away mid-meeting, or the sink was unloaded underneath the
 recorder. In a container, this means the entrypoint's PulseAudio process died.
 Check the container logs for the `[hansard-entrypoint]` lines.
+
+Neither of these ends the capture on its own any more. A meeting is an hour of
+audio that cannot be recorded twice, and losing all of it because the recorder
+fell over at minute fifty is the wrong trade. The bot logs
+`capture.recorder_failed`, starts a fresh segment beside the first
+(`<meeting>.part1.wav`, `.part2.wav`, …) and carries on, up to
+`HANSARD_CAPTURE__RECORDER_RESTART_ATTEMPTS` times. At the end the segments are
+concatenated back into the single `<meeting>.wav` the pipeline expects and the
+parts are removed. The gap is whatever the restart cost — seconds, not the
+meeting.
+
+When the budget runs out the capture stops with `stop_reason=recorder_failed`
+and still returns everything recorded up to that point. If the concatenation
+itself fails, the first segment is kept, `diagnostics.segment_join_error` says
+so and `capture.segments_not_joined` is logged; the remaining `.partN.wav` files
+are left on disk rather than discarded.
+
+```promql
+increase(hansard_capture_recorder_restarts_total{result="exhausted"}[1h])
+```
 
 ### `CaptureError: pactl is not installed` / `PulseAudio is not reachable`
 
@@ -375,6 +439,15 @@ from Hansard's side. The PowerShell to change each one is in
 
 Policy changes take time to propagate. If the PowerShell reports success and the
 join still fails, wait and retry before changing anything else.
+
+Those five are answers, not failures, and the bot never retries them. Everything
+that *is* worth retrying — Chromium refusing to launch, a navigation lost to a
+network blip, Teams bouncing the tab into its light experience — is retried up
+to `HANSARD_CAPTURE__JOIN_ATTEMPTS` times, each attempt from a fresh browser.
+`diagnostics.join_attempts` records how many it took, and a meeting that only
+ever succeeds on the second attempt is a signal about the host's network rather
+than about Teams. Once the attempts are spent, the original error is raised
+unchanged, so the table above still reads the way it always did.
 
 If the bot joins but the interface is in an unexpected language and the join
 buttons are not found, pin the Teams interface language — see
@@ -433,6 +506,36 @@ like any other. The guard tolerates the brief `unknown` that Teams shows while
 it re-renders, which is why it is a timeout rather than an immediate stop. Set
 it to `0` only if you would rather the bot sit through an unrecognised page
 until the silence or duration timeout.
+
+---
+
+## The bot left a meeting that was still going
+
+The two timeouts that can walk a bot out of a live meeting — `state_lost` and
+`silence_timeout` — both rest on reading the Teams page, and both now require a
+second opinion before they fire.
+
+**`state_lost`.** `in_meeting` is decided by the presence of an enabled *Leave*
+button. Teams fades the call controls out when nothing moves the pointer, and a
+bot never moves it, so the button can be mounted but invisible; a mounted,
+enabled one now counts. A *disabled* one still does not, because that is what
+the end-of-meeting screen shows. Beyond the DOM, anything the call itself
+produces — roster updates, contributing-source activity, dominant-speaker
+messages — is treated as proof the call is live, because all of it stops the
+moment the call is over. So a page Hansard cannot read no longer ends a meeting
+that is still sending traffic.
+
+**`silence_timeout`.** The speaking signals come from instrumentation injected
+into the page, and a Teams release can break it at any time. While the call is
+still producing signals of *any* kind, that instrumentation is alive and its
+silence means what it says — the bot leaves as it always did. Once even those
+have stopped arriving, the only remaining witness is the audio itself, and the
+bot will not leave a meeting people are audibly still talking in: the recorded
+tail has to be silent as well.
+
+If a bot still leaves early, `diagnostics.degraded_signals` names the signals
+that produced nothing all meeting, and `hansard_capture_stops_total{reason=...}`
+shows which timeout is firing across a fleet.
 
 Lower `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` for short test meetings — with
 the 600s default a bot that misses the end signal keeps recording silence for

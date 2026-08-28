@@ -47,6 +47,10 @@ CHROMIUM_ARGUMENTS: Final[tuple[str, ...]] = (
     "--no-sandbox",
     "--no-first-run",
     "--no-default-browser-check",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-ipc-flooding-protection",
 )
 
 IGNORED_DEFAULT_ARGUMENTS: Final[tuple[str, ...]] = ("--mute-audio",)
@@ -186,10 +190,17 @@ class SessionTiming:
     element_timeout_ms: float = 5_000.0
     navigation_timeout_ms: float = 60_000.0
     prejoin_settle_seconds: float = 1.0
+    retry_backoff_seconds: float = 2.0
 
 
 class _RestartJoinError(Exception):
     pass
+
+
+class _TransientJoinError(Exception):
+    def __init__(self, cause: Exception) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
 
 
 @dataclass(slots=True)
@@ -254,7 +265,7 @@ class TeamsBrowserSession:
         clock: Callable[[], float] = time.monotonic,
         epoch_ms: Callable[[], int] = lambda: int(time.time() * 1000),
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
-        max_join_attempts: int = 2,
+        max_join_attempts: int | None = None,
     ) -> None:
         self._settings = settings
         self._factory = factory
@@ -265,7 +276,9 @@ class TeamsBrowserSession:
         self._clock = clock
         self._epoch_ms = epoch_ms
         self._sleep = sleep
-        self._max_join_attempts = max(1, max_join_attempts)
+        self._max_join_attempts = max(
+            1, settings.join_attempts if max_join_attempts is None else max_join_attempts
+        )
         self._runtime: BrowserRuntime | None = None
         self._phase = JoinPhase.IDLE
         self._call_end: CallEndEvent | None = None
@@ -302,6 +315,11 @@ class TeamsBrowserSession:
                         "Teams kept redirecting to the light experience; "
                         f"gave up after {attempts} join attempts"
                     ) from None
+            except _TransientJoinError as error:
+                await self.aclose()
+                if attempts >= self._max_join_attempts:
+                    raise error.cause from None
+                await self._sleep(self._timing.retry_backoff_seconds * attempts)
 
     async def _attempt_join(self, join_url: str, attempt: int) -> JoinOutcome:
         deadline = _Deadline(self._clock, float(self._settings.join_timeout_seconds))
@@ -327,7 +345,10 @@ class TeamsBrowserSession:
         if self._runtime is not None:
             return
         self._phase = JoinPhase.LAUNCHING
-        runtime = await self._factory.start(self._options)
+        try:
+            runtime = await self._factory.start(self._options)
+        except Exception as error:
+            raise _TransientJoinError(CaptureError(f"could not start Chromium: {error}")) from error
         self._runtime = runtime
         await runtime.context.expose_binding(EMIT_BINDING, self._handle_binding)
         await runtime.context.add_init_script(self._instrumentation)
@@ -371,7 +392,7 @@ class TeamsBrowserSession:
             budget = min(self._timing.navigation_timeout_ms, deadline.remaining * 1000)
             await self.page.goto(url, timeout=budget)
         except Exception as error:
-            raise CaptureError(f"could not open the meeting link: {error}") from error
+            raise _TransientJoinError(CaptureError(f"could not open the meeting link: {error}")) from error
 
     async def _wait_url_stable(self, deadline: _Deadline) -> None:
         stable_for = 0.0
@@ -514,17 +535,20 @@ class TeamsBrowserSession:
         except Exception:
             return ""
 
-    async def _hangup_visible(self) -> bool:
+    async def _hangup_live(self, *, require_visible: bool) -> bool:
         locator = await self._present(selectors.HANGUP_BUTTON)
         if locator is None:
             return False
         try:
-            if not await locator.is_visible(timeout=self._timing.element_timeout_ms):
+            if require_visible and not await locator.is_visible(timeout=self._timing.element_timeout_ms):
                 return False
             disabled = await locator.get_attribute("aria-disabled")
         except Exception:
             return False
         return disabled != "true"
+
+    async def _hangup_visible(self) -> bool:
+        return await self._hangup_live(require_visible=True)
 
     async def open_roster(self) -> bool:
         if await self._present(selectors.ROSTER_PANEL) is not None:
@@ -541,6 +565,8 @@ class TeamsBrowserSession:
         for texts, state in TEXT_STATES:
             if selectors.matches_any(text, texts) is not None:
                 return state
+        if await self._hangup_live(require_visible=False):
+            return MeetingState.IN_MEETING
         if await self._present(selectors.PREJOIN_JOIN_BUTTON) is not None:
             return MeetingState.PREJOIN
         if await self._present(selectors.JOIN_ON_WEB) is not None:

@@ -202,6 +202,10 @@ starts a standalone exporter over the same registry, on `HANSARD_API__PORT` (def
 | `hansard_delivery_attempts_total` | counter | `channel`, `result` | Delivery attempts, `success` or `failure`. |
 | `hansard_object_storage_reachable` | gauge | — | `1` when the artifact store accepted the last write. |
 | `hansard_bot_join_attempts_total`, `hansard_bot_join_duration_seconds`, `hansard_bot_active` | counter, histogram, gauge | `result` | Meeting-join outcomes for the browser capture bot. |
+| `hansard_capture_audio_peak_dbfs` | gauge | — | Peak level of the last in-meeting audio probe. Sitting at or below `HANSARD_CAPTURE__AUDIO_SILENCE_FLOOR_DBFS` while a bot is active means the capture is recording silence **now**, not after the meeting. |
+| `hansard_capture_audio_repairs_total` | counter | `result` | Attempts to move the browser's playback stream back onto the capture sink: `moved` when something changed, `noop` when the routing was already right, `failed` when PulseAudio would not answer. |
+| `hansard_capture_recorder_restarts_total` | counter | `result` | ffmpeg restarts after it died or stalled mid-meeting: `restarted`, or `exhausted` when the restart budget was spent and the capture had to stop. |
+| `hansard_capture_stops_total` | counter | `reason` | Why each finished capture stopped: `meeting_ended`, `removed`, `max_duration`, `silence_timeout`, `alone_timeout`, `state_lost`, `recorder_failed`. |
 
 The `language` label is bounded: it is normalised to a two-letter code from a known list, and
 anything else becomes `unknown`. A meeting in an unexpected language can therefore never create a

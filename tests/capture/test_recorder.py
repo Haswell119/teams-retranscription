@@ -13,7 +13,11 @@ from conftest import (
     nosleep,
 )
 
-from hansard.adapters.capture.audio.recorder import FfmpegRecorder, RecorderSettings
+from hansard.adapters.capture.audio.recorder import (
+    WAV_HEADER_BYTES,
+    FfmpegRecorder,
+    RecorderSettings,
+)
 from hansard.domain.errors import CaptureError
 
 
@@ -133,3 +137,110 @@ async def test_unmeasurable_audio_is_not_declared_silent(tmp_path):
     report = await recorder.assert_not_silent(tmp_path / "meeting.wav")
     assert not report.measured
     assert not report.is_silent
+
+
+def real_size(path: Path) -> int:
+    return path.stat().st_size if path.exists() else 0
+
+
+def write_wav(path: Path, samples: list[int]) -> Path:
+    """A PCM WAV whose header is the right size but whose contents are what we asked for."""
+    payload = b"".join(int(sample).to_bytes(2, "little", signed=True) for sample in samples)
+    path.write_bytes(b"\0" * WAV_HEADER_BYTES + payload)
+    return path
+
+
+async def test_the_tail_of_a_growing_capture_reads_as_audible(tmp_path):
+    recorder, _, _ = build_recorder(tmp_path, size_of=real_size)
+    output = write_wav(tmp_path / "meeting.wav", [0, 16_000, -16_000] * 4_000)
+    await recorder.start(output)
+    reading = await recorder.tail_level(1.0)
+    assert reading.measured
+    assert reading.is_audible
+    assert reading.peak_dbfs == pytest.approx(-6.3, abs=0.2)
+    assert reading.seconds == pytest.approx(0.75, abs=0.01)
+
+
+async def test_the_tail_of_a_flat_capture_reads_as_silent(tmp_path):
+    recorder, _, _ = build_recorder(tmp_path, size_of=real_size)
+    output = write_wav(tmp_path / "meeting.wav", [0] * 16_000)
+    await recorder.start(output)
+    reading = await recorder.tail_level(1.0)
+    assert reading.measured
+    assert reading.is_silent
+    assert not reading.is_audible
+
+
+async def test_a_capture_with_nothing_written_yet_is_not_called_silent(tmp_path):
+    recorder, _, _ = build_recorder(tmp_path, size_of=real_size)
+    output = tmp_path / "meeting.wav"
+    output.write_bytes(b"\0" * WAV_HEADER_BYTES)
+    await recorder.start(output)
+    reading = await recorder.tail_level(1.0)
+    assert not reading.measured
+    assert not reading.is_silent
+
+
+async def test_a_restart_keeps_the_first_segment_and_opens_a_second(tmp_path):
+    launcher = FakeLauncher(processes=[FakeProcess(), FakeProcess()])
+    recorder, _, _ = build_recorder(tmp_path, launcher=launcher, size_of=real_size)
+    output = tmp_path / "meeting.wav"
+    write_wav(output, [4_000] * 16_000)
+    await recorder.start(output)
+    assert await recorder.restart()
+    assert recorder.restarts == 1
+    assert recorder.segments == (output, tmp_path / "meeting.part1.wav")
+    assert launcher.commands[1][-1] == str(tmp_path / "meeting.part1.wav")
+    assert launcher.spawned[0].terminated
+
+
+async def test_restarts_are_bounded_so_a_broken_source_does_not_spin(tmp_path):
+    launcher = FakeLauncher(processes=[FakeProcess() for _ in range(4)])
+    recorder, _, _ = build_recorder(
+        tmp_path,
+        launcher=launcher,
+        size_of=real_size,
+        settings=RecorderSettings(max_restarts=2),
+    )
+    await recorder.start(write_wav(tmp_path / "meeting.wav", [4_000] * 16_000))
+    assert await recorder.restart()
+    assert await recorder.restart()
+    assert not await recorder.restart()
+    assert recorder.restarts == 2
+
+
+async def test_stopping_after_a_restart_stitches_the_segments_together(tmp_path):
+    launcher = FakeLauncher(processes=[FakeProcess(), FakeProcess()])
+    runner = ProbeRunner()
+    recorder, _, _ = build_recorder(tmp_path, launcher=launcher, runner=runner, size_of=real_size)
+    output = tmp_path / "meeting.wav"
+    write_wav(output, [4_000] * 16_000)
+    await recorder.start(output)
+    await recorder.restart()
+    second = write_wav(tmp_path / "meeting.part1.wav", [4_000] * 16_000)
+
+    def concatenate(_command):
+        write_wav(tmp_path / "meeting.joined.wav", [4_000] * 32_000)
+
+    runner.on_run = concatenate
+    assert await recorder.stop() == output
+    assert recorder.join_error is None
+    assert output.stat().st_size == WAV_HEADER_BYTES + 64_000
+    assert not second.exists()
+    assert not (tmp_path / "meeting.segments.txt").exists()
+
+
+async def test_segments_that_cannot_be_stitched_keep_the_first_one_and_say_so(tmp_path):
+    launcher = FakeLauncher(processes=[FakeProcess(), FakeProcess()])
+    runner = ProbeRunner()
+    runner.returncode = 1
+    recorder, _, _ = build_recorder(tmp_path, launcher=launcher, runner=runner, size_of=real_size)
+    output = tmp_path / "meeting.wav"
+    write_wav(output, [4_000] * 16_000)
+    await recorder.start(output)
+    await recorder.restart()
+    write_wav(tmp_path / "meeting.part1.wav", [4_000] * 16_000)
+    assert await recorder.stop() == output
+    assert recorder.join_error is not None
+    assert "stitch 2 capture segments" in recorder.join_error
+    assert (tmp_path / "meeting.part1.wav").exists()

@@ -106,6 +106,13 @@ class CaptureSettings(BaseModel):
     browser_binary: Path | None = None
     pulse_sink_name: str = "hansard_sink"
     roster_poll_seconds: float = 1.0
+    join_attempts: int = 3
+    audio_probe_seconds: float = 15.0
+    audio_probe_window_seconds: float = 8.0
+    audio_silence_floor_dbfs: float = -60.0
+    audio_repair_after_seconds: int = 45
+    audio_repair_attempts: int = 4
+    recorder_restart_attempts: int = 3
 
 
 class SmtpSettings(BaseModel):
