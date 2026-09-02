@@ -204,6 +204,22 @@ This runs on the diarization audio chain, not the recognition chain, for the
 reason given above. `diarization.merge_similarity` controls it and
 `diarization.cluster_consolidation` turns it off.
 
+The same pass also decides the fate of clusters that barely speak. A cluster
+whose total speaking time falls under `diarization.minimum_speaker_seconds` is a
+candidate for absorption into a louder one — that is what removes the phantom
+speakers crosstalk and laughter create — but absorption is **conditional**: the
+two centroids must reach `diarization.absorption_similarity` first. A phantom
+carved out of somebody's own speech does sound like them and is absorbed; a
+participant who says twelve seconds in eighteen minutes and sounds like nobody
+else in the room keeps their own speaker.
+
+This is why the decision lives here and not in the diarizer, where it used to.
+The diarizer has turns and durations but no embeddings, so the only absorption it
+could perform was unconditional — nearest neighbour in time, regardless of voice.
+When consolidation is enabled the diarizer's own floor is therefore set to zero
+and this pass owns the decision; when consolidation is turned off the diarizer
+keeps the old behaviour, because something has to.
+
 ### Word-level attribution
 
 `WordLevelAttributor` turns two independent views of the meeting — a sequence of
@@ -353,6 +369,9 @@ class MyRecognizer:
             license_identifier="apache-2.0",
         )
 
+    def warm_up(self) -> None:
+        self._decode(silence(), TimeSpan(0.0, 1.0))
+
     def transcribe(self, clip: AudioClip, hints: RecognitionHints) -> Transcript:
         spans = hints.segments or (clip.span,)
         utterances = tuple(self._decode(clip.extract(span), span) for span in spans)
@@ -385,6 +404,24 @@ register_recognizer("mine", _build_mine)
 
 Import the heavy dependency *inside* the factory. Registration must stay cheap,
 because the module is imported whether or not your engine is selected.
+
+**Then measure it before you believe it.** A registered engine is immediately
+available to the shootout, which decodes byte-identical reference-boundary
+segments through every engine named on the command line and scores them with one
+normalizer:
+
+```bash
+make bench-shootout ENGINES=parakeet-fp32,mine SHOOTOUT_SECONDS=1800
+```
+
+The report gives word error, character error, substitutions, deletions and
+insertions per language, the error decomposition by word category, and word error
+split by how much of each segment another speaker is talking over. That last
+column is the one that has changed decisions here: a model that looks better on
+read speech has repeatedly turned out to be worse on the overlapped half of a
+real meeting. `bench/results/transcripts/` keeps every hypothesis, so a change to
+the normalizer or to the reference can be re-scored without decoding anything
+again.
 
 **3. Make it selectable.** Add `"mine"` to the `AsrEngine` literal in
 `config.py`, then `HANSARD_ASR__ENGINE=mine`. An unknown name already fails
