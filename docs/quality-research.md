@@ -139,7 +139,8 @@ difference in speaker handling and nothing else.
 | 10 | Gate absorption on voice similarity | same words | no gate value restores speaker counts; ordering was the cause | **REVERT** |
 | 11 | Merge threshold, re-measured after the revert | same words | 0.72 worth 0.17 points, and costs a quiet speaker | **No change** |
 | 12 | Score eight meetings end to end | 8 SUMM-RE meetings | macro **71.92 %** cpWER, **57.49 %** WER | The honest French figure |
-| 13 | Segment ceiling 120 s → 15 s | dense + sparse meeting | dense **83.05 % → 54.02 %** WER; sparse also improves | Verifying on AMI |
+| 13 | Segment ceiling 120 s → 15 s | dense + sparse meeting | dense **83.05 % → 54.02 %** WER; AMI loses 2.4 | Flat ceiling rejected |
+| 14 | Ceiling chosen from the speech ratio | AMI + 12 SUMM-RE meetings | tuning **−12.3** WER, held-out **−2.1**, AMI bit-identical | **KEEP** |
 
 ## Iterations
 
@@ -697,6 +698,66 @@ is not the language, it is how continuous the speech is: AMI Mix-Headset is real
 microphones in a real room with real pauses, SUMM-RE is four per-speaker tracks
 summed, so its silences are the intersection of four people's silences and there
 are almost none. The ceiling should follow the audio.
+
+### Iteration 14 — the adaptive ceiling, controlled and scored on held-out audio
+
+**Hypothesis.** Picking the ceiling from the speech ratio, with the threshold at
+0.85, should give the dense-meeting gain without the AMI cost. Two things have to
+be true: the adaptation must be exactly neutral where it does not trigger, and
+the gain must survive on meetings the threshold was not chosen from.
+
+**Experiment.** Three runs. The adaptive policy on AMI and on all twelve prepared
+SUMM-RE meetings; a control on both with the adaptation switched off
+(`dense_max_segment_seconds = 0`), same machine, same code, same threads.
+
+**Result 1 — neutral where it does not trigger, exactly.**
+
+| AMI, this machine, current code | WER | cpWER |
+| --- | ---: | ---: |
+| adaptive ceiling | 21.25 % | 29.37 % |
+| adaptation disabled (control) | **21.25 %** | **29.37 %** |
+
+Identical to two decimal places on every meeting. All three AMI recordings sit
+below the threshold — 70.3 %, 74.1 % and 57.8 % speech — so they keep the
+120-second ceiling and the change cannot reach them. **The adaptation costs AMI
+nothing.**
+
+It also settles a question I could not answer earlier. The published AMI figure
+is 20.44 % / 28.75 %; this machine measures 21.25 % / 29.37 % *with the change
+disabled*. Two independent runs gave the same number to two decimals, so the
+pipeline is deterministic here and this is not run-to-run noise. The gap is
+normalizer 1.3.0 and the hardware, not the segmentation change — and the reason
+it took a control run to find out is that **the AMI baseline was never reproduced
+on this machine before anything was changed**. That is the methodological lesson
+of this iteration and it is worth more than the number.
+
+**Result 2 — the gain survives held-out, and it is smaller.**
+
+| Held-out meeting | Speech | WER at 120 s | WER adaptive | Gain |
+| --- | ---: | ---: | ---: | ---: |
+| `020b_EBDZ` | sparse | 24.53 % | 24.53 % | — |
+| `018a_EARZ` | | 31.46 % | 30.78 % | +0.68 |
+| `011c_ECPL` | sparse | 44.70 % | 44.70 % | — |
+| `015b_EBDD` | dense | 60.49 % | **52.70 %** | **+7.79** |
+| **macro** | | **40.30 %** | **38.18 %** | **+2.12** |
+
+| Split | Meetings | WER before → after | cpWER before → after |
+| --- | ---: | --- | --- |
+| tuning | 8 | 57.49 % → **45.20 %** | 71.92 % → **68.65 %** |
+| held-out | 4 | 40.30 % → **38.18 %** | 54.72 % → **54.18 %** |
+
+**Conclusion. KEEP, and state the size honestly.** No recording measured got
+worse — two held-out meetings are untouched because they are below the threshold,
+one gains 0.7, one gains 7.8, and AMI is bit-identical. But the tuning split gains
+**12.3 points** and the held-out split gains **2.1**, and the difference is not
+overfitting of the threshold: it is that six of the eight tuning meetings are
+dense and only one of the four held-out ones is. The change is worth a great deal
+*on a densely overlapped meeting* and nothing at all on a sparse one, so what a
+corpus gains depends entirely on how many dense meetings it contains.
+
+That is the right claim to make about it, and it is the claim that transfers to
+production: Teams delivers a single server-mixed stream, so a lively meeting looks
+like `006b_EADH` and a polite one looks like `020c_EBPZ`.
 
 ---
 
