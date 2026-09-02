@@ -41,7 +41,6 @@ DIARIZER_KEYS: tuple[str, ...] = (
 CONSOLIDATION_KEYS: tuple[str, ...] = (
     "merge_similarity",
     "minimum_speaker_seconds",
-    "absorption_similarity",
     "speech_coverage_refinement",
 )
 
@@ -122,8 +121,6 @@ def consolidated(
         models_dir=models_dir,
         embedding_model=settings.diarization.embedding_model,
         merge_similarity=settings.diarization.merge_similarity,
-        minimum_speaker_seconds=settings.diarization.minimum_speaker_seconds,
-        absorption_similarity=settings.diarization.absorption_similarity,
     )
     return consolidator.consolidate(diarization, clip, speaker_ceiling)
 

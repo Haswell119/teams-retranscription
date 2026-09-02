@@ -43,10 +43,6 @@ def _provider(device: str) -> str:
     return "cpu"
 
 
-def _diarizer_floor(settings: DiarizationSettings) -> float:
-    return 0.0 if settings.cluster_consolidation else settings.minimum_speaker_seconds
-
-
 def _build_sherpa(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
     from hansard.adapters.diarization.sherpa import SherpaDiarizer
 
@@ -55,7 +51,7 @@ def _build_sherpa(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
         segmentation_model=settings.segmentation_model,
         embedding_model=settings.embedding_model,
         clustering_threshold=settings.clustering_threshold,
-        minimum_speaker_seconds=_diarizer_floor(settings),
+        minimum_speaker_seconds=settings.minimum_speaker_seconds,
         min_duration_on=settings.min_duration_on,
         min_duration_off=settings.min_duration_off,
         provider=_provider(settings.device),

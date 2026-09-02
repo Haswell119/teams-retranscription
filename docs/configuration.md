@@ -261,7 +261,6 @@ tuning, because it is the one that decides who is credited with what.
 | `MINIMUM_SPEAKER_SECONDS` | float | `10.0` | Any speaker whose total speaking time across the whole meeting is below this is absorbed into its nearest stable neighbour. This is what removes phantom speakers created by crosstalk, laughter or a single overlapping syllable. **It does not run when the speaker count is already known** — see the note below. Lower it to 1–3 s for a file-based transcription where a genuinely brief contributor must survive as their own speaker. |
 | `CLUSTER_CONSOLIDATION` | bool | `true` | Merges clusters whose speaker centroids are too close to be different people, which is what repairs one person fragmented across several speakers. Turn it off only to measure what it is doing. |
 | `MERGE_SIMILARITY` | float | `0.77` | The cosine similarity two cluster centroids must exceed before consolidation treats them as the same person. Raising it merges less; lowering it merges more. **Both directions measured worse.** Read the note below before you touch it. |
-| `ABSORPTION_SIMILARITY` | float | `0.55` | The cosine similarity a below-floor cluster must reach before it is absorbed into a louder one. This is the escape hatch for the quiet participant: a cluster under `MINIMUM_SPEAKER_SECONDS` that sounds like nobody else in the room stays its own speaker instead of being folded into whoever happens to be nearest. Raise it to keep more brief speakers apart; lower it toward `0.0` to restore the old unconditional absorption. |
 | `MIN_DURATION_ON` | float | `0.25` | Speech shorter than this is discarded by the segmentation model before clustering. |
 | `MIN_DURATION_OFF` | float | `0.40` | A silence shorter than this *inside one speaker's turn* is filled in rather than splitting the turn. Against a word-aligned reference such as SUMM-RE's, filling gaps manufactures false alarm; lower it toward `0.0` if the diarization error is dominated by false alarm rather than by missed speech. |
 | `MAX_SPEAKERS` | int | `8` | Reaches the diarization request but the sherpa engine does not read it. It does not cap anything today. |
@@ -715,7 +714,6 @@ HANSARD_VAD__MIN_SPEECH_SECONDS=0.15
 HANSARD_VAD__SPEECH_PAD_SECONDS=0.25
 
 HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS=1.5
-HANSARD_DIARIZATION__ABSORPTION_SIMILARITY=0.55
 HANSARD_DIARIZATION__MIN_DURATION_ON=0.25
 HANSARD_DIARIZATION__MIN_DURATION_OFF=0.40
 HANSARD_DIARIZATION__SPEECH_COVERAGE_REFINEMENT=true
@@ -727,13 +725,15 @@ HANSARD_MINUTES__TEMPERATURE=0.1
 
 The changes that matter here are the lower VAD threshold and longer padding,
 which stop quiet speech being discarded before it reaches the recogniser, and
-the much lower `MINIMUM_SPEAKER_SECONDS` — the default of `10.0` marks anyone who
-speaks for less than ten seconds in total as a candidate for absorption, which is
-exactly what an archival transcript must not do. Expect to spend that on a few
-phantom speakers. Absorption is no longer unconditional: a below-floor cluster is
-only folded into a louder one when their centroids reach
-`ABSORPTION_SIMILARITY`, so a brief contributor who does not sound like anybody
-else in the room keeps their own speaker even at the shipped floor.
+the much lower `MINIMUM_SPEAKER_SECONDS` — the default of `10.0` absorbs anyone
+who speaks for less than ten seconds in total, which is exactly what an archival
+transcript must not do. Expect to spend that on a few phantom speakers.
+
+Making that absorption conditional on voice similarity was tried and reverted:
+it cost speaker counting badly and bought nothing measurable, because on the
+SUMM-RE tuning meetings quiet-speaker recall is already 100 % with the
+unconditional floor. The measurement is in
+[quality-research](quality-research.md).
 `BATCH_SIZE=1` does not improve accuracy on its own; it lowers peak memory so you
 can afford everything else. `QUANTIZATION=none` is the shipped default and the
 right one here — see [the accuracy profile](#choosing-a-quantization-the-accuracy-profile).

@@ -126,8 +126,6 @@ class Composition:
                     models_dir=settings.runtime.models_dir,
                     embedding_model=diarization.embedding_model,
                     merge_similarity=diarization.merge_similarity,
-                    minimum_speaker_seconds=diarization.minimum_speaker_seconds,
-                    absorption_similarity=diarization.absorption_similarity,
                 )
                 if diarization.cluster_consolidation and diarization.engine != "null"
                 else None

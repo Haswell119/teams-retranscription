@@ -204,21 +204,14 @@ This runs on the diarization audio chain, not the recognition chain, for the
 reason given above. `diarization.merge_similarity` controls it and
 `diarization.cluster_consolidation` turns it off.
 
-The same pass also decides the fate of clusters that barely speak. A cluster
-whose total speaking time falls under `diarization.minimum_speaker_seconds` is a
-candidate for absorption into a louder one — that is what removes the phantom
-speakers crosstalk and laughter create — but absorption is **conditional**: the
-two centroids must reach `diarization.absorption_similarity` first. A phantom
-carved out of somebody's own speech does sound like them and is absorbed; a
-participant who says twelve seconds in eighteen minutes and sounds like nobody
-else in the room keeps their own speaker.
-
-This is why the decision lives here and not in the diarizer, where it used to.
-The diarizer has turns and durations but no embeddings, so the only absorption it
-could perform was unconditional — nearest neighbour in time, regardless of voice.
-When consolidation is enabled the diarizer's own floor is therefore set to zero
-and this pass owns the decision; when consolidation is turned off the diarizer
-keeps the old behaviour, because something has to.
+Clusters that barely speak are handled earlier, in the diarizer, where any
+cluster under `diarization.minimum_speaker_seconds` is folded into its nearest
+stable neighbour in time. Moving that decision here, so it could be conditioned
+on whether the two clusters actually sound alike, was tried and measured worse:
+absorbing after agglomeration rather than before leaves the phantom clusters the
+floor exists to remove, and speaker-count error went from 1.25 to 8.00 across
+four SUMM-RE meetings while quiet-speaker recall stayed at 100 % either way. See
+[quality-research](quality-research.md).
 
 ### Word-level attribution
 

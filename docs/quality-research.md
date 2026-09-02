@@ -135,7 +135,8 @@ difference in speaker handling and nothing else.
 | 6 | Unify `ok`/`okay` and `etc` spellings | same hypotheses | 30.82 % → **30.59 %** | KEEP |
 | 7 | Score four meetings instead of one | 4 SUMM-RE meetings | 020c is the best of four; macro **63.19 %** | Retire the single-meeting headline |
 | 8 | Remove the gap filler / drop the absorption floor / swap the embedding | same words | none beat the default | **REVERT** all three |
-| 9 | Merge threshold per embedding space | same words | 0.77 → **0.72** worth 1.5 points; found a regression I shipped | Measuring |
+| 9 | Merge threshold per embedding space | same words | 0.77 → **0.72** worth 1.5 points; found a regression I shipped | Re-measuring |
+| 10 | Gate absorption on voice similarity | same words | no gate value restores speaker counts; ordering was the cause | **REVERT** |
 
 ## Iterations
 
@@ -514,9 +515,32 @@ clusters the floor used to remove now survive. cpWER barely notices (63.19 →
 63.37) but speaker-count error goes from 1.25 to 8.00, and speaker count is
 exactly what a roster has to match.
 
-The gate is the right idea and 0.55 is the wrong number. It is being measured
-against 0.0, 0.25 and 0.40 — a consolidation-only setting, so the whole grid
-costs one clustering pass.
+**REVERTED.** The gate was measured against 0.0, 0.25 and 0.40, and it turned out
+not to be the gate at all:
+
+| Absorption gate, at merge 0.72 | cpWER | speaker-count error | speakers detected |
+| --- | ---: | ---: | --- |
+| 0.00 | 61.86 % | **4.75** | 12/4 8/4 9/3 5/4 |
+| 0.25 | 61.86 % | 5.00 | 12/4 8/4 10/3 5/4 |
+| 0.40 | 61.85 % | 5.75 | 13/4 9/4 11/3 5/4 |
+
+The three values are the same number to two decimals, and **even at 0.0 — absorb
+whenever similarity is not negative, which is always — the speaker counts do not
+come back**. The original absorbed in the diarizer, on raw clusters, *before*
+agglomeration; mine absorbs in the consolidator, on merged groups, *after* it. A
+group that has already swallowed three phantoms is no longer under the
+ten-second floor, so the floor stops seeing anything to remove. The gate was
+never the problem — the ordering was.
+
+The change is reverted in full: the floor goes back to the diarizer,
+`absorption_similarity` is gone, and the tests and documentation go with it. The
+protection it was built for cannot be demonstrated on this corpus — quiet-speaker
+recall is **100 % with and without it** — and shipping a change that costs
+speaker counting to defend against a failure nobody can produce is exactly what
+this log exists to prevent.
+
+What survives: `min_duration_on` and `min_duration_off` are still configuration,
+because being able to turn them was what killed the false-alarm hypothesis.
 
 ---
 
