@@ -113,9 +113,7 @@ def test_scoring_separates_the_languages():
         segment("a", 0.0, 1.0, reference="le budget", language="fr"),
         segment("a", 1.0, 2.0, reference="the budget", language="en"),
     ]
-    outcome = score_engine(
-        EngineSpec(name="stub"), segments, ["le budget", "the budget"], 1.0, 100.0, 0
-    )
+    outcome = score_engine(EngineSpec(name="stub"), segments, ["le budget", "the budget"], 1.0, 100.0, 0)
     assert {item.language for item in outcome.languages} == {"fr", "en"}
     assert outcome.outcome_for("fr").wer == 0.0
 

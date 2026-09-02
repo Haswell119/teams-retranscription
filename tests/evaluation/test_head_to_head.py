@@ -102,9 +102,7 @@ def test_a_lost_domain_term_shows_up_as_a_lost_proper_noun(tmp_path):
     }
     path = tmp_path / "damaged.ref.json"
     path.write_text(json.dumps(damaged), encoding="utf-8")
-    result = compare(
-        "board", reference, [("hansard", load_transcript(path))], glossary=("NAV", "Bloomberg")
-    )
+    result = compare("board", reference, [("hansard", load_transcript(path))], glossary=("NAV", "Bloomberg"))
     names = result.scores[0].decomposition.counts_for("proper_noun")
     assert names.recall < 1.0
 

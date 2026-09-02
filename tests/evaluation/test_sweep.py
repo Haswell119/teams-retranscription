@@ -24,8 +24,7 @@ def utterance(start, end, text, speaker="A"):
     pieces = text.split()
     step = (end - start) / max(len(pieces), 1)
     words = tuple(
-        word(piece, start + index * step, start + (index + 1) * step)
-        for index, piece in enumerate(pieces)
+        word(piece, start + index * step, start + (index + 1) * step) for index, piece in enumerate(pieces)
     )
     return Utterance(span=TimeSpan(start, end), text=text, speaker=speaker, words=words)
 
