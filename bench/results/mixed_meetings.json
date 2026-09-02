@@ -1,0 +1,169 @@
+{
+  "benchmark": "meetings",
+  "recognition": {
+    "model_id": "nemo-parakeet-tdt-0.6b-v3",
+    "precision": "float32",
+    "batch_size": 4,
+    "batch_seconds": 240.0,
+    "max_segment_seconds": 120.0,
+    "merge_similarity": 0.77,
+    "minimum_speaker_seconds": 10.0
+  },
+  "normalizer_version": "hansard-normalizers-1.2.0",
+  "rows": [
+    {
+      "meeting": "meeting_mixed_4spk",
+      "language": "mixed",
+      "duration_seconds": 333.5,
+      "reference_speakers": 4,
+      "detected_speakers": 4,
+      "reference_words": 812,
+      "hypothesis_words": 745,
+      "wer_percent": 13.83,
+      "cer_percent": 10.39,
+      "cpwer_percent": 23.56,
+      "tcpwer_percent": 24.15,
+      "wder_percent": 3.55,
+      "der_percent": 14.6,
+      "der_collar_percent": 10.85,
+      "jer_percent": 19.24,
+      "der_missed_percent": 11.8,
+      "der_false_alarm_percent": 0.3,
+      "der_confusion_percent": 2.5,
+      "reference_overlap_percent": 1.11,
+      "language_accuracy_percent": 97.58,
+      "detected_languages": [
+        "fr",
+        "en"
+      ],
+      "language_confusions": [
+        {
+          "expected": "fr",
+          "observed": "en",
+          "words": 18
+        }
+      ],
+      "real_time_factor": 0.1926,
+      "speedup": 5.2,
+      "peak_rss_mb": 3854.8,
+      "stage_seconds": {
+        "enhance": 6.238,
+        "voice_activity": 1.256,
+        "recognise": 25.695,
+        "language_drift": 1.554,
+        "identify_language": 0.002,
+        "diarise": 28.186,
+        "consolidate": 1.26,
+        "refine": 0.001,
+        "attribute": 0.027,
+        "resolve_names": 0.0
+      }
+    },
+    {
+      "meeting": "meeting_mixed_6spk",
+      "language": "mixed",
+      "duration_seconds": 594.4,
+      "reference_speakers": 6,
+      "detected_speakers": 7,
+      "reference_words": 1670,
+      "hypothesis_words": 1673,
+      "wer_percent": 4.44,
+      "cer_percent": 1.9,
+      "cpwer_percent": 21.62,
+      "tcpwer_percent": 22.3,
+      "wder_percent": 7.28,
+      "der_percent": 13.87,
+      "der_collar_percent": 10.53,
+      "jer_percent": 17.71,
+      "der_missed_percent": 8.36,
+      "der_false_alarm_percent": 0.25,
+      "der_confusion_percent": 5.26,
+      "reference_overlap_percent": 0.24,
+      "language_accuracy_percent": 97.79,
+      "detected_languages": [
+        "fr",
+        "en"
+      ],
+      "language_confusions": [
+        {
+          "expected": "en",
+          "observed": "fr",
+          "words": 25
+        },
+        {
+          "expected": "fr",
+          "observed": "en",
+          "words": 12
+        }
+      ],
+      "real_time_factor": 0.1803,
+      "speedup": 5.5,
+      "peak_rss_mb": 3927.3,
+      "stage_seconds": {
+        "enhance": 9.465,
+        "voice_activity": 1.964,
+        "recognise": 40.752,
+        "language_drift": 1.525,
+        "identify_language": 0.004,
+        "diarise": 50.845,
+        "consolidate": 2.52,
+        "refine": 0.002,
+        "attribute": 0.104,
+        "resolve_names": 0.0
+      }
+    },
+    {
+      "meeting": "meeting_mixed_8spk",
+      "language": "mixed",
+      "duration_seconds": 572.2,
+      "reference_speakers": 8,
+      "detected_speakers": 8,
+      "reference_words": 1466,
+      "hypothesis_words": 1428,
+      "wer_percent": 12.71,
+      "cer_percent": 5.4,
+      "cpwer_percent": 12.45,
+      "tcpwer_percent": 12.45,
+      "wder_percent": 0.88,
+      "der_percent": 9.61,
+      "der_collar_percent": 6.18,
+      "jer_percent": 10.16,
+      "der_missed_percent": 8.64,
+      "der_false_alarm_percent": 0.25,
+      "der_confusion_percent": 0.73,
+      "reference_overlap_percent": 1.41,
+      "language_accuracy_percent": 93.63,
+      "detected_languages": [
+        "fr",
+        "en"
+      ],
+      "language_confusions": [
+        {
+          "expected": "fr",
+          "observed": "en",
+          "words": 75
+        },
+        {
+          "expected": "en",
+          "observed": "fr",
+          "words": 16
+        }
+      ],
+      "real_time_factor": 0.1879,
+      "speedup": 5.3,
+      "peak_rss_mb": 4024.1,
+      "stage_seconds": {
+        "enhance": 9.479,
+        "voice_activity": 2.243,
+        "recognise": 41.396,
+        "language_drift": 1.403,
+        "identify_language": 0.003,
+        "diarise": 50.271,
+        "consolidate": 2.651,
+        "refine": 0.002,
+        "attribute": 0.064,
+        "resolve_names": 0.0
+      }
+    }
+  ]
+}

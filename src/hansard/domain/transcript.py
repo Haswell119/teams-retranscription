@@ -53,6 +53,10 @@ class Utterance:
         return len(self.words) if self.words else len(self.text.split())
 
 
+def _languages_agree(previous: Utterance, following: Utterance) -> bool:
+    return previous.language is None or following.language is None or previous.language == following.language
+
+
 @dataclass(frozen=True, slots=True)
 class Transcript:
     utterances: tuple[Utterance, ...] = ()
@@ -122,11 +126,12 @@ class Transcript:
         for utterance in self.utterances[1:]:
             previous = merged[-1]
             contiguous = utterance.span.start - previous.span.end <= max_gap
-            if utterance.speaker == previous.speaker and contiguous:
+            if utterance.speaker == previous.speaker and contiguous and _languages_agree(previous, utterance):
                 merged[-1] = replace(
                     previous,
                     span=TimeSpan(previous.span.start, utterance.span.end),
                     text=f"{previous.text.rstrip()} {utterance.text.lstrip()}".strip(),
+                    language=previous.language or utterance.language,
                     words=previous.words + utterance.words,
                     confidence=min(previous.confidence, utterance.confidence),
                 )
