@@ -260,9 +260,11 @@ construction as the AMI Mix-Headset condition and the same thing Teams delivers.
 > **These numbers were produced before the reference was corrected.** They score
 > against a reference in which SUMM-RE's SPPAS pause marks had been expanded into
 > the word "plus" — 1.61 % of every reference token, each one an unreachable
-> deletion. The row is left as it was published so the correction is visible
-> rather than quietly absorbed; the corrected multi-meeting figures are in
-> [§2.5.1](#251-summ-re-across-the-tuning-split).
+> deletion, and before the normalizer reached version 1.3.0. The row is left as
+> it was published so the correction is visible rather than quietly absorbed. The
+> corrected figures, and the seven-meeting reference-boundary measurement that
+> reframed [§8](#8-where-we-lose), are in
+> [quality-research](quality-research.md).
 
 ```bash
 make bench-data-summre
