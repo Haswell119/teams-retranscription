@@ -354,17 +354,17 @@ def run_summ_re(options: RunOptions) -> dict[str, object]:
         meeting = read_meeting(directory)
         if meeting.mixed_audio is None:
             continue
-        rows.append(
-            _score_corpus_meeting(
-                settings,
-                meeting.identifier,
-                meeting.mixed_audio,
-                meeting_transcript(meeting),
-                meeting_diarization(meeting),
-                SUMM_RE_LANGUAGE,
-                options.roster,
-            )
+        row = _score_corpus_meeting(
+            settings,
+            meeting.identifier,
+            meeting.mixed_audio,
+            meeting_transcript(meeting),
+            meeting_diarization(meeting),
+            SUMM_RE_LANGUAGE,
+            options.roster,
         )
+        row["split"] = summ_re_split(meeting.identifier)
+        rows.append(row)
     return {
         "benchmark": "summ-re",
         "profile": "roster" if options.roster else "default",
@@ -373,6 +373,11 @@ def run_summ_re(options: RunOptions) -> dict[str, object]:
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
         "summary": _aggregate(rows),
+        "by_split": {
+            name: _aggregate([row for row in rows if row.get("split") == name])
+            for name in SUMM_RE_SPLITS
+            if any(row.get("split") == name for row in rows)
+        },
     }
 
 
