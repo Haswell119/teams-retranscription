@@ -7,7 +7,7 @@ Runs entirely on your own infrastructure. Nothing leaves your network.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-1220%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1253%20passing-brightgreen.svg)](tests/)
 [![Languages](https://img.shields.io/badge/languages-fran%C3%A7ais%20%7C%20english-blue.svg)](docs/benchmarks.md)
 
 </div>
@@ -86,21 +86,27 @@ decided from our own recognized text rather than from the audio. See
 far easier than a real room, so we also measure on corpora of genuine
 spontaneous speech — and these are the numbers to judge us on:
 
-| Corpus | Speakers | cpWER | WER |
+| Corpus | Meetings | cpWER | WER |
 | --- | :---: | ---: | ---: |
-| AMI, 3 English meetings, told nothing | 4 → 5, 4, 5 | 28.75 % | 20.44 % |
-| AMI, 3 English meetings, with a participant list | 4 → **4, 4, 4** | **27.34 %** | 20.44 % |
-| SUMM-RE, 1 real French meeting | 4 → **4** | 53.16 % | 37.52 % |
+| AMI English meetings, told nothing | 3 | 29.37 % | 21.25 % |
+| AMI English meetings, with a participant list | 3 | **27.89 %** | 21.25 % |
+| SUMM-RE French meetings, held-out half | 4 | 54.18 % | 38.18 % |
+| SUMM-RE French meetings, all | 12 | 63.83 % | 42.86 % |
 
 Azure Speech, the engine behind Teams transcription, is independently measured at
-**27.39 %** cpWER on AMI. On English meetings we are level with it, down from
-49.39 % earlier in this project's life — closed by fixing our own defects, not by
-changing how we score. **On French meetings we are clearly behind**, and that is
-the largest open problem in the project; nobody else publishes a French meeting
-number to be behind, which cuts both ways. Three meetings is a small sample and
-the Azure figure comes from a third party using its own reference preparation.
-Where we lose, and why, is written down in
-[benchmarks §8](docs/benchmarks.md#8-where-we-lose).
+**27.39 %** cpWER on AMI. With a participant list we score 27.89 % — half a point
+behind, on three meetings, by two different scoring toolchains, which is not a
+result in either direction. **On French meetings we are clearly behind**, and
+that is the largest open problem in the project; nobody else publishes a French
+meeting number to be behind, which cuts both ways.
+
+The French figure is twelve meetings, not one. An earlier edition of this page
+reported 53.16 % from a single meeting that turned out to have the second-lowest
+speaker overlap of the twelve. Half the corpus is held back from tuning and
+scores 54.18 %. Where we lose, and why, is in
+[benchmarks §8](docs/benchmarks.md#8-where-we-lose); every experiment behind
+these numbers, including the ones that failed, is in
+[quality-research](docs/quality-research.md).
 
 **We now know where the French words go, and it is not French.** Handing the
 recognizer the corpus's own utterance boundaries across seven SUMM-RE meetings
@@ -120,12 +126,24 @@ scores on English AMI. It is not bad at French; it is bad at two people at once,
 and on the single mixed stream Teams hands us it has no way to be anything else.
 Replacing it with a bigger model does not help — NVIDIA Canary 1B v2, which
 outranks it on French read speech, scored 38.01 % on identical audio and lost in
-every band. The experiment log is
-[quality-research](docs/quality-research.md).
+every band. Across the twelve meetings end to end, reference overlap correlates
+with cpWER at Spearman **ρ = +0.77**; the number of speakers we get wrong
+correlates at **ρ = −0.14**.
+
+The one change that did help came from the same finding. A meeting where four
+people overlap has almost no silence for the detector to split on, so the
+pipeline was handing the recognizer 120-second spans of everyone at once and
+getting a quarter of the words back. The segment ceiling now follows the speech
+ratio: 15 seconds when the recording is over 85 % speech, 120 otherwise. On the
+tuning half that is worth **12.3 points of word error**; on AMI, where no meeting
+crosses the threshold, it changes the output not at all — verified by a control
+run that reproduces the unmodified number to two decimal places. The experiment
+log, including the two changes that were reverted and the one regression it
+caught, is [quality-research](docs/quality-research.md).
 
 **Speed and memory.** A 60-minute recording is transcribed and diarized in about
-44 minutes on that 4-core machine, peaking at 3.6 GB of RAM on the English
-fixtures and 4.1 GB on the French ones. INT8 weights ship alongside as an opt-in
+25 minutes on that 4-core machine, peaking at around 4.9 GB of RAM on the AMI
+meetings. INT8 weights ship alongside as an opt-in
 low-memory profile (`HANSARD_ASR__QUANTIZATION=int8`, ~1.4 GB resident instead of
 ~2.8 GB). They are **not** the default and not faster: INT8 costs about **2.0 WER
 points in French**, and deletes words wholesale on real meeting audio.

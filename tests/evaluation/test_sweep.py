@@ -147,7 +147,7 @@ def test_points_that_only_change_consolidation_share_a_diarizer_signature():
 
     base = Settings()
     left = SweepPoint("a", {"merge_similarity": 0.6}).applied(base)
-    right = SweepPoint("b", {"absorption_similarity": 0.9}).applied(base)
+    right = SweepPoint("b", {"minimum_speaker_seconds": 3.0}).applied(base)
     assert diarizer_signature(left) == diarizer_signature(right)
 
 

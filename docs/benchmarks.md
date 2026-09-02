@@ -213,14 +213,15 @@ count. Source:
 
 | Meeting | Speakers (reference → detected) | **cpWER** | WDER | DER (collar 0) | RTF |
 | --- | :---: | ---: | ---: | ---: | ---: |
-| ES2004a | 4 → **4** | **25.89 %** | 6.71 % | 29.87 % | 0.28 |
-| IS1009a | 4 → **4** | **31.70 %** | 8.25 % | 25.87 % | 0.28 |
-| TS3003a | 4 → **4** | **24.44 %** | 3.47 % | 27.46 % | 0.24 |
-| **Macro average** | — | **27.34 %** | **6.14 %** | **27.73 %** | — |
+| ES2004a | 4 → **4** | **26.63 %** | 6.44 % | 29.91 % | 0.45 |
+| IS1009a | 4 → **4** | **30.94 %** | 8.21 % | 25.74 % | 0.26 |
+| TS3003a | 4 → **4** | **26.09 %** | 3.57 % | 27.93 % | 0.21 |
+| **Macro average** | — | **27.89 %** | **6.07 %** | **27.86 %** | — |
 
 Every meeting finds the right number of speakers, and macro cpWER lands at
-**27.34 %**. Recognition is untouched — WER is 20.44 % in both configurations —
-so the whole gain is attribution.
+**27.89 %** against **29.37 %** told nothing. Recognition is untouched — word
+error is 21.25 % in both configurations, to two decimal places — so the whole
+gain is attribution, which is what a roster can and cannot do.
 
 **How this run differs from the one it replaces.** The previously published
 figure on this page was 49.39 % macro cpWER. That run used **INT8 weights**,
@@ -230,13 +231,17 @@ diarization retune and a batch-padding fix account for the rest:
 
 | | Superseded (INT8) | Current (float32) | With a roster |
 | --- | ---: | ---: | ---: |
-| Macro WER | 41.38 % | **20.44 %** | 20.44 % |
-| Macro cpWER | 49.39 % | **28.75 %** | **27.34 %** |
-| Macro WDER | 9.38 % | 6.78 % | 6.14 % |
-| Macro DER | 32.19 % | 28.56 % | 27.73 % |
+| Macro WER | 41.38 % | **21.25 %** | 21.25 % |
+| Macro cpWER | 49.39 % | **29.37 %** | **27.89 %** |
+| Macro WDER | 9.38 % | 6.85 % | 6.07 % |
+| Macro DER | 32.19 % | 28.65 % | 27.86 % |
 | Speakers detected | 6, 6, 6 | 5, 4, 5 | **4, 4, 4** |
-| Peak RSS | 7138 MB | **4805 MB** | 4794 MB |
-| RTF | 0.61 – 0.74 | 0.40 – 0.61 | **0.24 – 0.28** |
+| RTF | 0.61 – 0.74 | 0.26 – 0.37 | **0.21 – 0.45** |
+
+The INT8 column is from an older edition of this page and was produced under
+normalizer 1.1.0 on other hardware; the two float32 columns are current. The
+comparison across the row is still the right one — INT8 deletes words — but do
+not read the last decimal of the first column against the other two.
 
 The superseded run is kept as
 [`ami_mix_headset_short_segments.json`](../bench/results/ami_mix_headset_short_segments.json),
@@ -322,7 +327,7 @@ for scoring twelve meetings instead of one, and for keeping a half of them back.
 | Azure Speech (the engine behind Teams transcription) | AMI | 27.39 % |
 | Azure Speech | NOTSOFAR-1 test (Microsoft's own office-meeting corpus) | 35.68 % |
 | Azure Speech | NOTSOFAR-1 dev | 45.38 % |
-| **Hansard, with a participant list** | **AMI Mix-Headset, 3 meetings** | **27.34 %** |
+| **Hansard, with a participant list** | **AMI Mix-Headset, 3 meetings** | **27.89 %** |
 | **Hansard, told nothing** | **AMI Mix-Headset, 3 meetings** | **29.37 %** |
 | Hansard | SUMM-RE, 12 real French meetings | 63.83 % |
 | Hansard | SUMM-RE, 4 held-out French meetings | 54.18 % |
@@ -331,7 +336,9 @@ for scoring twelve meetings instead of one, and for keeping a half of them back.
 *Azure figures: AssemblyAI's January 2026 competitive benchmark, which is the
 only public source that scores Azure with cpWER on meeting corpora.*
 
-**On AMI we are level with Azure, and that claim needs four caveats.**
+**On AMI we are marginally behind Azure, and that comparison needs four
+caveats.** 27.89 % with a roster against Azure's 27.39 % is half a point, on
+three meetings, measured by two different toolchains.
 
 - The Azure number comes from a third party using their own reference
   preparation and normalizer, on conditions we cannot inspect. Many published
@@ -339,7 +346,7 @@ only public source that scores Azure with cpWER on meeting corpora.*
   nothing but the raw audio, which is harder. That difference alone can be worth
   several points in either direction.
 - Three meetings is a small sample. Per-meeting cpWER ranges from 27.83 % to
-  30.94 %.
+  30.94 % told nothing, and from 26.09 % to 30.94 % with a roster.
 - **The AMI figure moved when nothing about AMI changed.** This page previously
   published 20.44 % / 28.75 %, produced on other hardware under normalizer
   1.1.0. The current code on the current machine measures **21.25 % / 29.37 %**,
@@ -609,13 +616,20 @@ through `build_recognizer` like everything else, so `make bench-asr` reproduces
 
 Publishing this matters more than publishing the wins.
 
-**On real English meetings we are level with Azure, not ahead of it.** We ran
-three AMI test meetings (ES2004a, IS1009a, TS3003a — 56.6 minutes of real,
-spontaneous, four-person meeting audio in the Mix-Headset condition) end to end
-through the full pipeline, and scored them with our own harness. The macro
-average is **28.75 % cpWER** told nothing, **27.34 %** with a participant list,
-against Azure's published **27.39 %**. Level is not ahead, and on a three-meeting
-sample it is not even reliably level. The per-meeting numbers are in
+**On real English meetings we are marginally behind Azure.** We ran three AMI
+test meetings (ES2004a, IS1009a, TS3003a — 56.6 minutes of real, spontaneous,
+four-person meeting audio in the Mix-Headset condition) end to end through the
+full pipeline, and scored them with our own harness. The macro average is
+**29.37 % cpWER** told nothing, **27.89 %** with a participant list, against
+Azure's published **27.39 %**.
+
+An earlier edition of this page reported 27.34 % here and called it level. The
+number moved because the run moved — different machine, normalizer 1.1.0 rather
+than 1.3.0 — not because anything got worse; the same code measures 21.25 % word
+error in both roster configurations, to two decimal places. Half a point on three
+meetings between two different scoring toolchains is not a result in either
+direction, and reporting it as parity was already more than the evidence
+supported. The per-meeting numbers are in
 [§2.4](#24-ami-real-meeting-audio) and the raw file is
 [`bench/results/ami_mix_headset.json`](../bench/results/ami_mix_headset.json).
 
@@ -826,75 +840,32 @@ must-pass gate fails. A must-pass failure means the work is not finished.
 
 Only the shipped profile is scored. Result files carrying a `profile` field —
 the INT8 runs and the historical AMI runs — are skipped, so a gate can never be
-passed by a configuration nobody installs.
+passed by a configuration nobody installs. Diagnostic runs live in
+[`bench/results/experiments/`](../bench/results/experiments/), which the checker
+does not read at all: a sweep that deliberately misconfigures the pipeline to
+learn something must not be able to fail a release gate, and a lucky point in a
+grid must not be able to pass one.
 
 Current status on the hardware described at the top of this page, over every
 shipped-profile result in `bench/results/`:
 
 ```
-FAIL must_pass ES2004a                            cpwer                   28.30% <= 27.00%
-FAIL stretch   ES2004a                            cpwer                   28.30% <= 20.00%
-FAIL stretch   ES2004a                            wder                     7.47% <= 5.00%
-FAIL must_pass ES2004a                            wer                     18.87% <= 15.00%
-FAIL stretch   ES2004a                            wer                     18.87% <= 12.00%
-FAIL must_pass ES2004a                            cer                     16.13% <= 8.00%
-FAIL must_pass ES2004a                            der                     31.06% <= 15.00%
-FAIL stretch   ES2004a                            der                     31.06% <= 8.00%
-FAIL stretch   ES2004a                            rtf                      0.57 <= 0.35
-FAIL must_pass IS1009a                            cpwer                   31.70% <= 27.00%
-FAIL stretch   IS1009a                            cpwer                   31.70% <= 20.00%
-FAIL must_pass IS1009a                            tcpwer                  33.38% <= 30.00%
-FAIL stretch   IS1009a                            wder                     8.25% <= 5.00%
-FAIL must_pass IS1009a                            wer                     22.66% <= 15.00%
-FAIL stretch   IS1009a                            wer                     22.66% <= 12.00%
-FAIL must_pass IS1009a                            cer                     18.22% <= 8.00%
-FAIL must_pass IS1009a                            der                     25.87% <= 15.00%
-FAIL stretch   IS1009a                            der                     25.87% <= 8.00%
-FAIL stretch   IS1009a                            rtf                      0.61 <= 0.35
-FAIL stretch   TS3003a                            cpwer                   26.25% <= 20.00%
-FAIL must_pass TS3003a                            wer                     19.79% <= 15.00%
-FAIL stretch   TS3003a                            wer                     19.79% <= 12.00%
-FAIL must_pass TS3003a                            cer                     14.73% <= 8.00%
-FAIL must_pass TS3003a                            der                     28.74% <= 15.00%
-FAIL stretch   TS3003a                            der                     28.74% <= 8.00%
-FAIL stretch   TS3003a                            rtf                      0.40 <= 0.35
-FAIL stretch   FLEURS en_us (read speech)         wer                      4.47% <= 3.00%
-FAIL stretch   FLEURS en_us (read speech)         rtf                      0.49 <= 0.35
-FAIL stretch   LibriSpeech dev-clean (read speech) wer                      3.34% <= 3.00%
-FAIL stretch   LibriSpeech dev-clean (read speech) rtf                      0.57 <= 0.35
-FAIL must_pass 020c_EBPZ                          cpwer                   53.16% <= 30.00%
-FAIL stretch   020c_EBPZ                          cpwer                   53.16% <= 22.00%
-FAIL must_pass 020c_EBPZ                          tcpwer                  56.52% <= 33.00%
-FAIL must_pass 020c_EBPZ                          wder                    17.17% <= 12.00%
-FAIL stretch   020c_EBPZ                          wder                    17.17% <= 6.00%
-FAIL must_pass 020c_EBPZ                          wer                     37.52% <= 20.00%
-FAIL stretch   020c_EBPZ                          wer                     37.52% <= 17.00%
-FAIL must_pass 020c_EBPZ                          cer                     28.69% <= 10.00%
-FAIL must_pass 020c_EBPZ                          der                     36.22% <= 15.00%
-FAIL stretch   020c_EBPZ                          der                     36.22% <= 8.00%
-FAIL stretch   020c_EBPZ                          rtf                      0.59 <= 0.35
-FAIL stretch   meeting_3spk                       der                      8.64% <= 8.00%
-FAIL stretch   meeting_3spk                       rtf                      0.78 <= 0.35
-FAIL stretch   meeting_6spk                       der                      9.40% <= 8.00%
-FAIL stretch   meeting_6spk                       rtf                      0.81 <= 0.35
-FAIL stretch   meeting_9spk                       der                      9.94% <= 8.00%
-FAIL stretch   meeting_9spk                       rtf                      0.61 <= 0.35
-FAIL stretch   meeting_fr_3spk                    der                     11.88% <= 8.00%
-FAIL stretch   meeting_fr_6spk                    der                      8.87% <= 8.00%
-FAIL stretch   meeting_fr_9spk                    der                     13.98% <= 8.00%
-
-108/158 gates met  (18 must-pass failures, 32 stretch misses)
-
+189/360 gates met  (89 must-pass failures, 82 stretch misses)
 Must-pass gates are not met. The work is not finished.
 ```
 
-**Every one of the eighteen must-pass failures is a real meeting** — twelve on
-the three AMI meetings, six on SUMM-RE. That is the open problem of
-[§8](#8-where-we-lose), stated by the tooling rather than by us. Nothing on the
-synthetic meetings or on read speech blocks a release any more, and
-`speaker_count_error` no longer appears at all: the count is within the gate on
-every corpus that reaches it, where it was two over on all three AMI meetings
-before the diarization retune and six over before the clustering fixes.
+**Eighty-seven of the eighty-nine must-pass failures are real meetings** —
+fourteen on the three AMI meetings, seventy-three across the twelve SUMM-RE
+meetings. The remaining two are the code-switched fixtures: character error on
+`meeting_mixed_4spk` and language accuracy on `meeting_mixed_8spk`. That is the
+open problem of [§8](#8-where-we-lose), stated by the tooling rather than by us.
+
+The count jumped when the corpus did. This section previously reported eighteen
+failures, because SUMM-RE contributed one meeting; it now contributes twelve, and
+each meeting is graded against the same six or seven French meeting gates. More
+failures here is more measurement, not more breakage — and it is why the number
+in this block should be read alongside the corpus sizes in
+[§2](#2-meeting-transcription-with-speaker-attribution) rather than on its own.
 
 Two things changed when float32 became the default, and both show up here as
 failures that have disappeared — the command prints only what fails:

@@ -115,7 +115,7 @@ def _pipeline(recognizer: object, guard: DriftGuardPolicy | None) -> Transcripti
         attributor=PassThroughAttributor(),
         detector=WholeClipDetector(),
         drift_guard=guard,
-        segmentation=SegmentationPolicy(max_seconds=LONG_SEGMENT),
+        segmentation=SegmentationPolicy(max_seconds=LONG_SEGMENT, dense_max_seconds=0.0),
     )
 
 
@@ -232,3 +232,17 @@ def test_the_guard_is_off_when_no_policy_is_configured():
     assert len(recognizer.calls) == 1
     assert "Today one will pench" in outcome.transcript.text
     assert "language_drift" not in outcome.stage_seconds
+
+
+def test_dense_audio_never_reaches_the_long_segments_the_guard_exists_for():
+    recognizer = DriftingRecognizer()
+    pipeline = TranscriptionPipeline(
+        recognizer=recognizer,
+        attributor=PassThroughAttributor(),
+        detector=WholeClipDetector(),
+        drift_guard=None,
+        segmentation=SegmentationPolicy(max_seconds=LONG_SEGMENT),
+    )
+    outcome = pipeline.run(_clip(), _request())
+    assert max(span.duration for span in recognizer.calls[0].segments) <= 15.0
+    assert "Today one will pench" not in outcome.transcript.text
