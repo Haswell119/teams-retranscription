@@ -138,6 +138,7 @@ difference in speaker handling and nothing else.
 | 9 | Merge threshold per embedding space | same words | apparent 1.5-point win; found a regression I shipped | Superseded by 11 |
 | 10 | Gate absorption on voice similarity | same words | no gate value restores speaker counts; ordering was the cause | **REVERT** |
 | 11 | Merge threshold, re-measured after the revert | same words | 0.72 worth 0.17 points, and costs a quiet speaker | **No change** |
+| 12 | Score eight meetings end to end | 8 SUMM-RE meetings | macro **71.92 %** cpWER, **57.49 %** WER | The honest French figure |
 
 ## Iterations
 
@@ -579,6 +580,55 @@ default by more than noise. That is a result: the diarization defaults are not
 where the remaining French error lives, and
 [the roadmap](#what-to-do-next-in-the-order-the-evidence-supports) says where it
 does.
+
+### Iteration 12 — eight real French meetings, and the number is much worse
+
+**Hypothesis.** Eight meetings will give a French figure that can be published
+without a straight face problem. It will be worse than the single-meeting 53.16 %.
+
+**Experiment.** The full pipeline, unchanged defaults, on all eight SUMM-RE
+tuning meetings — 151.9 minutes of real French meeting audio.
+
+**Result.**
+
+| Meeting | Duration | Speakers | Words ref → produced | WER | **cpWER** | WDER | DER | Reference overlap |
+| --- | ---: | :---: | :---: | ---: | ---: | ---: | ---: | ---: |
+| `020c_EBPZ` | 18.2 min | 4 → **4** | 3376 → 2369 | **36.36 %** | **51.99 %** | 17.03 % | 32.28 % | 5.04 % |
+| `004c_PAPH` | 21.1 min | 4 → 7 | 4110 → 2332 | 47.55 % | 56.92 % | 11.22 % | 36.02 % | 10.97 % |
+| `021a_EARD` | 18.8 min | 4 → 6 | 3751 → 2125 | 49.67 % | 52.96 % | 6.88 % | 26.18 % | 9.55 % |
+| `017a_EBRZ` | 12.5 min | 3 → 4 | 1131 → 718 | 52.19 % | 59.07 % | 5.32 % | 44.62 % | 8.06 % |
+| `018b_EADZ` | 19.4 min | 4 → **4** | 4377 → 1884 | 66.33 % | 71.60 % | 13.60 % | 35.15 % | 12.57 % |
+| `033c_EBPH` | 20.7 min | 4 → 3 | 5472 → 1935 | 72.25 % | **100.86 %** | 65.69 % | 73.30 % | **21.83 %** |
+| `006b_EADH` | 21.4 min | 4 → **4** | 6462 → 1586 | **83.05 %** | 89.79 % | 40.97 % | 58.58 % | **18.89 %** |
+| `035b_EADH` | 19.8 min | 4 → 2 | 4402 → 2338 | 52.55 % | 92.19 % | 52.52 % | 68.57 % | 12.57 % |
+| **macro** | 151.9 min | | | **57.49 %** | **71.92 %** | **26.65 %** | **46.84 %** | 12.43 % |
+
+**Conclusion.** The published 53.16 % was a figure for the easiest meeting in the
+corpus. The honest eight-meeting number is **71.92 % cpWER and 57.49 % WER**, and
+`020c_EBPZ` is the best row in the table by fourteen points.
+
+Order the rows by reference overlap and the table sorts itself: 5.0 % overlap →
+51.99 % cpWER, 21.8 % overlap → 100.86 %. The two worst meetings are the two most
+overlapped, which is [iteration 3](#iteration-3--the-recogniser-is-not-the-bottleneck-the-second-voice-is)
+arriving end to end instead of on reference boundaries.
+
+**And one row does not fit that story, which is the useful part.** `006b_EADH`
+detects its four speakers correctly and still scores 83.05 % word error, producing
+**1586 of 6462 reference words — a quarter**. Its reference contains **1377
+seconds of speech inside a 1281-second meeting**, because the reference is the sum
+of four per-speaker tracks and they overlap. To the voice-activity detector that
+is one continuous 21-minute utterance: it hands the recognizer **45 segments**
+where the same pipeline gives `020c_EBPZ` 108, and a 120-second span of four
+people talking over each other is not something a one-stream recognizer can
+transcribe.
+
+That points at a default this project has already tested and retired.
+[Benchmarks §8](benchmarks.md#8-where-we-lose) records that changing
+`audio.max_segment_seconds` from 120 s to 20 s to 8 s was worth under two points
+— but that was measured on `020c_EBPZ`, which has 777 seconds of speech in 1094
+seconds of audio and is the *sparsest* meeting in the corpus. A dead hypothesis
+tested on one meeting is a dead hypothesis about one meeting. It is being
+re-measured on a dense one.
 
 ---
 

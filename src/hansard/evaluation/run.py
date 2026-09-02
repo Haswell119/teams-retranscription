@@ -347,6 +347,10 @@ def run_summ_re(options: RunOptions) -> dict[str, object]:
     if not root.is_dir():
         return {"benchmark": "summ-re", "normalizer_version": NORMALIZER_VERSION, "rows": rows}
     for directory in sorted(item for item in root.iterdir() if item.is_dir()):
+        if options.meetings and directory.name not in options.meetings:
+            continue
+        if options.split is not None and summ_re_split(directory.name) != options.split:
+            continue
         meeting = read_meeting(directory)
         if meeting.mixed_audio is None:
             continue
