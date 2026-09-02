@@ -375,6 +375,87 @@ another speaker's voice.
 first concrete demonstration that the bilingual defect costs words and not only
 labels.
 
+### Iteration 7 — one meeting was an anecdote, and it was the flattering one
+
+**Hypothesis.** The published SUMM-RE figure comes from a single meeting. Four
+meetings will say something different.
+
+**Experiment.** The diarization sweep at the shipped defaults, on four SUMM-RE
+tuning meetings, scoring one cached recognition pass per meeting.
+
+**Result.**
+
+| Meeting | Speakers (ref → detected) | cpWER | WDER | DER | missed | false alarm | confusion |
+| --- | :---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `004c_PAPH` | 4 → 6 | 56.11 % | 10.49 % | 36.38 % | 5.0 % | 18.9 % | 12.5 % |
+| `006b_EADH` | 4 → 5 | **85.80 %** | 17.06 % | 41.82 % | 6.0 % | 23.2 % | 12.7 % |
+| `017a_EBRZ` | 3 → 5 | 61.66 % | 8.62 % | 54.64 % | 5.8 % | 29.7 % | 19.1 % |
+| `020c_EBPZ` | 4 → **4** | **49.18 %** | 12.97 % | 34.92 % | 4.0 % | 18.1 % | 12.9 % |
+| **macro** | | **63.19 %** | 12.28 % | 41.94 % | 5.2 % | 22.5 % | 14.3 % |
+
+**Conclusion.** Two things, and neither is comfortable.
+
+`020c_EBPZ` scores **49.18 %** here against the published **53.16 %** — the
+corrected reference and normalizer 1.3.0 are worth four points, as
+[iterations 2](#iteration-2--a-pause-is-not-a-word) and
+[6](#iteration-6--what-the-french-errors-actually-are) predicted. That is the
+honest current figure for that meeting.
+
+And `020c_EBPZ` is the **best** of the four. The macro average across four
+meetings is **63.19 %**, fourteen points worse, because it is the only one of the
+four where the speaker count comes out right. `006b_EADH` at 85.80 % is a
+different order of failure. The project has been reasoning about French meetings
+from its most flattering sample. KEEP the wider corpus as the reporting unit;
+`020c_EBPZ` alone is retired as a headline.
+
+---
+
+### Iteration 8 — a better speaker embedding, and a gap-filler worth removing
+
+**Hypothesis.** Three separate ideas, each with published support behind it.
+TitaNet-small is the weakest embedding in its family (1.15 % EER against 0.72 %
+for WeSpeaker ResNet34-LM); `min_duration_off = 0.4` fills same-speaker gaps and
+against a word-aligned reference that manufactures false alarm, which is 22.5 %
+of our DER; and the ten-second absorption floor is what removes phantom speakers,
+so it should be worth its cost.
+
+**Experiment.** Seven points over the same four meetings and the same cached
+words, so any difference is speaker handling alone.
+
+**Result.**
+
+| Point | cpWER | WDER | DER | false alarm | speaker-count error | quiet-speaker recall |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **default** | **63.19 %** | **12.28 %** | 41.94 % | 22.46 % | 1.25 | 100 % |
+| `min_duration_off=0.0` | 63.24 % | 12.15 % | **41.01 %** | **21.40 %** | 1.50 | 87.5 % |
+| `minimum_speaker_seconds=0` | 63.70 % | 12.76 % | 42.96 % | 22.92 % | **10.75** | 100 % |
+| TitaNet-large | 66.59 % | 20.96 % | 47.30 % | 20.33 % | 1.25 | 100 % |
+| ERes2Net | 67.11 % | 14.77 % | 44.58 % | 22.12 % | 1.50 | 87.5 % |
+| WeSpeaker ResNet34-LM | 90.50 % | 45.17 % | 65.40 % | 18.38 % | 2.25 | 50 % |
+| CAM++ | 96.59 % | 54.44 % | 72.19 % | 20.32 % | 2.00 | 50 % |
+
+**Conclusion. REVERT all three, and read the last two rows carefully.**
+
+*Removing the gap filler is noise.* False alarm does fall, 22.46 % → 21.40 %, and
+DER with it — and cpWER does not move at all (63.19 → 63.24). The false alarm was
+real and it was not costing us words. Dead hypothesis, recorded.
+
+*The absorption floor earns its place.* Setting it to zero takes the speaker-count
+error from 1.25 to **10.75** — eighteen clusters where there are four speakers —
+while quiet-speaker recall stays at 100 % either way. The floor is not what
+threatens quiet participants here, and the gated absorption shipped alongside it
+is what makes sure it never will be.
+
+*The embedding swaps were run at TitaNet's thresholds, and that is a flaw in the
+experiment, not a verdict on the models.* `clustering_threshold = 0.99` and
+`merge_similarity = 0.77` were calibrated in TitaNet's cosine geometry, which
+[configuration](configuration.md#tuning-clustering_threshold-by-symptom) already
+warns does not transfer. WeSpeaker and CAM++ collapse four speakers into one or
+two, which is the signature of a merge threshold that is far too low for their
+similarity distribution, not of a bad embedding. The follow-up — a merge-threshold
+grid inside each embedding space, which now costs one clustering pass per
+embedding rather than one per threshold — is the honest version of this test.
+
 ---
 
 ## Dead hypotheses inherited from earlier work
