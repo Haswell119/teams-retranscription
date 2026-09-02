@@ -141,3 +141,28 @@ def test_an_older_cache_without_spans_falls_back_to_the_utterances(tmp_path):
     )
     _, _, spans = _read_transcript(path, "fr", 9.0, object())
     assert spans == (TimeSpan(0.0, 4.0),)
+
+
+def test_points_that_only_change_consolidation_share_a_diarizer_signature():
+    from hansard.evaluation.sweep import diarizer_signature
+
+    base = Settings()
+    left = SweepPoint("a", {"merge_similarity": 0.6}).applied(base)
+    right = SweepPoint("b", {"absorption_similarity": 0.9}).applied(base)
+    assert diarizer_signature(left) == diarizer_signature(right)
+
+
+def test_changing_the_embedding_model_changes_the_signature():
+    from hansard.evaluation.sweep import diarizer_signature
+
+    base = Settings()
+    other = SweepPoint("b", {"embedding_model": "something_else.onnx"}).applied(base)
+    assert diarizer_signature(base) != diarizer_signature(other)
+
+
+def test_changing_a_segmentation_duration_changes_the_signature():
+    from hansard.evaluation.sweep import diarizer_signature
+
+    base = Settings()
+    other = SweepPoint("b", {"min_duration_off": 0.0}).applied(base)
+    assert diarizer_signature(base) != diarizer_signature(other)

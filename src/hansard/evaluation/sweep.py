@@ -29,18 +29,23 @@ from hansard.ports.diarization import DiarizationRequest
 
 SWEEP_VERSION = "hansard-sweep-1.0.0"
 
-SWEEP_KEYS: tuple[str, ...] = (
+DIARIZER_KEYS: tuple[str, ...] = (
     "embedding_model",
     "segmentation_model",
     "clustering_threshold",
-    "merge_similarity",
-    "minimum_speaker_seconds",
-    "absorption_similarity",
     "min_duration_on",
     "min_duration_off",
     "cluster_consolidation",
+)
+
+CONSOLIDATION_KEYS: tuple[str, ...] = (
+    "merge_similarity",
+    "minimum_speaker_seconds",
+    "absorption_similarity",
     "speech_coverage_refinement",
 )
+
+SWEEP_KEYS: tuple[str, ...] = DIARIZER_KEYS + CONSOLIDATION_KEYS
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +92,7 @@ def cached_transcript(
     return outcome.transcript, clip, outcome.speech_spans
 
 
-def diarize_once(
+def clusters_only(
     clip: AudioClip, settings: Settings, models_dir: Path, speaker_ceiling: int | None = None
 ) -> tuple[Diarization, float]:
     diarizer = build_diarizer(settings.diarization, models_dir)
@@ -101,16 +106,37 @@ def diarize_once(
             speaker_ceiling=speaker_ceiling,
         ),
     )
-    if settings.diarization.cluster_consolidation and diarization.speaker_count > 1:
-        consolidator = EmbeddingClusterConsolidator(
-            models_dir=models_dir,
-            embedding_model=settings.diarization.embedding_model,
-            merge_similarity=settings.diarization.merge_similarity,
-            minimum_speaker_seconds=settings.diarization.minimum_speaker_seconds,
-            absorption_similarity=settings.diarization.absorption_similarity,
-        )
-        diarization = consolidator.consolidate(diarization, clip, speaker_ceiling)
     return diarization, time.perf_counter() - started
+
+
+def consolidated(
+    diarization: Diarization,
+    clip: AudioClip,
+    settings: Settings,
+    models_dir: Path,
+    speaker_ceiling: int | None = None,
+) -> Diarization:
+    if not settings.diarization.cluster_consolidation or diarization.speaker_count < 2:
+        return diarization
+    consolidator = EmbeddingClusterConsolidator(
+        models_dir=models_dir,
+        embedding_model=settings.diarization.embedding_model,
+        merge_similarity=settings.diarization.merge_similarity,
+        minimum_speaker_seconds=settings.diarization.minimum_speaker_seconds,
+        absorption_similarity=settings.diarization.absorption_similarity,
+    )
+    return consolidator.consolidate(diarization, clip, speaker_ceiling)
+
+
+def diarize_once(
+    clip: AudioClip, settings: Settings, models_dir: Path, speaker_ceiling: int | None = None
+) -> tuple[Diarization, float]:
+    diarization, elapsed = clusters_only(clip, settings, models_dir, speaker_ceiling)
+    return consolidated(diarization, clip, settings, models_dir, speaker_ceiling), elapsed
+
+
+def diarizer_signature(settings: Settings) -> tuple[object, ...]:
+    return tuple(getattr(settings.diarization, key) for key in DIARIZER_KEYS)
 
 
 def score_point(
@@ -160,13 +186,20 @@ def run_sweep(
         transcript, clip, speech = cached_transcript(meeting, settings, cache)
         prepared.append((meeting, transcript, clip, speech))
     rows: list[dict[str, object]] = []
+    clusters: dict[tuple[object, ...], dict[str, Diarization]] = {}
     for point in points:
         applied = point.applied(settings)
+        signature = diarizer_signature(applied)
+        cached = clusters.setdefault(signature, {})
         scored: list[dict[str, object]] = []
         elapsed = 0.0
         for meeting, transcript, clip, speech in prepared:
-            diarization, seconds = diarize_once(clip, applied, models_dir)
-            elapsed += seconds
+            raw = cached.get(meeting.identifier)
+            if raw is None:
+                raw, seconds = clusters_only(clip, applied, models_dir)
+                cached[meeting.identifier] = raw
+                elapsed += seconds
+            diarization = consolidated(raw, clip, applied, models_dir)
             scored.append(
                 score_point(
                     meeting,
