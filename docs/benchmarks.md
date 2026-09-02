@@ -24,7 +24,7 @@ as the English ones do. French read speech is measured and passing
 ([§1](#1-speech-recognition-french-and-english)); French synthetic meetings are
 built by the same generator as the English ones and recorded beside them
 ([§2.2](#22-french-synthetic-meetings)); one real French meeting is recorded too,
-and it is our worst published result ([§2.4](#24-summ-re-real-french-meeting-audio)).
+and it is our worst published result ([§2.5](#25-summ-re-real-french-meeting-audio)).
 Nothing here is an English measurement with a French claim attached to it.
 
 ## 1. Speech recognition, French and English
@@ -142,7 +142,42 @@ French cpWER rises more steeply with speaker count than English does (4.20 %,
 nine speakers French WDER is 3.42 % against 1.52 % in English, so the extra
 error is speaker attribution rather than recognition.
 
-### 2.3 AMI, real meeting audio
+### 2.3 Code-switched meetings, French and English in one room
+
+Source:
+[`bench/results/mixed_meetings.json`](../bench/results/mixed_meetings.json).
+Three fixtures built from the same French and English speaker pools as above,
+with each speaker's utterances drawn from both languages so that the language
+changes within the meeting and within a speaker's turns. No language tag is
+given to the recognizer.
+
+| Fixture | Speakers (reference → detected) | WER | **cpWER** | tcpWER@5s | WDER | **Language accuracy** |
+| --- | :---: | ---: | ---: | ---: | ---: | ---: |
+| `meeting_mixed_4spk` | 4 → **4** | 13.83 % | 23.56 % | 24.15 % | 3.55 % | 97.58 % |
+| `meeting_mixed_6spk` | 6 → 7 | 4.44 % | 21.62 % | 22.30 % | 7.28 % | 97.79 % |
+| `meeting_mixed_8spk` | 8 → **8** | 12.71 % | **12.45 %** | 12.45 % | **0.88 %** | 93.63 % |
+| **macro average** | | **10.33 %** | **19.21 %** | 19.63 % | **3.90 %** | **96.33 %** |
+
+```bash
+make bench-mixed
+```
+
+**Language accuracy is 96.33 %, under the 98 % gate, and the errors run one
+way.** 105 French words were labelled English; 41 English words were labelled
+French. Language is currently decided from the recognized *text*, so a French
+utterance that decodes into English-looking words is then confidently labelled
+English — the recognition error and the language error have the same cause and
+reinforce each other. Fixing this needs a language decision that comes from the
+audio rather than from our own output; it has not been done.
+
+Two further caveats. These fixtures are clean close-talk recordings summed
+together, so they measure code-switching and not a real room — the same caveat
+that applies to §2.1 and §2.2, and the reason [§2.4](#24-ami-real-meeting-audio)
+and [§2.5](#25-summ-re-real-french-meeting-audio) exist. And the code-switching
+is *between* utterances, not inside them; a fixture where a speaker switches
+language mid-sentence is not built yet.
+
+### 2.4 AMI, real meeting audio
 
 Source:
 [`bench/results/ami_mix_headset.json`](../bench/results/ami_mix_headset.json).
@@ -210,7 +245,7 @@ for any single-stream system, ours included. The gate stays where it is because
 it is right for the audio a Teams meeting produces; on AMI, read the confusion
 and false-alarm components instead.
 
-### 2.4 SUMM-RE, real French meeting audio
+### 2.5 SUMM-RE, real French meeting audio
 
 Source: [`bench/results/summ_re.json`](../bench/results/summ_re.json). AMI gave
 us a real spontaneous *English* meeting to be measured against. SUMM-RE, a French
@@ -253,7 +288,7 @@ talk for 380, 326, 59 and 12 seconds; AMI's four each talk for minutes. A
 meeting where two participants barely speak is the ordinary case in an
 organisation, and it is exactly the case the synthetic fixtures do not test.
 
-### 2.5 How this compares to Microsoft
+### 2.6 How this compares to Microsoft
 
 | System | Corpus | cpWER |
 | --- | --- | ---: |
@@ -292,7 +327,7 @@ changing how we score.
 real French meeting scores 53.16 % cpWER. Neither Microsoft nor anyone else
 publishes a French meeting figure, so there is nothing to compare it against —
 which cuts both ways. It is not evidence that we are better than Teams in
-French, and it is the reason [§2.4](#24-summ-re-real-french-meeting-audio) exists
+French, and it is the reason [§2.5](#25-summ-re-real-french-meeting-audio) exists
 at all.
 
 Note also the gap in Microsoft's own numbers: Azure markets **2.4 % WER** on
@@ -518,7 +553,7 @@ through the full pipeline, and scored them with our own harness. The macro
 average is **28.75 % cpWER** told nothing, **27.34 %** with a participant list,
 against Azure's published **27.39 %**. Level is not ahead, and on a three-meeting
 sample it is not even reliably level. The per-meeting numbers are in
-[§2.3](#23-ami-real-meeting-audio) and the raw file is
+[§2.4](#24-ami-real-meeting-audio) and the raw file is
 [`bench/results/ami_mix_headset.json`](../bench/results/ami_mix_headset.json).
 
 The most legible symptom left is speaker counting: five, four and five clusters
@@ -615,21 +650,62 @@ are dead:**
 | We feed too much silence | 756 s → 26.59 %, 871 s → **25.46 %**, 907 s → 37.52 %, 1002 s → 32.19 % | Dead — not monotone; adding silence *helped* twice |
 | The overlap and seam mechanism | Removing the overlap entirely: −0.56 points at a 20 s ceiling, **+0.69** at 8 s | Dead — noise |
 
-Every configuration we can reach lands between 35.6 % and 37.5 %. The corpus's
-own boundaries reach 26.59 %. **What is different about them is untested**, and
-the leading remaining candidate is boundary precision — spans that begin and end
-on real speech edges rather than on detector output plus padding. That is written
-here as an open question, not as a finding, and it will stay that way until
-someone measures it.
+Every configuration we can reach lands between 35.6 % and 37.5 %.
+
+**That open question is now closed, and the answer is not boundaries.** Handing
+the recognizer the corpus's own utterance spans across **seven** SUMM-RE tuning
+meetings — 855 segments, 1803 seconds, no detector, no padding, no seams — leaves
+**30.82 %** word error. Perfect boundaries are worth about seven points. Thirty-one
+remain. Boundary precision was the leading candidate; it is a real term and it is
+not the dominant one.
+
+**The dominant term is the second voice.** Splitting the same hypotheses by how
+much of each reference utterance another participant is talking over:
+
+| Overlap with another speaker | Segments | Reference words | WER | Utterances returned empty |
+| --- | ---: | ---: | ---: | ---: |
+| clean, under 5 % | 414 | 3758 | **20.60 %** | 9 |
+| light, 5–50 % | 177 | 2154 | 23.35 % | 7 |
+| **heavy, over 50 %** | 238 | 1232 | **70.54 %** | **48** |
+
+Heavily overlapped speech is **17 % of the reference words and 39 % of the
+errors**. And the 66 utterances the recognizer answers with silence are buried
+under another speaker **84.3 %** of the time, against **31.6 %** for the ones it
+does transcribe; 75.8 % of them are more than half covered, against 27.4 % of the
+rest.
+
+Read the first row again: **on clean French spontaneous meeting speech the
+shipped recognizer scores 20.60 %**, which is close to what it scores on English
+AMI. It is not bad at French. It is bad at two people at once, and on one mixed
+stream it has no way to be anything else. That is why
+[§9](#9-what-we-have-not-measured-yet) now names speech separation as the largest
+unexplored lever, and why it also explains why we cannot afford it.
+
+**A bigger, newer, better-ranked recognizer does not fix it.** NVIDIA Canary 1B
+v2 — CC-BY-4.0, ONNX, explicitly conditioned on French, and ahead of Parakeet on
+the Open ASR multilingual French track (4.83 against 5.42) — was run on
+byte-identical segments and scored **38.01 %** against Parakeet's 30.82 %. It
+loses in every overlap band and every duration band, at twice the memory. Its
+failure has a shape worth recording: it produced 1 empty output where Parakeet
+produced 66, and paid for that with **672 insertions against 369** and 1190
+substitutions against 879. On a short, half-buried turn Parakeet says nothing and
+Canary says something wrong. For a verbatim record, invention is the worse
+failure. The full table is in
+[quality-research](quality-research.md#iteration-4--canary-1b-v2-instead-of-parakeet).
 
 The floor underneath all of it is the register rather than the machinery. One
 participant's own isolated 32 kHz track, scored against that participant's own
 reference with oracle boundaries and no mixing or segmentation of ours involved,
-still scores **28.05 %**, against 4.63 % on French read speech. Summing the four
-tracks into one stream costs a further 3.3 points, which is the fair price of a
-single-channel mixture and not a corpus defect. Expect the mid-twenties on casual
-multi-party French, and treat any claim that a segmentation change alone will
-reach read-speech numbers as unsupported.
+still scores **28.05 %**, against 4.63 % on French read speech. Expect the low
+twenties on clean casual multi-party French, and treat any claim that a
+segmentation change alone will reach read-speech numbers as unsupported.
+
+**One point of the published SUMM-RE figure was our own scoring.** SUMM-RE is
+annotated in the SPPAS convention, where `+` marks a short pause. The French
+normalizer expands a bare `+` into the word "plus", so 533 pause marks — 1.61 %
+of every reference token — became words no recognizer could produce, each one a
+guaranteed deletion. The corpus reader now strips them, which moved the
+reference-boundary figure from 31.54 % to 30.82 % on unchanged hypotheses.
 
 **We also do not beat Azure on read speech.** Azure Speech reports 2.78 % on
 FLEURS `fr_fr`; we measure 4.63 %. Read-speech benchmarks are not what a meeting
@@ -646,29 +722,26 @@ generated claim, and open export formats.
 
 Being explicit about this is part of the point.
 
-- **NOTSOFAR-1.** The harness supports it; we have not run it.
-- **More than one real French meeting.** SUMM-RE is a 91-hour corpus and we have
-  scored **one** meeting from it ([§2.4](#24-summ-re-real-french-meeting-audio)).
-  One meeting is an anecdote: it is enough to have found a defect, not enough to
-  claim a French meeting figure with a straight face. Preparation code ships in
-  `hansard.evaluation.corpora`, so the cost of the next ten is machine time.
-  For context, published results for other open models on this corpus sit at
-  19–23 % WER against our 37.52 %.
-- **A code-switched French/English meeting run.** This is the newest empty cell
-  and the most conspicuous, because the feature it measures shipped without it.
-  The fixtures exist (`meeting_mixed_4spk`, `_6spk`, `_8spk`), `make bench-mixed`
-  scores them, `MIXED_MEETING_GATES` grades them and `language_accuracy` is
-  implemented — but no result file has been committed, so this page carries no
-  mixed cpWER and no measured language accuracy. Everything currently known about
-  bilingual behaviour comes from unit tests on text, which prove the extraction
-  logic and prove nothing about the audio. See [multilingual](multilingual.md).
+- **NOTSOFAR-1.** The harness supports it; we have not run it. The corpus is
+  CC-BY-4.0 and downloadable, but the dev and eval splits are 40 GB and 84 GB,
+  and the official metric is `tcpWER` scored with `fgnt/meeteval` — which we
+  already depend on. It is a machine-time problem, not a code problem.
 - **A recorded head-to-head against a live Teams transcript.** The protocol is
   written up in [metrics.md](metrics.md); it needs real meetings and real consent.
   `hansard compare` is the tool for it: it scores several systems against one
-  reference and breaks the result down by the language actually spoken, which is
-  the comparison that matters for a bilingual meeting. The tool is tested; the
-  head-to-head is not run.
+  reference and now breaks the result down by the language actually spoken, by
+  word category (names, numbers, code-switched words, function words) and by how
+  long each reference speaker actually spoke. The tool is tested; the head-to-head
+  is not run.
 - **Minutes quality against Copilot's recap**, blind and rated by humans.
+- **Any speech separation front-end.** [§8](#8-where-we-lose) now shows that
+  overlapped speech is where the French words go. Every credible single-channel
+  separator for meetings — the NOTSOFAR-1 baseline's Conformer CSS, TF-GridNet,
+  MossFormer2, SepFormer — costs one to two orders of magnitude more compute than
+  this entire pipeline, and the NOTSOFAR baseline additionally runs three
+  parallel ASR decodes on the separated streams. On 4 vCPU with no GPU that is
+  not affordable, and we have not measured it. It remains the largest known
+  unexplored lever.
 
 ## 10. Checking the gates
 

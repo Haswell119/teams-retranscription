@@ -35,6 +35,7 @@ SWEEP_KEYS: tuple[str, ...] = (
     "clustering_threshold",
     "merge_similarity",
     "minimum_speaker_seconds",
+    "absorption_similarity",
     "min_duration_on",
     "min_duration_off",
     "cluster_consolidation",
@@ -103,6 +104,8 @@ def diarize_once(
             models_dir=models_dir,
             embedding_model=settings.diarization.embedding_model,
             merge_similarity=settings.diarization.merge_similarity,
+            minimum_speaker_seconds=settings.diarization.minimum_speaker_seconds,
+            absorption_similarity=settings.diarization.absorption_similarity,
         )
         diarization = consolidator.consolidate(diarization, clip, speaker_ceiling)
     return diarization, time.perf_counter() - started

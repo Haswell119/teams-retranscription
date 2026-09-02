@@ -62,7 +62,7 @@ the engine behind Teams transcription — is **27.39 %** cpWER on AMI, **35.68 %
 on NOTSOFAR-1 test and **45.38 %** on NOTSOFAR-1 dev. Those figures come from a
 third party using its own reference preparation, so parity with them is
 *measured*, not *established*; see
-[benchmarks §2.5](benchmarks.md#25-how-this-compares-to-microsoft).
+[benchmarks §2.6](benchmarks.md#26-how-this-compares-to-microsoft).
 
 ---
 

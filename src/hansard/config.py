@@ -65,6 +65,7 @@ class DiarizationSettings(BaseModel):
     speech_coverage_refinement: bool = True
     cluster_consolidation: bool = True
     merge_similarity: float = 0.77
+    absorption_similarity: float = 0.55
     maximum_turn_extension: float = 2.5
 
 

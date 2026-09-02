@@ -7,12 +7,12 @@ from pathlib import Path
 
 from hansard.adapters.language.identification import UtteranceLanguageTagger
 from hansard.domain.language import MIXED, normalise_tag
+from hansard.domain.speakers import Diarization, SpeakerTurn
 from hansard.domain.transcript import Transcript
 from hansard.evaluation.datasets import load_reference_json
 from hansard.evaluation.formats.subtitles import load_subtitles
-from hansard.evaluation.metrics.language import language_identification, reference_language_at
-from hansard.domain.speakers import Diarization, SpeakerTurn
 from hansard.evaluation.metrics.decomposition import Decomposition, decompose
+from hansard.evaluation.metrics.language import language_identification, reference_language_at
 from hansard.evaluation.metrics.quiet import QuietSpeakerReport, quiet_speaker_report
 from hansard.evaluation.metrics.speaker import (
     concatenated_minimum_permutation_wer,

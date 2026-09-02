@@ -20,6 +20,8 @@ class EmbeddingClusterConsolidator:
     merge_similarity: float = 0.60
     samples_per_cluster: int = 8
     minimum_segment_seconds: float = 1.2
+    minimum_speaker_seconds: float = 0.0
+    absorption_similarity: float = 0.55
     _extractor: Any | None = field(default=None, init=False, repr=False)
 
     @property
@@ -79,10 +81,17 @@ class EmbeddingClusterConsolidator:
         if len(centroids) < 2:
             return diarization
         merged = _agglomerate(centroids, self.merge_similarity, ceiling)
-        if len(set(merged.values())) == len(centroids):
+        rescued = _absorb_quiet_clusters(
+            merged,
+            centroids,
+            diarization.speaking_time(),
+            self.minimum_speaker_seconds,
+            self.absorption_similarity,
+        )
+        if len(set(rescued.values())) == len(centroids):
             return diarization
         turns = tuple(
-            SpeakerTurn(turn.span, merged.get(turn.label, turn.label), turn.confidence)
+            SpeakerTurn(turn.span, rescued.get(turn.label, turn.label), turn.confidence)
             for turn in diarization.turns
         )
         return Diarization(turns=turns, labels=tuple(dict.fromkeys(turn.label for turn in turns)))
@@ -114,3 +123,60 @@ def _agglomerate(
         parent[max(left_root, right_root)] = min(left_root, right_root)
         groups -= 1
     return {label: root(label) for label in labels}
+
+
+def _absorb_quiet_clusters(
+    assignment: dict[str, str],
+    centroids: dict[str, np.ndarray],
+    speaking: dict[str, float],
+    minimum_seconds: float,
+    similarity: float,
+) -> dict[str, str]:
+    if minimum_seconds <= 0.0:
+        return assignment
+    totals: dict[str, float] = {}
+    for label, group in assignment.items():
+        totals[group] = totals.get(group, 0.0) + speaking.get(label, 0.0)
+    quiet = {group for group, total in totals.items() if total < minimum_seconds}
+    loud = [group for group in totals if group not in quiet]
+    if not quiet or not loud:
+        return assignment
+    absorbed = dict(assignment)
+    for group in sorted(quiet):
+        members = [label for label, target in assignment.items() if target == group]
+        centre = _mean_direction([centroids[label] for label in members if label in centroids])
+        if centre is None:
+            continue
+        best, score = _closest(centre, loud, assignment, centroids)
+        if best is None or score < similarity:
+            continue
+        for label in members:
+            absorbed[label] = best
+    return absorbed
+
+
+def _closest(
+    centre: np.ndarray,
+    candidates: list[str],
+    assignment: dict[str, str],
+    centroids: dict[str, np.ndarray],
+) -> tuple[str | None, float]:
+    best: str | None = None
+    score = -1.0
+    for group in candidates:
+        members = [centroids[label] for label, target in assignment.items() if target == group]
+        other = _mean_direction(members)
+        if other is None:
+            continue
+        similarity = float(np.dot(centre, other))
+        if similarity > score:
+            best, score = group, similarity
+    return best, score
+
+
+def _mean_direction(vectors: list[np.ndarray]) -> np.ndarray | None:
+    if not vectors:
+        return None
+    mean = np.mean(np.stack(vectors), axis=0)
+    norm = float(np.linalg.norm(mean))
+    return mean / norm if norm > 0 else None
