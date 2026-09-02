@@ -19,6 +19,8 @@ class AudioSettings(BaseModel):
     high_pass_hz: float = 60.0
     denoise: bool = False
     max_segment_seconds: float = 120.0
+    dense_max_segment_seconds: float = 15.0
+    dense_speech_ratio: float = 0.85
     min_segment_seconds: float = 1.0
     segment_padding_seconds: float = 0.2
 

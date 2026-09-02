@@ -85,6 +85,8 @@ Prefix `HANSARD_AUDIO__`.
 | `TARGET_LUFS` | float | `-23.0` | The loudness target, in LUFS. `-23` is the EBU broadcast reference. Raise it towards `-18` for very quiet conference-room recordings; going higher trades headroom for nothing useful. |
 | `HIGH_PASS_HZ` | float | `60.0` | Corner frequency of the high-pass filter, applied to **both** chains. Raise to 80–100 Hz for recordings with heavy HVAC rumble. Set to `0` to disable filtering entirely, which also removes the only filter the diarization chain has. |
 | `DENOISE` | bool | `false` | Adds ffmpeg `afftdn` to the recognition chain. Off by default: on meeting audio it removes as much speech detail as noise. Try it only on a recording with constant, stationary hiss. |
+| `DENSE_MAX_SEGMENT_SECONDS` | float | `15.0` | The segment ceiling used instead of `MAX_SEGMENT_SECONDS` when the recording is almost continuous speech. Set it to `0` or to `MAX_SEGMENT_SECONDS` to disable the adaptation and get a single fixed ceiling back. See the note below — this is worth up to **29 points of word error** on a densely overlapped meeting. |
+| `DENSE_SPEECH_RATIO` | float | `0.85` | The share of the recording that has to be speech before the dense ceiling applies. Measured over the voice-activity spans, so it counts detected speech rather than reference speech. |
 | `MAX_SEGMENT_SECONDS` | float | `120.0` | Longest chunk handed to the recogniser. Longer chunks give the model more context and cost memory: measured on an AMI meeting, 120 s beats 28 s by 4.1 points of word error rate and costs about 1.9 GB more at peak. Lower it on small nodes and expect worse transcription. See [benchmarks](benchmarks.md#6-engineering-findings-worth-knowing). |
 | `MIN_SEGMENT_SECONDS` | float | `1.0` | Segments shorter than this are dropped before recognition. Raise it if you see one-word phantom utterances between real turns. |
 | `SEGMENT_PADDING_SECONDS` | float | `0.2` | Padding added either side of each speech segment, so a word is not clipped at the boundary. |
@@ -708,6 +710,8 @@ HANSARD_ASR__INTRA_OP_THREADS=0
 
 HANSARD_AUDIO__HIGH_PASS_HZ=80
 HANSARD_AUDIO__MAX_SEGMENT_SECONDS=30
+HANSARD_AUDIO__DENSE_MAX_SEGMENT_SECONDS=15
+HANSARD_AUDIO__DENSE_SPEECH_RATIO=0.85
 HANSARD_AUDIO__SEGMENT_PADDING_SECONDS=0.35
 
 HANSARD_VAD__THRESHOLD=0.35
@@ -765,3 +769,41 @@ validate and appear in `model_dump()`, but no code reads them today:
 - [Delivery](delivery.md) — the `delivery` section in depth
 - [Troubleshooting](troubleshooting.md) — symptom-first
 - [Multilingual](multilingual.md) — what the language settings do to a bilingual meeting
+
+
+### Why there are two segment ceilings
+
+`MAX_SEGMENT_SECONDS` trades memory for context, and raising it from 28 s to
+120 s was measured worth 4.1 points of word error on AMI, because the recognizer
+sees more of the conversation around each turn. That result is real and it is
+also the reason a single ceiling is wrong.
+
+The measurement that changed this is in
+[quality-research](quality-research.md). On a SUMM-RE meeting where four
+participants overlap enough that 96.8 % of the recording is speech, the detector
+finds almost no silence to split on, so the pipeline hands the recognizer
+**45 segments for 21 minutes** — 120-second spans of four people talking at once.
+It produced 1586 of 6462 reference words. At a 15-second ceiling it produced
+3334, and word error fell from 83.05 % to 54.02 %.
+
+Run the same change on AMI and it costs 2.4 points, because AMI is real
+microphones in a real room and its long spans are usually one person still
+talking. The two corpora want opposite settings, and what separates them is not
+the language — it is how much silence the recording contains:
+
+| Recording | Speech | Median detected span | Word error gained at a 15 s ceiling |
+| --- | ---: | ---: | ---: |
+| AMI `ES2004a` | 70.3 % | 3.05 s | −2.4 points (worse) |
+| SUMM-RE `017a_EBRZ` | 39.0 % | 1.29 s | +0.7 |
+| SUMM-RE `020c_EBPZ` | 75.9 % | 3.08 s | +1.1 |
+| SUMM-RE `004c_PAPH` | 89.9 % | 5.71 s | +7.1 |
+| SUMM-RE `021a_EARD` | 91.9 % | 5.20 s | +16.4 |
+| SUMM-RE `033c_EBPH` | 96.9 % | 15.47 s | +21.3 |
+| SUMM-RE `006b_EADH` | 96.8 % | 14.70 s | **+29.0** |
+
+So Hansard measures the speech ratio and picks the ceiling from it.
+`DENSE_SPEECH_RATIO = 0.85` sits in the gap between the recordings that gain
+7 points or more and the recordings that gain one or lose two. Teams delivers a
+server-mixed stream, which behaves like the dense end of this table when a
+meeting gets lively, so the adaptation matters in production and not only on a
+corpus.

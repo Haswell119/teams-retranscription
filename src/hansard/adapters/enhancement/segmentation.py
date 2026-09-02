@@ -12,17 +12,32 @@ class SegmentationPolicy:
     merge_gap_seconds: float = 0.4
     padding_seconds: float = 0.2
     split_overlap_seconds: float = 2.0
+    dense_max_seconds: float = 15.0
+    dense_speech_ratio: float = 0.85
 
 
-def _split_long(span: TimeSpan, policy: SegmentationPolicy) -> list[TimeSpan]:
-    if span.duration <= policy.max_seconds:
+def speech_ratio(speech: tuple[TimeSpan, ...], total_duration: float) -> float:
+    if total_duration <= 0.0:
+        return 0.0
+    return min(1.0, sum(span.duration for span in speech) / total_duration)
+
+
+def ceiling_for(speech: tuple[TimeSpan, ...], policy: SegmentationPolicy, total_duration: float) -> float:
+    if policy.dense_max_seconds <= 0.0 or policy.dense_max_seconds >= policy.max_seconds:
+        return policy.max_seconds
+    dense = speech_ratio(speech, total_duration) >= policy.dense_speech_ratio
+    return policy.dense_max_seconds if dense else policy.max_seconds
+
+
+def _split_long(span: TimeSpan, policy: SegmentationPolicy, ceiling: float) -> list[TimeSpan]:
+    if span.duration <= ceiling:
         return [span]
-    overlap = min(policy.split_overlap_seconds, policy.max_seconds / 3.0)
-    stride = policy.max_seconds - overlap
+    overlap = min(policy.split_overlap_seconds, ceiling / 3.0)
+    stride = ceiling - overlap
     parts: list[TimeSpan] = []
     cursor = span.start
     while cursor < span.end:
-        finish = min(cursor + policy.max_seconds, span.end)
+        finish = min(cursor + ceiling, span.end)
         parts.append(TimeSpan(cursor, finish))
         if finish >= span.end:
             break
@@ -38,12 +53,13 @@ def plan_segments(
     if not speech:
         if total_duration <= 0.0:
             return ()
-        return tuple(_split_long(TimeSpan(0.0, total_duration), policy))
+        return tuple(_split_long(TimeSpan(0.0, total_duration), policy, policy.max_seconds))
+    ceiling = ceiling_for(speech, policy, total_duration)
     grouped: list[TimeSpan] = [speech[0]]
     for span in speech[1:]:
         current = grouped[-1]
         gap = span.start - current.end
-        if gap <= policy.merge_gap_seconds and (span.end - current.start) <= policy.max_seconds:
+        if gap <= policy.merge_gap_seconds and (span.end - current.start) <= ceiling:
             grouped[-1] = TimeSpan(current.start, span.end)
         else:
             grouped.append(span)
@@ -55,5 +71,5 @@ def plan_segments(
         )
         if span.duration < policy.min_seconds:
             continue
-        planned.extend(_split_long(padded, policy))
+        planned.extend(_split_long(padded, policy, ceiling))
     return tuple(planned)

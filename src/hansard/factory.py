@@ -75,6 +75,8 @@ class Composition:
             max_seconds=audio.max_segment_seconds,
             min_seconds=audio.min_segment_seconds,
             padding_seconds=audio.segment_padding_seconds,
+            dense_max_seconds=audio.dense_max_segment_seconds,
+            dense_speech_ratio=audio.dense_speech_ratio,
         )
 
     def language_tagger(self) -> UtteranceLanguageTagger | None:
