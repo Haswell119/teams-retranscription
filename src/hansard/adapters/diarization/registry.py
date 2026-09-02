@@ -52,6 +52,8 @@ def _build_sherpa(settings: DiarizationSettings, models_dir: Path) -> Diarizer:
         embedding_model=settings.embedding_model,
         clustering_threshold=settings.clustering_threshold,
         minimum_speaker_seconds=settings.minimum_speaker_seconds,
+        min_duration_on=settings.min_duration_on,
+        min_duration_off=settings.min_duration_off,
         provider=_provider(settings.device),
     )
 

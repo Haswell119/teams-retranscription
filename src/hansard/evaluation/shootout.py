@@ -406,9 +406,13 @@ def with_language(spec: EngineSpec, language: str | None) -> EngineSpec:
 
 
 register_preset(EngineSpec(name="parakeet-fp32"))
-register_preset(EngineSpec(name="parakeet-fp32-fr", language="fr"))
-register_preset(EngineSpec(name="parakeet-fp32-en", language="en"))
 register_preset(EngineSpec(name="parakeet-int8", quantization="int8"))
+register_preset(EngineSpec(name="canary-1b-v2", model_id="nemo-canary-1b-v2"))
+register_preset(EngineSpec(name="canary-1b-v2-fr", model_id="nemo-canary-1b-v2", language="fr"))
+register_preset(EngineSpec(name="canary-1b-v2-en", model_id="nemo-canary-1b-v2", language="en"))
+register_preset(
+    EngineSpec(name="canary-1b-v2-int8", model_id="nemo-canary-1b-v2", quantization="int8", language="fr")
+)
 register_preset(
     EngineSpec(name="whisper-large-v3", engine="whisper", model_id="large-v3", quantization="int8")
 )

@@ -57,6 +57,8 @@ class DiarizationSettings(BaseModel):
     embedding_model: str = "nemo_en_titanet_small.onnx"
     clustering_threshold: float = 0.99
     minimum_speaker_seconds: float = 10.0
+    min_duration_on: float = 0.25
+    min_duration_off: float = 0.40
     max_speakers: int = 8
     min_speakers: int = 1
     device: Device = "auto"
