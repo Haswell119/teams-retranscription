@@ -122,6 +122,18 @@ difference in speaker handling and nothing else.
 
 ---
 
+## Summary of the campaign so far
+
+| # | Change | Measured on | Result | Decision |
+| ---: | --- | --- | --- | --- |
+| 0 | Run the code-switched benchmark | 3 fixtures | 19.21 % cpWER, 96.33 % language accuracy | KEEP as baseline |
+| 1 | Reference boundaries instead of ours | 7 SUMM-RE meetings | 37.52 % → **30.82 %** WER | Boundaries are worth 7 points, not 25 |
+| 2 | Stop scoring SPPAS pause marks as words | same hypotheses | 31.54 % → **30.82 %** | KEEP |
+| 3 | Split the errors by overlap | same hypotheses | clean **20.60 %**, heavy **70.54 %** | The finding of the campaign |
+| 4 | Canary 1B v2 instead of Parakeet | identical segments | 30.82 % → **38.01 %** | **REVERT** |
+| 5 | Run the gates | everything measured | 143/206, 20 must-pass failures | Checkpoint |
+| 6 | Unify `ok`/`okay` and `etc` spellings | same hypotheses | 30.82 % → **30.59 %** | KEEP |
+
 ## Iterations
 
 Each iteration below states the hypothesis, the smallest experiment that could
