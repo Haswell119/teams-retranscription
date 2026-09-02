@@ -92,7 +92,170 @@ corpus was widened before anything was tuned.
 Each iteration below states the hypothesis, the smallest experiment that could
 refute it, the before and after numbers, and the decision.
 
-<!-- ITERATIONS -->
+### Iteration 0 — reproduce, and fill the empty cell
+
+**Hypothesis.** The published baseline is reproducible on this machine, and the
+code-switched benchmark that [benchmarks §9](benchmarks.md#9-what-we-have-not-measured-yet)
+lists as unmeasured can simply be run.
+
+**Experiment.** `make bench-mixed` on the three synthetic code-switched fixtures.
+
+**Result.** Reproduced bit-for-bit against the committed run.
+
+| Fixture | Speakers (ref → detected) | WER | cpWER | tcpWER@5s | WDER | Language accuracy |
+| --- | :---: | ---: | ---: | ---: | ---: | ---: |
+| `meeting_mixed_4spk` | 4 → **4** | 13.83 % | 23.56 % | 24.15 % | 3.55 % | 97.58 % |
+| `meeting_mixed_6spk` | 6 → 7 | 4.44 % | 21.62 % | 22.30 % | 7.28 % | 97.79 % |
+| `meeting_mixed_8spk` | 8 → **8** | 12.71 % | 12.45 % | 12.45 % | 0.88 % | 93.63 % |
+| **macro** | | **10.33 %** | **19.21 %** | 19.63 % | **3.90 %** | **96.33 %** |
+
+**Conclusion.** The cell is no longer empty. Language accuracy is **96.33 %**,
+under the 98 % target, and the errors are asymmetric: 105 French words were
+labelled English against 41 the other way. That asymmetry is the signature the
+brief predicted — French audio decoded into English-looking text, and a
+text-based identifier that then believes the text. KEEP as the bilingual
+baseline.
+
+---
+
+### Iteration 1 — is the recogniser the problem, or the segmentation in front of it?
+
+**Hypothesis.** [Benchmarks §8](benchmarks.md#8-where-we-lose) leaves boundary
+precision as the leading suspect for SUMM-RE, on the evidence that the corpus's
+own utterance boundaries reach 26.59 % word error where our segmentation reaches
+37.52 %. If boundaries are the dominant term, giving the current recogniser
+perfect boundaries should recover most of that gap.
+
+**Experiment.** The new ASR shootout, which decodes reference utterance spans
+directly and scores them with the corpus normalizer. Seven SUMM-RE tuning
+meetings, 855 segments, 1803 seconds of audio, Parakeet TDT 0.6B v3 in float32,
+four threads.
+
+**Result.**
+
+| Condition | Word error | Substitutions | Deletions | Insertions |
+| --- | ---: | ---: | ---: | ---: |
+| Full pipeline, `020c_EBPZ` only (published) | 37.52 % | — | — | — |
+| **Reference boundaries, 7 meetings** | **30.82 %** | 879 | 954 | 369 |
+
+**Conclusion.** Perfect boundaries are worth roughly seven points, and
+**thirty-one points remain**. Deletions are 45 % of all errors and the
+recogniser returns nothing at all for 66 of 855 reference utterances — 7.7 % of
+segments, 259 reference words — with a median duration of 0.79 seconds against
+1.38 seconds for the corpus as a whole. Short spontaneous turns are where the
+words disappear.
+
+This reframes the project. Segmentation is a real but secondary term; the
+recogniser is the primary one. KEEP the finding, and redirect the effort from
+boundary work to model work.
+
+---
+
+### Iteration 2 — a pause is not a word
+
+**Hypothesis.** Some of the SUMM-RE word error is a transcription convention
+rather than a recognition failure.
+
+**Experiment.** Inspect the raw reference tokens. SUMM-RE follows the SPPAS
+convention: `+` for a short pause, `@` for laughter, `*` for an unintelligible
+word. The French normalizer already discards `@` and `*` — and expands a bare
+`+` into the word **"plus"**.
+
+**Result.** 533 of 33,013 prepared reference tokens are `+`, 1.61 % of the
+corpus, each of them an invented reference word that no recogniser can produce.
+Stripping the three markers where the corpus is read moves reference-boundary
+word error from **31.54 % to 30.82 %** on the same hypotheses, scored again
+without re-running the recogniser.
+
+**Conclusion.** KEEP. It is a small correction and it goes the honest way: the
+number gets smaller because a defect in our scoring is removed, not because the
+system improved. Every SUMM-RE figure in this document is on the corrected
+reference.
+
+---
+
+### Iteration 3 — the recogniser is not the bottleneck, the second voice is
+
+**Hypothesis.** Iteration 1 left thirty-one points of word error at perfect
+boundaries and blamed the recogniser. Before replacing it, check *which* audio
+it fails on. The brief's hypothesis C says a one-stream architecture has a
+structural floor in overlapped speech. If that floor is the dominant term, the
+errors will concentrate where another participant is talking.
+
+**Experiment.** For every reference utterance, compute the fraction of its
+duration covered by *another speaker's* reference speech, from the per-speaker
+tracks. Then score the same 855 Parakeet hypotheses split by that fraction.
+
+**Result.**
+
+| Overlap with another speaker | Segments | Reference words | WER | Empty outputs |
+| --- | ---: | ---: | ---: | ---: |
+| clean, under 5 % | 414 | 3758 | **20.60 %** | 9 |
+| light, 5–50 % | 177 | 2154 | 23.35 % | 7 |
+| **heavy, over 50 %** | 238 | 1232 | **70.54 %** | **48** |
+
+And the 66 utterances the recogniser returns *nothing* for are covered by
+another speaker **84.3 %** of the time, against **31.6 %** for the utterances it
+does transcribe. 75.8 % of them are more than half buried; only 13.6 % are
+clean, against 49.8 % of the rest.
+
+**Conclusion.** This is the finding of the campaign. On clean French
+spontaneous meeting speech Parakeet scores **20.6 %**, which is respectable and
+close to the AMI English figure. Heavily overlapped speech is **17 % of the
+reference words and 39 % of the errors.** The recogniser is not failing at
+French; it is failing at two people at once, and on a single mixed stream it
+cannot do otherwise — it transcribes the loud speaker and the quiet one
+disappears.
+
+KEEP as the ordering principle for everything that follows: overlap first, model
+second. And note what it means for the earlier segmentation work — feeding the
+recogniser tighter boundaries cannot recover a word that was never separable
+from the voice on top of it.
+
+---
+
+### Iteration 4 — Canary 1B v2 instead of Parakeet
+
+**Hypothesis.** NVIDIA Canary 1B v2 is a larger, newer, CC-BY-4.0 model with an
+explicit French decoding token, published as ONNX by the same author as our
+Parakeet export and loadable through the `onnx-asr` package the project already
+depends on. Its predecessor holds the best published SUMM-RE figure. It should
+beat Parakeet on French meeting audio.
+
+**Experiment.** The shootout, on byte-identical segments: 829 SUMM-RE reference
+utterances shared by both runs, Canary decoded with `language=fr`, float32,
+four threads.
+
+**Result. It is worse everywhere, and there is no band in which it wins.**
+
+| | Parakeet TDT 0.6B v3 | Canary 1B v2 |
+| --- | ---: | ---: |
+| **Word error, all segments** | **30.82 %** | 38.01 % |
+| Substitutions / deletions / insertions | 879 / 954 / 369 | 1190 / 854 / 672 |
+| Empty outputs | 66 | 1 |
+| clean, under 5 % overlap | **20.60 %** | 27.38 % |
+| light, 5–50 % | **23.35 %** | 30.36 % |
+| heavy, over 50 % | **70.54 %** | 78.41 % |
+| under 1 s | **73.89 %** | 75.41 % |
+| 1–3 s | **36.98 %** | 49.77 % |
+| 3–6 s | **15.91 %** | 22.04 % |
+| over 6 s | **16.68 %** | 18.05 % |
+| Peak memory | 3.0 GB | 5.5 GB |
+
+The shape of the failure is worth keeping. Canary almost never stays silent — 1
+empty output against Parakeet's 66 — and it pays for that in **672 insertions
+against 369** and **1190 substitutions against 879**. On a short, half-buried
+turn Parakeet emits nothing and Canary emits something wrong. Fewer deletions,
+more invention. For a verbatim record that is the worse trade.
+
+**Conclusion. REVERT.** Canary 1B v2 is not adopted. Read-speech leaderboards
+put it comfortably ahead of Parakeet on French (4.83 against 5.42 on the Open
+ASR multilingual track) and it loses by seven points on real meeting audio, at
+nearly twice the memory and roughly six times the compute. Read-speech rank does
+not transfer to meetings — the same lesson INT8 taught this project, arriving
+from the other direction.
+
+Recorded so nobody buys it twice.
 
 ---
 

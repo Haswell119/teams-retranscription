@@ -36,6 +36,13 @@ def preset(name: str) -> EngineSpec:
     return PRESETS[name]
 
 
+OVERLAP_BANDS: tuple[tuple[str, float, float], ...] = (
+    ("clean", 0.0, 0.05),
+    ("light", 0.05, 0.5),
+    ("heavy", 0.5, 1.01),
+)
+
+
 @dataclass(frozen=True, slots=True)
 class ShootoutSegment:
     corpus: str
@@ -45,6 +52,14 @@ class ShootoutSegment:
     audio: Path
     span: TimeSpan
     reference: str
+    overlap: float = 0.0
+
+    @property
+    def band(self) -> str:
+        for name, low, high in OVERLAP_BANDS:
+            if low <= self.overlap < high:
+                return name
+        return OVERLAP_BANDS[-1][0]
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +93,26 @@ class EngineSpec:
             "quantization": self.quantization,
             "beam_size": self.beam_size,
             "language": self.language or "auto",
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OverlapOutcome:
+    band: str
+    segments: int
+    reference_words: int
+    empty_segments: int
+    wer: float
+    deletions: int
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "band": self.band,
+            "segments": self.segments,
+            "reference_words": self.reference_words,
+            "empty_segments": self.empty_segments,
+            "wer_percent": round(self.wer * 100, 2),
+            "deletions": self.deletions,
         }
 
 
@@ -121,6 +156,7 @@ class EngineOutcome:
     peak_memory_mb: float
     empty_segments: int
     failures: int
+    overlap_bands: tuple[OverlapOutcome, ...] = ()
 
     @property
     def real_time_factor(self) -> float:
@@ -139,6 +175,7 @@ class EngineOutcome:
             "empty_segments": self.empty_segments,
             "failures": self.failures,
             "by_language": [item.as_dict() for item in self.languages],
+            "by_overlap": [item.as_dict() for item in self.overlap_bands],
         }
 
 
@@ -166,6 +203,15 @@ def summ_re_segments(
         meeting = read_meeting(directory)
         if meeting.mixed_audio is None:
             continue
+        elsewhere = {
+            track.speaker: tuple(
+                utterance.span
+                for other in meeting.tracks
+                if other.speaker != track.speaker
+                for utterance in other.utterances
+            )
+            for track in meeting.tracks
+        }
         for track in meeting.tracks:
             for utterance in track.utterances:
                 if utterance.span.duration < minimum_seconds:
@@ -179,9 +225,26 @@ def summ_re_segments(
                         audio=meeting.mixed_audio,
                         span=utterance.span,
                         reference=utterance.text,
+                        overlap=overlap_fraction(utterance.span, elsewhere[track.speaker]),
                     )
                 )
     return tuple(segments)
+
+
+def overlap_fraction(span: TimeSpan, others: Sequence[TimeSpan]) -> float:
+    if span.duration <= 0.0:
+        return 0.0
+    covered = 0.0
+    cursor = span.start
+    for other in sorted(others, key=lambda item: item.start):
+        start = max(other.start, cursor, span.start)
+        end = min(other.end, span.end)
+        if end > start:
+            covered += end - start
+            cursor = end
+        if cursor >= span.end:
+            break
+    return min(1.0, covered / span.duration)
 
 
 def ami_segments(
@@ -194,6 +257,9 @@ def ami_segments(
         for utterance in meeting.reference.utterances:
             if utterance.span.duration < minimum_seconds or not utterance.text.strip():
                 continue
+            others = tuple(
+                other.span for other in meeting.reference.utterances if other.speaker != utterance.speaker
+            )
             segments.append(
                 ShootoutSegment(
                     corpus="ami",
@@ -203,6 +269,7 @@ def ami_segments(
                     audio=meeting.audio_path,
                     span=utterance.span,
                     reference=utterance.text,
+                    overlap=overlap_fraction(utterance.span, others),
                 )
             )
     return tuple(segments)
@@ -317,7 +384,38 @@ def score_engine(
         peak_memory_mb=peak_memory_mb,
         empty_segments=sum(1 for item in hypotheses if not item.strip()),
         failures=failures,
+        overlap_bands=_overlap_bands(segments, hypotheses),
     )
+
+
+def _overlap_bands(
+    segments: Sequence[ShootoutSegment], hypotheses: Sequence[str]
+) -> tuple[OverlapOutcome, ...]:
+    grouped: dict[str, list[tuple[ShootoutSegment, str]]] = {}
+    for segment, hypothesis in zip(segments, hypotheses, strict=True):
+        grouped.setdefault(segment.band, []).append((segment, hypothesis))
+    bands: list[OverlapOutcome] = []
+    for name, _, _ in OVERLAP_BANDS:
+        members = grouped.get(name)
+        if not members:
+            continue
+        normalizer = normalizer_for(members[0][0].language)
+        result = word_error_rate(
+            [segment.reference for segment, _ in members],
+            [hypothesis for _, hypothesis in members],
+            normalizer,
+        )
+        bands.append(
+            OverlapOutcome(
+                band=name,
+                segments=len(members),
+                reference_words=result.reference_words,
+                empty_segments=sum(1 for _, hypothesis in members if not hypothesis.strip()),
+                wer=result.wer,
+                deletions=result.deletions,
+            )
+        )
+    return tuple(bands)
 
 
 def run_shootout(
@@ -365,6 +463,7 @@ def rescore(
                 audio=Path(str(record.get("audio", ""))),
                 span=TimeSpan(key[1], key[2]),
                 reference=str(reference),
+                overlap=float(record.get("overlap", 0.0)),
             )
         )
         hypotheses.append(str(record.get("hypothesis", "")))
@@ -426,6 +525,7 @@ def _write_transcripts(path: Path, segments: Sequence[ShootoutSegment], hypothes
                         "start": round(segment.span.start, 3),
                         "end": round(segment.span.end, 3),
                         "language": segment.language,
+                        "overlap": round(segment.overlap, 4),
                         "reference": segment.reference,
                         "hypothesis": hypothesis,
                     },
