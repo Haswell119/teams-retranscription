@@ -133,6 +133,9 @@ difference in speaker handling and nothing else.
 | 4 | Canary 1B v2 instead of Parakeet | identical segments | 30.82 % → **38.01 %** | **REVERT** |
 | 5 | Run the gates | everything measured | 143/206, 20 must-pass failures | Checkpoint |
 | 6 | Unify `ok`/`okay` and `etc` spellings | same hypotheses | 30.82 % → **30.59 %** | KEEP |
+| 7 | Score four meetings instead of one | 4 SUMM-RE meetings | 020c is the best of four; macro **63.19 %** | Retire the single-meeting headline |
+| 8 | Remove the gap filler / drop the absorption floor / swap the embedding | same words | none beat the default | **REVERT** all three |
+| 9 | Merge threshold per embedding space | same words | 0.77 → **0.72** worth 1.5 points; found a regression I shipped | Measuring |
 
 ## Iterations
 
@@ -455,6 +458,65 @@ two, which is the signature of a merge threshold that is far too low for their
 similarity distribution, not of a bad embedding. The follow-up — a merge-threshold
 grid inside each embedding space, which now costs one clustering pass per
 embedding rather than one per threshold — is the honest version of this test.
+
+### Iteration 9 — the merge threshold moves, and my own change did not
+
+**Hypothesis.** Two things at once. Iteration 8 ran the alternative embeddings at
+TitaNet's thresholds, which was not a fair test; each embedding space needs its
+own merge threshold. And the shipped `merge_similarity = 0.77` was tuned when
+`020c_EBPZ` was the only meeting, so it may be wrong for the other three.
+
+**Experiment.** A merge-threshold grid inside each embedding space, on the same
+four meetings and the same cached words. With clustering shared across every
+point that agrees on the diarizer settings, four embeddings cost four clustering
+passes rather than eleven.
+
+**Result.**
+
+| Point | cpWER | WDER | DER | speaker-count error | speakers detected |
+| --- | ---: | ---: | ---: | ---: | --- |
+| **TitaNet-small, merge 0.72** | **61.91 %** | 13.99 % | **40.17 %** | 6.75 | 14/4 10/4 13/3 5/4 |
+| TitaNet-small, merge 0.77 | 63.37 % | 12.55 % | 42.23 % | 8.00 | 14/4 12/4 15/3 6/4 |
+| TitaNet-small, merge 0.82 | 63.37 % | 12.48 % | 42.54 % | 8.25 | 14/4 13/4 15/3 6/4 |
+| TitaNet-small, merge 0.68 | 63.73 % | 20.61 % | 45.57 % | 6.00 | 12/4 9/4 13/3 5/4 |
+| TitaNet-large, merge 0.82 | 66.31 % | 14.89 % | 43.67 % | 12.75 | 17/4 11/4 23/3 15/4 |
+| ERes2Net, merge 0.86 | 67.74 % | 15.91 % | 45.08 % | 9.75 | 13/4 10/4 19/3 12/4 |
+| WeSpeaker, merge 0.86 / 0.91 / 0.95 | 88.34 % | 38.51 % | 60.86 % | 1.50 | 3/4 4/4 1/3 1/4 |
+
+**Conclusion, in three parts, and the middle one is about a defect I introduced.**
+
+*The merge threshold does move, and 0.77 is not the best value on four meetings.*
+0.72 is worth **1.5 points of cpWER** and two points of DER over 0.77. Not yet
+adopted: it is one grid on the tuning split and it changes a default that
+[configuration](configuration.md#minimum_speaker_seconds-and-merge_similarity-the-pair-that-was-retuned)
+records as already retuned once. It gets re-measured on the held-out split before
+anything moves.
+
+*WeSpeaker's collapse is not a merge-threshold problem.* It scores **identically
+at 0.86, 0.91 and 0.95** — the three points are the same number to two decimals —
+which means consolidation is not what is collapsing it. Four speakers are already
+down to 3, 4, 1 and 1 clusters before consolidation runs, so the collapse happens
+inside sherpa-onnx's own clustering at `clustering_threshold = 0.99`. That is a
+diarizer setting, so fixing it costs a clustering pass per value rather than a
+free consolidation, and TitaNet-small at 0.72 is ahead of anything WeSpeaker
+reached. Recorded as untested rather than as a verdict.
+
+*And the cluster counts exposed a regression I had shipped.* Compare the speaker
+counts against [iteration 8](#iteration-8--a-better-speaker-embedding-and-a-gap-filler-worth-removing):
+6/4, 5/4, 5/3, 4/4 there, **14/4, 12/4, 15/3, 6/4** here, at the same merge
+threshold. The difference is the gated absorption from
+[the quiet-speaker change](#iteration-8--a-better-speaker-embedding-and-a-gap-filler-worth-removing) —
+moving the floor from the diarizer, where it absorbed unconditionally into the
+nearest neighbour in time, to the consolidator, where it now requires a cosine
+similarity of 0.55 first. TitaNet-small's embeddings on short spontaneous
+segments are not confident enough to clear that bar, so most of the phantom
+clusters the floor used to remove now survive. cpWER barely notices (63.19 →
+63.37) but speaker-count error goes from 1.25 to 8.00, and speaker count is
+exactly what a roster has to match.
+
+The gate is the right idea and 0.55 is the wrong number. It is being measured
+against 0.0, 0.25 and 0.40 — a consolidation-only setting, so the whole grid
+costs one clustering pass.
 
 ---
 
