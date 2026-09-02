@@ -668,11 +668,35 @@ tuned on one corpus is a hypothesis** — the configuration page already says
 so about `merge_similarity`, and it applies with equal force to a default
 *retired* on one meeting.
 
-Not yet adopted. Two things have to hold first: the effect has to survive on all
-eight meetings, and it must not undo the finding that raising the ceiling from
-28 s to 120 s was worth 4.1 points of word error **on AMI**, which is a corpus of
-genuine close-talk mixing rather than summed per-speaker tracks. Both are
-running.
+**Both conditions were then checked, and they disagree.**
+
+| Corpus | Ceiling | WER | cpWER | WDER | DER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| SUMM-RE, 8 meetings | 120 s | 57.49 % | 71.92 % | 26.65 % | 46.84 % |
+| **SUMM-RE, 8 meetings** | **15 s** | **44.49 %** | **67.93 %** | **25.17 %** | 46.78 % |
+| AMI, 3 meetings | 120 s | **20.44 %** | **28.75 %** | 6.78 % | 28.56 % |
+| AMI, 3 meetings | 15 s | 22.87 % | 30.22 % | **6.39 %** | 28.66 % |
+
+Thirteen points of word error on French, **two and a half points against us on
+English**. The AMI regression is the mirror image of the 4.1 points the original
+28 s → 120 s change bought, and it is not a fluke of one meeting: all three AMI
+meetings get worse.
+
+Two more things worth reading off the SUMM-RE table. cpWER improves by only 4
+points where word error improves by 13, because the recovered words land on the
+wrong speakers — `033c_EBPH` goes from 72.25 % to 50.95 % word error and its cpWER
+gets *worse*, 100.86 % to 110.46 %, on three detected speakers where there are
+four. Recovering speech exposes the diarization failure that was previously
+hidden behind not having the speech at all. And DER does not move at all, 46.84 %
+to 46.78 %, which confirms the change is doing nothing to the speaker timeline —
+it is purely about how much the recognizer emits.
+
+**So a flat ceiling is the wrong shape of answer.** 120 s is right for AMI and
+catastrophic for a dense French meeting; 15 s is the reverse. What separates them
+is not the language, it is how continuous the speech is: AMI Mix-Headset is real
+microphones in a real room with real pauses, SUMM-RE is four per-speaker tracks
+summed, so its silences are the intersection of four people's silences and there
+are almost none. The ceiling should follow the audio.
 
 ---
 
