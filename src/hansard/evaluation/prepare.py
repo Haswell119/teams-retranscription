@@ -14,7 +14,13 @@ from typing import Any
 import numpy as np
 import soundfile as sf
 
+from hansard.domain.errors import ConfigurationError
 from hansard.domain.language import MIXED
+from hansard.evaluation.corpora import (
+    SUMM_RE_DEV_SHARDS,
+    SUMM_RE_SPLITS,
+    summ_re_meetings_in_split,
+)
 
 TARGET_SAMPLE_RATE = 16_000
 LIBRISPEECH_DEV_CLEAN = "https://www.openslr.org/resources/12/dev-clean.tar.gz"
@@ -33,9 +39,13 @@ MLS_FRENCH_BASE = (
 )
 SUMM_RE_REVISION = "47cb4ec3437ef5497b6092b8c6d1e0b5b1d86dc0"
 SUMM_RE_SHARD = (
-    "https://huggingface.co/datasets/linagora/SUMM-RE/resolve/{revision}/data/dev/dev-00006-of-00029.parquet"
+    "https://huggingface.co/datasets/linagora/SUMM-RE/resolve/{revision}/data/dev/"
+    "dev-{shard:05d}-of-{shards:05d}.parquet"
 )
-SUMM_RE_MEETINGS: tuple[str, ...] = ("020c_EBPZ",)
+SUMM_RE_REPOSITORY_PATH = (
+    "datasets/linagora/SUMM-RE@{revision}/data/dev/dev-{shard:05d}-of-{shards:05d}.parquet"
+)
+SUMM_RE_DEFAULT_MEETINGS = 1
 MLS_FRENCH_SPEAKERS: tuple[str, ...] = (
     "10087_11650_000",
     "10177_10625_000",
@@ -225,56 +235,148 @@ def _collect_mls_speakers(root: Path) -> dict[str, list[tuple[Path, str]]]:
     return speakers
 
 
-def prepare_summ_re_corpus(output: Path, meetings: tuple[str, ...] = SUMM_RE_MEETINGS) -> Path:
+def summ_re_shard_index(
+    revision: str = SUMM_RE_REVISION, shards: int = SUMM_RE_DEV_SHARDS
+) -> dict[str, tuple[int, ...]]:
+    import pyarrow.parquet as pq
+
+    filesystem = _summ_re_filesystem()
+    index: dict[str, list[int]] = {}
+    for shard in range(shards):
+        location = SUMM_RE_REPOSITORY_PATH.format(revision=revision, shard=shard, shards=shards)
+        with filesystem.open(location, "rb") as handle:
+            table = pq.ParquetFile(handle).read(columns=["meeting_id"])
+        for identifier in dict.fromkeys(table.column("meeting_id").to_pylist()):
+            index.setdefault(str(identifier), []).append(shard)
+    return {identifier: tuple(found) for identifier, found in index.items()}
+
+
+def _summ_re_filesystem() -> Any:
+    try:
+        from huggingface_hub import HfFileSystem
+    except ImportError as error:
+        raise ConfigurationError(
+            "listing the SUMM-RE shards requires huggingface_hub; "
+            "install it with pip install 'hansard[asr-onnx]'"
+        ) from error
+    return HfFileSystem()
+
+
+def _summ_re_prepared(root: Path) -> tuple[str, ...]:
+    if not root.is_dir():
+        return ()
+    return tuple(
+        sorted(item.name for item in root.iterdir() if item.is_dir() and (item / "mixed.wav").exists())
+    )
+
+
+def prepare_summ_re_corpus(
+    output: Path,
+    meetings: Sequence[str] | None = None,
+    limit: int = SUMM_RE_DEFAULT_MEETINGS,
+    split: str | None = None,
+    keep_tracks: bool = False,
+    revision: str = SUMM_RE_REVISION,
+    shards: int = SUMM_RE_DEV_SHARDS,
+) -> Path:
     import pyarrow.parquet as pq
 
     root = output / "summ-re"
     root.mkdir(parents=True, exist_ok=True)
-    if all((root / name / "mixed.wav").exists() for name in meetings):
+    prepared = _summ_re_prepared(root)
+    if meetings is None and len(summ_re_meetings_in_split(prepared, split)) >= limit:
         return root
-    archive = _download(SUMM_RE_SHARD.format(revision=SUMM_RE_REVISION), output / "summ_re.parquet")
-    table = pq.read_table(archive)
-    tracks: dict[str, list[dict[str, Any]]] = {}
-    for row in table.to_pylist():
-        identifier = str(row.get("meeting_id"))
-        if identifier in meetings:
-            tracks.setdefault(identifier, []).append(row)
-    for identifier, rows in tracks.items():
-        _write_summ_re_meeting(root / identifier, rows)
-    archive.unlink(missing_ok=True)
+    index = summ_re_shard_index(revision=revision, shards=shards)
+    wanted = _summ_re_selection(index, meetings, limit, split)
+    missing = tuple(name for name in wanted if name not in prepared)
+    if not missing:
+        return root
+    needed = sorted({shard for name in missing for shard in index[name]})
+    pending: dict[str, _SummReAccumulator] = {}
+    for shard in needed:
+        url = SUMM_RE_SHARD.format(revision=revision, shard=shard, shards=shards)
+        archive = _download(url, output / f"summ_re_dev_{shard:05d}.parquet")
+        table = pq.read_table(archive)
+        identifiers = [str(value) for value in table.column("meeting_id").to_pylist()]
+        for position, identifier in enumerate(identifiers):
+            if identifier not in missing:
+                continue
+            accumulator = pending.setdefault(identifier, _SummReAccumulator(root / identifier, keep_tracks))
+            accumulator.add(table.slice(position, 1).to_pylist()[0])
+        del table
+        archive.unlink(missing_ok=True)
+        for identifier in [name for name, found in index.items() if name in pending and found[-1] == shard]:
+            pending.pop(identifier).finish()
+    for accumulator in pending.values():
+        accumulator.finish()
     return root
 
 
-def _write_summ_re_meeting(directory: Path, rows: list[dict[str, Any]]) -> None:
-    directory.mkdir(parents=True, exist_ok=True)
+def _summ_re_selection(
+    index: Mapping[str, tuple[int, ...]],
+    meetings: Sequence[str] | None,
+    limit: int,
+    split: str | None,
+) -> tuple[str, ...]:
+    if meetings is not None:
+        unknown = tuple(name for name in meetings if name not in index)
+        if unknown:
+            raise ConfigurationError(f"unknown SUMM-RE meetings: {unknown}")
+        return tuple(meetings)
+    return summ_re_meetings_in_split(tuple(index), split)[: max(0, limit)]
+
+
+@dataclass
+class _SummReAccumulator:
+    directory: Path
+    keep_tracks: bool = False
     mixture: np.ndarray | None = None
-    for row in rows:
+
+    def add(self, row: dict[str, Any]) -> None:
+        self.directory.mkdir(parents=True, exist_ok=True)
         speaker = str(row.get("speaker_id"))
         payload = row.get("audio")
         raw = payload["bytes"] if isinstance(payload, dict) else payload
         samples = _resampled_mono(raw)
-        if mixture is None or len(samples) > len(mixture):
+        if self.mixture is None or len(samples) > len(self.mixture):
             grown = np.zeros(len(samples), dtype=np.float32)
-            if mixture is not None:
-                grown[: len(mixture)] = mixture
-            mixture = grown
-        mixture[: len(samples)] += samples
-        records = [
-            {
-                "start": float(segment["start"]),
-                "end": float(segment["end"]),
-                "text": str(segment["transcript"]).strip(),
-            }
-            for segment in row.get("segments") or []
-            if str(segment["transcript"]).strip()
-        ]
-        (directory / f"{speaker}.json").write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
-    if mixture is None:
-        return
-    peak = float(np.max(np.abs(mixture)))
-    if peak > 0:
-        mixture = (mixture / peak * 0.85).astype(np.float32)
-    sf.write(str(directory / "mixed.wav"), mixture, TARGET_SAMPLE_RATE, subtype="PCM_16")
+            if self.mixture is not None:
+                grown[: len(self.mixture)] = self.mixture
+            self.mixture = grown
+        self.mixture[: len(samples)] += samples
+        if self.keep_tracks:
+            sf.write(str(self.directory / f"{speaker}.wav"), samples, TARGET_SAMPLE_RATE, subtype="PCM_16")
+        records = [_summ_re_segment(segment) for segment in row.get("segments") or []]
+        kept = [record for record in records if record["text"]]
+        (self.directory / f"{speaker}.json").write_text(
+            json.dumps(kept, ensure_ascii=False), encoding="utf-8"
+        )
+
+    def finish(self) -> None:
+        if self.mixture is None:
+            return
+        peak = float(np.max(np.abs(self.mixture)))
+        mixture = (self.mixture / peak * 0.85).astype(np.float32) if peak > 0 else self.mixture
+        sf.write(str(self.directory / "mixed.wav"), mixture, TARGET_SAMPLE_RATE, subtype="PCM_16")
+        self.mixture = None
+
+
+def _summ_re_segment(segment: Mapping[str, Any]) -> dict[str, Any]:
+    words = [
+        {
+            "start": float(word["start"]),
+            "end": float(word["end"]),
+            "word": str(word["word"]),
+        }
+        for word in segment.get("words") or []
+        if str(word.get("word", "")).strip()
+    ]
+    return {
+        "start": float(segment["start"]),
+        "end": float(segment["end"]),
+        "text": str(segment["transcript"]).strip(),
+        "words": words,
+    }
 
 
 def _resampled_mono(raw: Any) -> np.ndarray:
@@ -441,8 +543,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skip-french-meetings", action="store_true")
     parser.add_argument("--skip-mixed-meetings", action="store_true")
     parser.add_argument("--ami", action="store_true", help="also fetch the AMI test meetings")
+    parser.add_argument("--summ-re", action="store_true", help="also fetch real French meetings from SUMM-RE")
     parser.add_argument(
-        "--summ-re", action="store_true", help="also fetch a real French meeting from SUMM-RE"
+        "--summ-re-meetings",
+        type=int,
+        default=SUMM_RE_DEFAULT_MEETINGS,
+        help="how many SUMM-RE meetings to prepare",
+    )
+    parser.add_argument(
+        "--summ-re-split",
+        choices=SUMM_RE_SPLITS,
+        default=None,
+        help="restrict the SUMM-RE selection to one deterministic split",
+    )
+    parser.add_argument(
+        "--summ-re-tracks",
+        action="store_true",
+        help="also keep the per-speaker SUMM-RE tracks, for diagnostics only",
     )
     arguments = parser.parse_args(argv)
     output = arguments.output
@@ -468,7 +585,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if arguments.summ_re:
         try:
-            root = prepare_summ_re_corpus(output)
+            root = prepare_summ_re_corpus(
+                output,
+                limit=arguments.summ_re_meetings,
+                split=arguments.summ_re_split,
+                keep_tracks=arguments.summ_re_tracks,
+            )
             print(f"summ-re -> {root}")
         except Exception as error:
             print(f"summ-re failed: {type(error).__name__}: {error}")

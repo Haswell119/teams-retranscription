@@ -16,12 +16,15 @@ from hansard.domain.transcript import Transcript
 from hansard.evaluation.ami import discover_meetings
 from hansard.evaluation.corpora import (
     SUMM_RE_LANGUAGE,
+    SUMM_RE_SPLITS,
     meeting_diarization,
     meeting_transcript,
     read_meeting,
 )
 from hansard.evaluation.datasets import load_manifest, load_reference_json
+from hansard.evaluation.metrics.decomposition import decompose
 from hansard.evaluation.metrics.language import language_identification
+from hansard.evaluation.metrics.quiet import quiet_speaker_report
 from hansard.evaluation.metrics.speaker import (
     concatenated_minimum_permutation_wer,
     diarization_error_rate,
@@ -33,6 +36,14 @@ from hansard.evaluation.metrics.speaker import (
 from hansard.evaluation.metrics.system import ResourceProbe
 from hansard.evaluation.metrics.text import word_error_rate
 from hansard.evaluation.normalizers import NORMALIZER_VERSION, normalizer_for
+from hansard.evaluation.shootout import (
+    ami_segments,
+    budgeted,
+    preset,
+    run_shootout,
+    shootout_payload,
+    summ_re_segments,
+)
 from hansard.factory import Composition
 from hansard.ports.asr import RecognitionHints
 
@@ -65,6 +76,11 @@ class RunOptions:
     threads: int
     language: str | None = None
     roster: bool = False
+    corpus: str = "summ-re"
+    engines: tuple[str, ...] = ()
+    seconds: float = 0.0
+    split: str | None = None
+    transcripts: Path | None = None
 
 
 def _percent(value: float) -> float:
@@ -196,6 +212,15 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
                 "der_false_alarm_percent": _percent(strict.false_alarm_rate),
                 "der_confusion_percent": _percent(strict.confusion_rate),
                 "reference_overlap_percent": _percent(overlap_ratio(reference_diarization)),
+                "speakers": quiet_speaker_report(
+                    reference, hypothesis, reference_diarization, outcome.diarization, normalizer
+                ).as_dict(),
+                "decomposition": decompose(
+                    normalizer.normalize(reference.text),
+                    normalizer.normalize(hypothesis.text),
+                    language if language != MIXED else "fr",
+                    reference.text,
+                ).as_dict(),
                 "language_accuracy_percent": _percent(identified.accuracy),
                 "detected_languages": list(hypothesis.language_profile.significant),
                 "language_confusions": [
@@ -266,6 +291,15 @@ def _score_corpus_meeting(
         "der_false_alarm_percent": _percent(strict.false_alarm_rate),
         "der_confusion_percent": _percent(strict.confusion_rate),
         "reference_overlap_percent": _percent(overlap_ratio(reference_diarization)),
+        "speakers": quiet_speaker_report(
+            reference, hypothesis, reference_diarization, outcome.diarization, normalizer
+        ).as_dict(),
+        "decomposition": decompose(
+            normalizer.normalize(reference.text),
+            normalizer.normalize(hypothesis.text),
+            language if language != MIXED else "fr",
+            reference.text,
+        ).as_dict(),
         "real_time_factor": round(elapsed / clip.duration, 4),
         "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
         "stage_seconds": outcome.stage_seconds,
@@ -365,9 +399,28 @@ def _aggregate(rows: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
+def run_shootout_benchmark(options: RunOptions) -> dict[str, object]:
+    settings = Settings()
+    settings.asr.intra_op_threads = options.threads
+    if options.corpus == "ami":
+        segments = ami_segments(options.data_dir / "ami", options.data_dir / "ami" / "annotations")
+    else:
+        segments = summ_re_segments(options.data_dir / "summ-re", split=options.split)
+    selected = budgeted(segments, options.seconds)
+    specs = tuple(preset(name) for name in options.engines) or (preset("parakeet-fp32"),)
+    outcomes = run_shootout(
+        specs,
+        selected,
+        settings.runtime.models_dir,
+        threads=options.threads,
+        transcripts_dir=options.transcripts,
+    )
+    return shootout_payload(outcomes, selected, options.corpus, settings)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hansard-bench")
-    parser.add_argument("benchmark", choices=("asr", "meetings", "ami", "summ-re"))
+    parser.add_argument("benchmark", choices=("asr", "meetings", "ami", "summ-re", "shootout"))
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--threads", type=int, default=0)
@@ -377,6 +430,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="supply the speakers as a participant list, as a Teams meeting would",
     )
+    parser.add_argument("--corpus", default="summ-re", choices=("summ-re", "ami"))
+    parser.add_argument("--engines", default="", help="comma separated shootout engine presets")
+    parser.add_argument(
+        "--seconds", type=float, default=0.0, help="audio budget per engine, 0 for everything"
+    )
+    parser.add_argument("--split", default=None, choices=SUMM_RE_SPLITS)
+    parser.add_argument("--transcripts", type=Path, default=None)
     return parser
 
 
@@ -388,12 +448,18 @@ def main(argv: list[str] | None = None) -> int:
         threads=arguments.threads,
         language=arguments.language,
         roster=arguments.roster,
+        corpus=arguments.corpus,
+        engines=tuple(name for name in arguments.engines.split(",") if name),
+        seconds=arguments.seconds,
+        split=arguments.split,
+        transcripts=arguments.transcripts,
     )
     runners = {
         "asr": run_asr,
         "meetings": run_meetings,
         "ami": run_ami,
         "summ-re": run_summ_re,
+        "shootout": run_shootout_benchmark,
     }
     report = runners[arguments.benchmark](options)
     options.output.parent.mkdir(parents=True, exist_ok=True)

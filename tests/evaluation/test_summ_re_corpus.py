@@ -5,7 +5,14 @@ import numpy as np
 import soundfile as sf
 
 from hansard.evaluation.corpora import meeting_diarization, meeting_transcript, read_meeting
-from hansard.evaluation.prepare import _resampled_mono, _write_summ_re_meeting
+from hansard.evaluation.prepare import _resampled_mono, _SummReAccumulator
+
+
+def _write_summ_re_meeting(directory, rows, keep_tracks=False):
+    accumulator = _SummReAccumulator(directory, keep_tracks)
+    for row in rows:
+        accumulator.add(row)
+    accumulator.finish()
 
 
 def encoded(samples, rate):
