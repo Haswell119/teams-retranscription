@@ -85,6 +85,7 @@ class Composition:
             identifier=TextLanguageIdentifier(),
             default_language=asr.language,
             trust_engine_tags=True,
+            revise_weak_verdicts=asr.language_revision,
         )
 
     def drift_guard(self) -> DriftGuardPolicy | None:

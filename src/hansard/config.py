@@ -42,6 +42,7 @@ class AsrSettings(BaseModel):
     batch_seconds: float = 240.0
     language: str | None = None
     identify_language: bool = True
+    language_revision: bool = False
     language_drift_guard: bool = True
     drift_probe_seconds: float = 4.0
     drift_probe_count: int = 8

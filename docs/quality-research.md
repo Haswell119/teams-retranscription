@@ -135,8 +135,9 @@ difference in speaker handling and nothing else.
 | 6 | Unify `ok`/`okay` and `etc` spellings | same hypotheses | 30.82 % → **30.59 %** | KEEP |
 | 7 | Score four meetings instead of one | 4 SUMM-RE meetings | 020c is the best of four; macro **63.19 %** | Retire the single-meeting headline |
 | 8 | Remove the gap filler / drop the absorption floor / swap the embedding | same words | none beat the default | **REVERT** all three |
-| 9 | Merge threshold per embedding space | same words | 0.77 → **0.72** worth 1.5 points; found a regression I shipped | Re-measuring |
+| 9 | Merge threshold per embedding space | same words | apparent 1.5-point win; found a regression I shipped | Superseded by 11 |
 | 10 | Gate absorption on voice similarity | same words | no gate value restores speaker counts; ordering was the cause | **REVERT** |
+| 11 | Merge threshold, re-measured after the revert | same words | 0.72 worth 0.17 points, and costs a quiet speaker | **No change** |
 
 ## Iterations
 
@@ -541,6 +542,43 @@ this log exists to prevent.
 
 What survives: `min_duration_on` and `min_duration_off` are still configuration,
 because being able to turn them was what killed the false-alarm hypothesis.
+
+### Iteration 11 — the merge threshold, measured again on code that works
+
+**Hypothesis.** [Iteration 9](#iteration-9--the-merge-threshold-moves-and-my-own-change-did-not)
+found `merge_similarity = 0.72` worth 1.5 points of cpWER over the shipped 0.77.
+That grid ran on code carrying the absorption regression. Re-measure it on the
+reverted code before adopting anything.
+
+**Experiment.** The same five-point grid, the same four meetings, the same cached
+words, on `HEAD` after the revert.
+
+**Result.** The revert reproduces the original behaviour exactly — 6/4, 5/4, 5/3,
+4/4 speakers at 0.77, and 63.06 % cpWER against iteration 8's 63.19 %, the
+difference being normalizer 1.3.0. And the gain evaporates:
+
+| `merge_similarity` | cpWER | WDER | DER | speaker-count error | quiet-speaker recall | speakers |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 0.68 | 63.79 % | 21.05 % | 45.89 % | 1.00 | 87.5 % | 3/4 2/4 3/3 3/4 |
+| 0.72 | **62.89 %** | **12.12 %** | **41.35 %** | 1.00 | **87.5 %** | 5/4 5/4 4/3 **3/4** |
+| 0.75 | 62.89 % | 12.12 % | 41.35 % | 1.25 | 87.5 % | 5/4 5/4 5/3 3/4 |
+| **0.77 (shipped)** | 63.06 % | 12.25 % | 41.94 % | 1.25 | **100 %** | 6/4 5/4 5/3 **4/4** |
+| 0.80 | 63.11 % | 12.14 % | 42.14 % | 1.50 | 100 % | 6/4 6/4 5/3 4/4 |
+
+**Conclusion. No change.** 0.72 is worth **0.17 points**, not 1.5 — the 1.5 was
+an artefact of the regression it was measured against. And it buys those
+0.17 points by collapsing `020c_EBPZ` from four speakers to three, taking
+quiet-speaker recall from 100 % to 87.5 %. That is the same failure
+[configuration](configuration.md#minimum_speaker_seconds-and-merge_similarity-the-pair-that-was-retuned)
+records at 0.70, arriving three hundredths earlier than expected. `0.77` stays.
+
+**The diarization exploration ends here with nothing adopted.** Seven
+configurations, four embedding models, five merge thresholds and four absorption
+gates, all measured on identical words, and not one of them beats the shipped
+default by more than noise. That is a result: the diarization defaults are not
+where the remaining French error lives, and
+[the roadmap](#what-to-do-next-in-the-order-the-evidence-supports) says where it
+does.
 
 ---
 

@@ -110,7 +110,7 @@ class UtteranceLanguageTagger:
     identifier: TextLanguageIdentifier = TextLanguageIdentifier()
     default_language: str | None = None
     trust_engine_tags: bool = False
-    revise_weak_verdicts: bool = True
+    revise_weak_verdicts: bool = False
     weak_confidence: float = 0.55
     weak_evidence: float = 3.0
     context_confidence: float = 0.70

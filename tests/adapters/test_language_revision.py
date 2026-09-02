@@ -9,6 +9,7 @@ def utterance(start, text, speaker="A"):
 
 def tagged(*utterances, **options):
     transcript = Transcript(utterances=tuple(utterances), language="mixed")
+    options.setdefault("revise_weak_verdicts", True)
     return [item.language for item in UtteranceLanguageTagger(**options).tag(transcript).utterances]
 
 
@@ -19,6 +20,25 @@ def test_a_weak_verdict_is_revised_towards_a_speakers_settled_language():
         utterance(6.0, "il faut vraiment que nous parlions de cette question ensemble"),
     )
     assert languages == ["fr", "fr", "fr"]
+
+
+def test_revision_is_off_by_default():
+    languages = [
+        item.language
+        for item in UtteranceLanguageTagger()
+        .tag(
+            Transcript(
+                utterances=(
+                    utterance(0.0, "je pense que nous devons revoir le budget de cette annee"),
+                    utterance(3.0, "the thing"),
+                    utterance(6.0, "il faut vraiment que nous parlions de cette question ensemble"),
+                ),
+                language="mixed",
+            )
+        )
+        .utterances
+    ]
+    assert languages[1] == "en"
 
 
 def test_revision_is_off_when_it_is_turned_off():
