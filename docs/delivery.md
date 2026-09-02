@@ -37,7 +37,7 @@ A meeting request carries `DeliveryTarget(channel, address, formats)` values. Th
 
 | Channel | Address format | Example |
 | --- | --- | --- |
-| `filesystem` | directory relative to the artefact root | `2026/august/board` |
+| `filesystem` | directory relative to the artefact root; empty means the root itself | `2026/august/board` |
 | `email` | one or more recipients, comma/semicolon/space separated | `clerk@council.example; mayor@council.example` |
 | `webhook` | absolute URL (or empty to use `HANSARD_DELIVERY__WEBHOOK_URL`) | `https://intranet.example/hooks/minutes` |
 | `teams_chat` | `chat:{chat-id}` | `chat:19:2da4c29f6d7041eca70b638b43d45437@thread.v2` |
@@ -51,6 +51,12 @@ Defaults come from settings:
 export HANSARD_DELIVERY__DEFAULT_CHANNELS='["filesystem"]'   # JSON list, pydantic-settings syntax
 export HANSARD_DELIVERY__OUTPUT_DIR=/var/lib/hansard/artifacts
 ```
+
+A meeting that carries no target of its own is delivered to those default channels with an **empty**
+address, which for `filesystem` is `OUTPUT_DIR` itself. It has to be empty: the publisher is already
+rooted at `OUTPUT_DIR`, so passing that same path as the address once resolved to `artifacts/artifacts`
+with the relative default, and was refused outright as an absolute address with the value every
+container and the Helm chart set.
 
 All targets are published **concurrently** by `DeliveryDispatcher`, each with its own timeout. One
 failing channel never prevents the others: the dispatcher returns a `DeliveryReport` with a
@@ -331,7 +337,7 @@ never costs you the Teams post or the on-disk artefact.
 | `webhook … answered 400` from Workflows | The flow expects an Adaptive Card. Set `HANSARD_DELIVERY__WEBHOOK_FORMAT=adaptive_card`. |
 | SMTP `535` / authentication rejected | Check `HANSARD_DELIVERY__SMTP__USERNAME` / `…__PASSWORD`; some relays require the sender to match the account. |
 | SMTP hangs on port 465 | Implicit TLS: set `USE_TLS=true` (STARTTLS is then disabled automatically). |
-| `absolute delivery directory '…' is refused` | Filesystem addresses are relative to `HANSARD_DELIVERY__OUTPUT_DIR` by design. |
+| `absolute delivery directory '…' is refused` | Filesystem addresses are relative to `HANSARD_DELIVERY__OUTPUT_DIR` by design. Leave the address empty to mean that directory itself. |
 | Nothing is delivered at all | `HANSARD_DELIVERY__DEFAULT_CHANNELS` is a JSON list, e.g. `'["filesystem","email"]'`. |
 
 ## Extending

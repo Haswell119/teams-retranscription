@@ -438,6 +438,7 @@ of this works is in [Teams setup](teams-setup.md).
 | `AUDIO_REPAIR_AFTER_SECONDS` | int | `45` | How long the recording has to stay flat before the browser's playback stream is moved back onto the capture sink. |
 | `AUDIO_REPAIR_ATTEMPTS` | int | `4` | How many such repairs one meeting may attempt. Past that the capture keeps running and the failure is left to the diagnostics. |
 | `RECORDER_RESTART_ATTEMPTS` | int | `3` | How many times ffmpeg may be restarted into a fresh segment after it dies or stalls mid-meeting. The segments are stitched back together at the end. `0` restores the old behaviour: one failure ends the capture. |
+| `FAIL_ON_SILENCE` | bool | `false` | `true` makes a capture that measured as silence raise `CaptureError` instead of being handed to the pipeline. The recording is finished and on disk either way; failing the job throws away a meeting that may simply have been quiet, which is why this is off. The silence is still logged as `capture.silent_recording`, counted by `hansard_capture_silent_total`, and carried in `diagnostics.silence`. |
 
 ---
 
@@ -589,6 +590,8 @@ Prefix `HANSARD_RUNTIME__`.
 | `WORKSPACE` | path | `/var/lib/hansard` | Scratch directory for captured audio and intermediate files. On a bare-metal install point it somewhere your user can write. |
 | `MODELS_DIR` | path | `/var/lib/hansard/models` | Root of the model bundle. **The setting you will change first on a laptop.** The container images override it to `/models`. Layout in [installation](installation.md#the-expected-layout). |
 | `ALLOW_MODEL_DOWNLOADS` | bool | `false` | When `false`, a missing model is a hard error rather than a silent download. Leave it off: it is the property that makes an air gap enforceable, and CI runs transcription with the network disabled to prove it. |
+| `JOB_STORE` | `filesystem` \| `memory` | `filesystem` | Where `hansard serve` keeps its job records. `filesystem` writes one small JSON per job under `<WORKSPACE>/jobs/`, so a worker restart does not lose meetings that were in flight. `memory` restores the old behaviour: faster, and everything in flight is lost with the process. |
+| `RECOVER_JOBS` | bool | `true` | On start-up, re-queue every job the previous process left unfinished. A job whose recording is on disk is resumed as a file transcription; a job interrupted before anything was recorded is failed with an explicit reason instead of being left `capturing` forever. Requires `JOB_STORE=filesystem` to have anything to recover. |
 | `MAX_CONCURRENT_MEETINGS` | int | `2` | Number of concurrent job workers inside one `hansard serve` process. Each concurrent meeting holds its own recogniser in memory, so budget roughly 2.8 GB per unit at the float32 default, or 1.4 GB with `HANSARD_ASR__QUANTIZATION=int8`, before raising it. It does not apply to `hansard transcribe` or `hansard join`, which process one meeting each. |
 | `LOG_LEVEL` | str | `INFO` | Level applied to Hansard and to every third-party library, through the stdlib root logger. `DEBUG` adds one `stage.started` event per pipeline stage. |
 | `LOG_FORMAT` | `json` \| `console` | `json` | `json` emits one JSON object per line on stdout; `console` emits a readable aligned line. Both go through the redaction and content-elision processors. See [observability](observability.md). |

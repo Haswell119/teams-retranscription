@@ -15,7 +15,7 @@ from hansard.domain.transcript import Transcript
 from hansard.observability.metrics import record_job_state
 
 
-def _now() -> datetime:
+def now() -> datetime:
     return datetime.now(UTC)
 
 
@@ -35,7 +35,7 @@ class JobRecord:
     error: str | None = None
 
     def advanced(self, state: JobState, **changes: object) -> JobRecord:
-        return replace(self, state=state, updated_at=_now(), **changes)  # type: ignore[arg-type]
+        return replace(self, state=state, updated_at=now(), **changes)  # type: ignore[arg-type]
 
 
 @runtime_checkable
@@ -56,7 +56,7 @@ class InMemoryJobStore:
     capacity: int = 512
 
     async def create(self, request: MeetingRequest) -> JobRecord:
-        moment = _now()
+        moment = now()
         record = JobRecord(
             identifier=request.identifier,
             request=request,
@@ -119,12 +119,18 @@ class JobQueue:
     def pending(self) -> int:
         return self._queue.qsize()
 
+    async def resubmit(self, record: JobRecord) -> JobRecord:
+        saved = await self.store.save(record)
+        record_job_state(saved.state.value)
+        await self._queue.put(saved.identifier)
+        return saved
+
     async def _worker(self) -> None:
         while True:
             identifier = await self._queue.get()
             try:
                 record = await self.store.get(identifier)
-                await self._transition(record, JobState.TRANSCRIBING)
+                await self._transition(record, JobState.CAPTURING)
                 completed = await self.handler(record)
                 record_job_state(completed.state.value)
                 await self.store.save(completed)

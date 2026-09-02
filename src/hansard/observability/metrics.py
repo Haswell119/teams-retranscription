@@ -377,6 +377,10 @@ CAPTURE_STOPS: Final[Counter] = _counter(
     "capture_stops_total", "Captures that finished, counted by why the bot stopped", ("reason",)
 )
 
+CAPTURE_SILENT: Final[Counter] = _counter(
+    "capture_silent_total", "Finished captures whose audio measured as silence"
+)
+
 
 def set_build_info(
     version: str,
@@ -476,6 +480,10 @@ def record_recorder_restart(result: str) -> None:
 
 def record_capture_stop(reason: str) -> None:
     CAPTURE_STOPS.labels(reason=reason).inc()
+
+
+def record_capture_silent() -> None:
+    CAPTURE_SILENT.inc()
 
 
 def render_latest() -> tuple[bytes, str]:

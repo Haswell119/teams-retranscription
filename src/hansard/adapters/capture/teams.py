@@ -11,6 +11,7 @@ from typing import Final
 
 from hansard.adapters.capture.audio.pulse import PulseAudioSink, PulseSinkPlan
 from hansard.adapters.capture.audio.recorder import (
+    SILENCE_DIAGNOSTIC,
     FfmpegRecorder,
     LevelReading,
     RecorderSettings,
@@ -50,6 +51,7 @@ from hansard.observability.metrics import (
     record_audio_level,
     record_audio_repair,
     record_bot_join,
+    record_capture_silent,
     record_capture_stop,
     record_recorder_restart,
 )
@@ -266,7 +268,7 @@ class TeamsBrowserCapture:
         timeline = reducer.timeline(end_epoch_ms)
         if recorder.join_error is not None:
             LOGGER.warning("capture.segments_not_joined", detail=recorder.join_error)
-        silence = await recorder.assert_not_silent(audio_path)
+        silence = await self._report_silence(recorder, audio_path)
         record_capture_stop(str(reason))
         self.last_diagnostics = CaptureDiagnostics(
             stop_reason=reason,
@@ -288,6 +290,22 @@ class TeamsBrowserCapture:
             ended_at=ended_at,
             sample_rate=self.sample_rate,
         )
+
+    async def _report_silence(self, recorder: FfmpegRecorder, audio_path: Path) -> SilenceReport:
+        if self.settings.fail_on_silence:
+            return await recorder.assert_not_silent(audio_path)
+        report = await recorder.silence_report(audio_path)
+        if report.is_silent:
+            record_capture_silent()
+            LOGGER.error(
+                "capture.silent_recording",
+                peak_dbfs=report.max_dbfs,
+                mean_dbfs=report.mean_dbfs,
+                floor_dbfs=report.floor_dbfs,
+                audio_repairs=self._audio_repairs,
+                detail=SILENCE_DIAGNOSTIC,
+            )
+        return report
 
     async def _join(self, session: TeamsBrowserSession, join_url: str) -> JoinOutcome:
         started = time.monotonic()

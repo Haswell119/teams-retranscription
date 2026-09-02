@@ -100,6 +100,8 @@ join URL
 │ active-speaker signal, which a reducer folds into a timeline.    │
 └──────────────────────────────────────────────────────────────────┘
    │  16 kHz mono WAV  +  Roster(participants, observations)
+   │  the job record is written to disk at every phase change, so a worker
+   │  restart resumes the meeting from the WAV instead of losing it
    ▼  TranscriptionPipeline.run(clip, request, roster)
    │
    ├── enhance ──────────► high pass + loudnorm ─────┐

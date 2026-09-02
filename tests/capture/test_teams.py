@@ -330,9 +330,21 @@ async def test_join_refusal_propagates_and_releases_the_devices(tmp_path):
     assert launcher.process.terminated
 
 
-async def test_a_silent_recording_fails_loudly(tmp_path):
+async def test_a_silent_recording_is_handed_back_with_its_diagnosis(tmp_path):
     capture, _, _, _ = build_capture(
         volumedetect=VOLUMEDETECT_SILENT, settings=capture_settings(max_duration_seconds=2)
+    )
+    result = await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
+    assert result.audio_path.exists() or result.audio_path.name.endswith(".wav")
+    diagnostics = capture.last_diagnostics
+    assert diagnostics is not None
+    assert diagnostics.silence is not None and diagnostics.silence.is_silent
+
+
+async def test_a_silent_recording_can_still_be_made_fatal(tmp_path):
+    capture, _, _, _ = build_capture(
+        volumedetect=VOLUMEDETECT_SILENT,
+        settings=capture_settings(max_duration_seconds=2, fail_on_silence=True),
     )
     with pytest.raises(CaptureError, match="no audible audio"):
         await capture.capture(MeetingRequest(join_url=JOIN_URL), tmp_path)
