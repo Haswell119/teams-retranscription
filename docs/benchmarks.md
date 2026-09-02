@@ -257,6 +257,13 @@ construction as the AMI Mix-Headset condition and the same thing Teams delivers.
 | --- | ---: | :---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `020c_EBPZ` | 18.2 min | 4 → **4** | 3283 → 2356 | 37.52 % | **53.16 %** | 56.52 % | 17.17 % | 36.22 % | 5.06 % | 0.59 |
 
+> **These numbers were produced before the reference was corrected.** They score
+> against a reference in which SUMM-RE's SPPAS pause marks had been expanded into
+> the word "plus" — 1.61 % of every reference token, each one an unreachable
+> deletion. The row is left as it was published so the correction is visible
+> rather than quietly absorbed; the corrected multi-meeting figures are in
+> [§2.5.1](#251-summ-re-across-the-tuning-split).
+
 ```bash
 make bench-data-summre
 make bench-summre

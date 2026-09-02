@@ -66,11 +66,13 @@ class SweepPoint:
         return updated
 
 
-def cached_transcript(meeting: SweepMeeting, settings: Settings, cache: Path) -> tuple[Transcript, AudioClip]:
+def cached_transcript(
+    meeting: SweepMeeting, settings: Settings, cache: Path
+) -> tuple[Transcript, AudioClip, tuple[TimeSpan, ...]]:
     clip = load_clip(meeting.audio)
     path = cache / f"{meeting.identifier}.json"
     if path.exists():
-        return _read_transcript(path, meeting.language, clip.duration), clip
+        return _read_transcript(path, meeting.language, clip.duration, clip)
     pipeline = Composition(settings).pipeline()
     pipeline.diarizer = None
     pipeline.consolidator = None
@@ -81,8 +83,8 @@ def cached_transcript(meeting: SweepMeeting, settings: Settings, cache: Path) ->
     outcome = pipeline.run(
         clip, MeetingRequest(audio_path=meeting.audio, title=meeting.identifier, language=meeting.language)
     )
-    _write_transcript(path, outcome.transcript)
-    return outcome.transcript, clip
+    _write_transcript(path, outcome.transcript, outcome.speech_spans)
+    return outcome.transcript, clip, outcome.speech_spans
 
 
 def diarize_once(
@@ -155,8 +157,8 @@ def run_sweep(
     models_dir = settings.runtime.models_dir
     prepared: list[tuple[SweepMeeting, Transcript, AudioClip, tuple[TimeSpan, ...]]] = []
     for meeting in meetings:
-        transcript, clip = cached_transcript(meeting, settings, cache)
-        prepared.append((meeting, transcript, clip, _speech_spans(transcript)))
+        transcript, clip, speech = cached_transcript(meeting, settings, cache)
+        prepared.append((meeting, transcript, clip, speech))
     rows: list[dict[str, object]] = []
     for point in points:
         applied = point.applied(settings)
@@ -236,11 +238,12 @@ def _speech_spans(transcript: Transcript) -> tuple[TimeSpan, ...]:
     return tuple(utterance.span for utterance in transcript.utterances)
 
 
-def _write_transcript(path: Path, transcript: Transcript) -> None:
+def _write_transcript(path: Path, transcript: Transcript, speech: Sequence[TimeSpan] = ()) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "language": transcript.language,
         "audio_duration": transcript.audio_duration,
+        "speech_spans": [[span.start, span.end] for span in speech],
         "utterances": [
             {
                 "start": utterance.span.start,
@@ -264,7 +267,9 @@ def _write_transcript(path: Path, transcript: Transcript) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
-def _read_transcript(path: Path, language: str, duration: float) -> Transcript:
+def _read_transcript(
+    path: Path, language: str, duration: float, clip: AudioClip
+) -> tuple[Transcript, AudioClip, tuple[TimeSpan, ...]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     utterances = tuple(
         Utterance(
@@ -283,11 +288,18 @@ def _read_transcript(path: Path, language: str, duration: float) -> Transcript:
         )
         for item in payload.get("utterances", ())
     )
-    return Transcript(
+    transcript = Transcript(
         utterances=utterances,
         language=payload.get("language") or language,
         audio_duration=float(payload.get("audio_duration") or duration),
     )
+    recorded = payload.get("speech_spans")
+    speech = (
+        tuple(TimeSpan(float(pair[0]), float(pair[1])) for pair in recorded)
+        if recorded
+        else _speech_spans(transcript)
+    )
+    return transcript, clip, speech
 
 
 def grid(
