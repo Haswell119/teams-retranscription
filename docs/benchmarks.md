@@ -534,13 +534,22 @@ normalizer version, the hardware, and the per-stage timings. A file with a
 `profile` field — the INT8 runs, the historical AMI runs — is kept for comparison
 and is excluded from the gate check.
 
-**One reproduction caveat, stated rather than hidden:** `make bench-meetings`
-follows `HANSARD_ASR__QUANTIZATION` and therefore reproduces
-[§2.1](#21-english-synthetic-meetings-exact-ground-truth) as shipped, but
-`make bench-asr` currently pins its own recognizer to INT8 inside
-`hansard.evaluation.run`, so it reproduces the INT8 read-speech row of
-[§5](#5-choosing-a-quantization-profile) rather than the float32 table in
-[§1](#1-speech-recognition-french-and-english).
+Two more targets exist for asking questions rather than publishing answers.
+`make bench-shootout` runs one or more recognizers over byte-identical
+reference-boundary segments and scores them with one normalizer, reporting word
+error split by overlap band and by word category; `ENGINES=parakeet-fp32,canary-1b-v2-fr`
+selects what to compare. `make bench-sweep` runs recognition **once** per
+meeting, caches the transcript, and then re-diarizes and re-attributes those same
+words for every point on a grid, so a diarization question costs one recognition
+pass instead of one per configuration. Neither writes a published number; both
+write to `bench/results/` for the [quality-research log](quality-research.md).
+
+**The read-speech benchmark used to build its own recognizer**, bypassing the
+registry, which meant it ignored `HANSARD_RUNTIME__MODELS_DIR` and would fetch
+weights from the network instead of using the verified local bundle. It now goes
+through `build_recognizer` like everything else, so `make bench-asr` reproduces
+[§1](#1-speech-recognition-french-and-english) offline and follows
+`HANSARD_ASR__QUANTIZATION` the way the rest of the harness does.
 
 ## 8. Where we lose
 

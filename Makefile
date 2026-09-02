@@ -2,9 +2,13 @@ VENV ?= .venv
 PYTHON ?= $(VENV)/bin/python
 MODELS_DIR ?= $(CURDIR)/models
 EVAL_DIR ?= $(CURDIR)/bench/data
+CORPUS ?= summ-re
+ENGINES ?= parakeet-fp32
+SHOOTOUT_SECONDS ?= 1800
+SUMM_RE_MEETINGS ?= 8
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-dev models bench bench-all bench-ami bench-summre bench-data-summre gates bench-asr bench-meetings bench-mixed bench-data bench-data-ami test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
+.PHONY: help install install-dev models bench bench-all bench-ami bench-summre bench-data-summre gates bench-asr bench-meetings bench-mixed bench-shootout bench-sweep bench-data bench-data-ami test test-fast lint format typecheck check docs-check clean docker-api docker-worker docker-models helm-lint
 
 help:
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -36,14 +40,27 @@ bench-meetings: ## Benchmark meeting transcription with speaker attribution
 bench-mixed: ## Benchmark the code-switched French/English meetings only
 	$(PYTHON) -m hansard.evaluation.run meetings --language mixed --output bench/results/mixed_meetings.json
 
-bench-data-summre: ## Fetch a real French meeting from the SUMM-RE corpus
-	$(PYTHON) -m hansard.evaluation.prepare --output $(EVAL_DIR) --summ-re --skip-fleurs --skip-meetings
+bench-data-summre: ## Fetch real French meetings from the SUMM-RE tuning split
+	$(PYTHON) -m hansard.evaluation.prepare --output $(EVAL_DIR) --summ-re \
+		--summ-re-meetings $(SUMM_RE_MEETINGS) --summ-re-split tuning \
+		--skip-fleurs --skip-meetings
 
 bench-summre: ## Benchmark on a real French meeting
 	$(PYTHON) -m hansard.evaluation.run summ-re --output bench/results/summ_re.json
 
 bench-ami: ## Benchmark on the AMI meeting corpus
 	$(PYTHON) -m hansard.evaluation.run ami --output bench/results/ami_mix_headset.json
+
+bench-shootout: ## Compare recognisers on identical reference-boundary segments
+	$(PYTHON) -m hansard.evaluation.run shootout --corpus summ-re --split tuning \
+		--engines $(ENGINES) --seconds $(SHOOTOUT_SECONDS) --threads 4 \
+		--transcripts bench/results/transcripts/$(CORPUS) \
+		--output bench/results/shootout_$(CORPUS).json
+
+bench-sweep: ## Sweep diarization settings over one cached recognition pass
+	$(PYTHON) -m hansard.evaluation.run diarization-sweep --corpus $(CORPUS) --split tuning \
+		--threads 4 --cache bench/cache/$(CORPUS) \
+		--output bench/results/diarization_sweep_$(CORPUS).json
 
 gates: ## Check the measured results against the quality gates
 	$(PYTHON) -m hansard.evaluation.check

@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from hansard.adapters.asr.onnx_engine import OnnxRecognizer
+from hansard.adapters.asr.registry import build_recognizer
 from hansard.adapters.audio import load_clip
 from hansard.config import Settings
 from hansard.domain.language import MIXED
@@ -110,12 +110,8 @@ def _recognition_profile(settings: Settings) -> dict[str, object]:
 
 def run_asr(options: RunOptions) -> dict[str, object]:
     settings = Settings()
-    engine = OnnxRecognizer(
-        quantization=None if settings.asr.quantization == "none" else settings.asr.quantization,
-        batch_size=settings.asr.batch_size,
-        memory_profile=settings.asr.memory_profile,
-        intra_op_threads=options.threads,
-    )
+    settings.asr.intra_op_threads = options.threads
+    engine = build_recognizer(settings.asr, settings.runtime.models_dir)
     engine.warm_up()
     rows: list[dict[str, object]] = []
     for filename, language, label in ASR_CORPORA:
