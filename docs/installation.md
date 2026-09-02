@@ -206,14 +206,14 @@ models/
 **Both recognition profiles are in the manifest**, which is why the bundle is
 3.2 GB: the float32 weights (`encoder-model.onnx` plus its `.data` sidecar and
 `decoder_joint-model.onnx`, 2.5 GB) are the shipped default, and the INT8 weights
-(640 MB) are the opt-in low-memory profile. `HANSARD_ASR__QUANTIZATION=int8`
+(670 MB) are the opt-in low-memory profile. `HANSARD_ASR__QUANTIZATION=int8`
 switches between them with no download and no network access. The quality and
 memory trade-off is in
 [benchmarks §5](benchmarks.md#5-choosing-a-quantization-profile); the short
 version is that INT8 saves about 1.4 GB of resident memory, is no faster, and
 costs roughly two points of word error rate in French.
 
-Diarization (46 MB) and voice activity detection (2 MB) are language independent
+Diarization (42 MB) and voice activity detection (2 MB) are language independent
 and have a single profile each.
 
 ### Pointing Hansard at them

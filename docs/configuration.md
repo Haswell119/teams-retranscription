@@ -122,7 +122,7 @@ Prefix `HANSARD_ASR__`.
 | --- | --- | --- | --- |
 | `ENGINE` | `parakeet` \| `whisper` \| `qwen3` \| `null` | `parakeet` | `parakeet` and `qwen3` both build the ONNX recogniser. `whisper` builds the faster-whisper recogniser and needs the `asr-whisper` extra — see below. `null` produces an empty transcript, for testing the rest of the pipeline. |
 | `MODEL_ID` | str | `nemo-parakeet-tdt-0.6b-v3` | Directory name under `runtime.models_dir`, and the id passed to `onnx-asr`. |
-| `QUANTIZATION` | `none` \| `int8` | `none` | `none` is the shipped default: float32 weights, about 2.5 GB on disk and 2.8 GB resident, and the numbers published in [benchmarks](benchmarks.md). `int8` is the opt-in low-memory profile: about 640 MB on disk and 1.4 GB resident, **no faster**, about 2.0 WER points worse on French read speech — and far worse than that on real meeting audio, where it deletes words wholesale. Both sets of weights are in the bundle, so switching needs no download. Read the quality profile below before choosing it. |
+| `QUANTIZATION` | `none` \| `int8` | `none` | `none` is the shipped default: float32 weights, about 2.5 GB on disk and 2.8 GB resident, and the numbers published in [benchmarks](benchmarks.md). `int8` is the opt-in low-memory profile: about 670 MB on disk and 1.4 GB resident, **no faster**, about 2.0 WER points worse on French read speech — and far worse than that on real meeting audio, where it deletes words wholesale. Both sets of weights are in the bundle, so switching needs no download. Read the quality profile below before choosing it. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | `auto` selects the CUDA execution provider if ONNX Runtime reports one, and falls back to CPU. Pin to `cpu` when a GPU is present but you want it left for something else. |
 | `BEAM_SIZE` | int | `1` | Only reaches the Whisper adapter. It has no effect on Parakeet. |
 | `BATCH_SECONDS` | float | `240.0` | Ceiling on the **padded** audio held in flight for one decoding call. A batch is padded to its longest segment, so what it costs is that longest segment times the number of segments in it, not the sum of their durations — and that product is what this bounds. A two-minute segment therefore travels with at most one companion, while thirty-second segments still batch four at a time. Bounding the sum instead let a two-minute segment drag three short ones into its padding, which is where the 7.1 GB peak on real meeting audio came from. `0` disables it and leaves only `BATCH_SIZE`. |
@@ -155,7 +155,7 @@ Cost, same runs:
 
 | | `none` (float32, default) | `int8` |
 | --- | --- | --- |
-| On disk | 2.5 GB | 640 MB |
+| On disk | 2.5 GB | 670 MB |
 | Peak resident memory, read speech | 2.74 – 2.86 GB | 1.38 – 1.40 GB |
 | Peak resident memory, meeting pipeline | 3.21 – 3.59 GB | 2.09 – 2.73 GB |
 | CPU-seconds per second of audio | 0.645 | 0.650 |
