@@ -100,6 +100,8 @@ join URL
 │ active-speaker signal, which a reducer folds into a timeline.    │
 └──────────────────────────────────────────────────────────────────┘
    │  16 kHz mono WAV  +  Roster(participants, observations)
+   │  the job record is written to disk at every phase change, so a worker
+   │  restart resumes the meeting from the WAV instead of losing it
    ▼  TranscriptionPipeline.run(clip, request, roster)
    │
    ├── enhance ──────────► high pass + loudnorm ─────┐
@@ -291,7 +293,7 @@ path is synchronous, the I/O path is `async`.**
 | Enhancement | Subprocess | Synchronous, samples piped through ffmpeg | A second copy of the clip during the pipe |
 | Voice activity | CPU, ONNX | Synchronous | ~2 MB of model |
 | Recognition | CPU or GPU, ONNX | Synchronous, batched by `asr.batch_size` | The dominant cost: about 2.8 GB resident for the shipped float32 model, or 1.4 GB for the INT8 profile, plus activations proportional to batch size |
-| Diarization | CPU or GPU, ONNX | Synchronous | 46 MB of models, plus one embedding per segment |
+| Diarization | CPU or GPU, ONNX | Synchronous | 42 MB of models, plus one embedding per segment |
 | Attribution and naming | Pure Python | Synchronous | Negligible |
 | Capture (browser, PulseAudio, roster) | I/O bound | `async`, `asyncio` throughout | The recording streams to disk, not to memory |
 | Delivery | Network | `async`, targets fanned out with `asyncio.gather` and a per-target timeout | Negligible |
@@ -433,7 +435,7 @@ Existing channels and their address formats are in [delivery](delivery.md).
 
 **ONNX Runtime rather than PyTorch.** Parakeet is a NeMo model and the obvious
 route would be `nemo-toolkit`, which brings PyTorch and CUDA libraries with it.
-The ONNX export is 2.5 GB on disk in float32 and 640 MB in INT8, roughly 2.8 GB
+The ONNX export is 2.5 GB on disk in float32 and 670 MB in INT8, roughly 2.8 GB
 and 1.4 GB resident; the PyTorch path is several gigabytes of wheels before any
 weights are loaded, and it puts a CUDA-shaped dependency into an image that has
 to run on CPU. The CPU

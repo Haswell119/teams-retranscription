@@ -113,6 +113,7 @@ class CaptureSettings(BaseModel):
     audio_repair_after_seconds: int = 45
     audio_repair_attempts: int = 4
     recorder_restart_attempts: int = 3
+    fail_on_silence: bool = False
 
 
 class SmtpSettings(BaseModel):
@@ -174,6 +175,8 @@ class RuntimeSettings(BaseModel):
     models_dir: Path = Path("/var/lib/hansard/models")
     allow_model_downloads: bool = False
     max_concurrent_meetings: int = 2
+    job_store: Literal["filesystem", "memory"] = "filesystem"
+    recover_jobs: bool = True
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
     telemetry_enabled: bool = False

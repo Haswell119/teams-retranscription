@@ -12,6 +12,7 @@ from hansard.domain.audio import TARGET_SAMPLE_RATE, AudioClip
 from hansard.domain.errors import HansardError
 
 _DIRECT_SUFFIXES = {".wav", ".flac", ".ogg", ".opus"}
+_CONTAINER_HEADER_BYTES = 4_096
 
 
 def _ffmpeg_binary() -> str | None:
@@ -74,14 +75,24 @@ def _load_via_ffmpeg(path: Path, sample_rate: int) -> AudioClip:
     return AudioClip(np.frombuffer(process.stdout, dtype=np.float32).copy(), sample_rate)
 
 
+def _has_payload(path: Path) -> bool:
+    try:
+        return path.stat().st_size > _CONTAINER_HEADER_BYTES
+    except OSError:
+        return False
+
+
 def load_clip(path: Path, sample_rate: int = TARGET_SAMPLE_RATE) -> AudioClip:
     if not path.exists():
         raise HansardError(f"audio file not found: {path}")
     if path.suffix.lower() in _DIRECT_SUFFIXES:
         try:
-            return _load_via_soundfile(path, sample_rate)
+            clip = _load_via_soundfile(path, sample_rate)
         except (sf.LibsndfileError, RuntimeError):
             return _load_via_ffmpeg(path, sample_rate)
+        if clip.samples.size or not _has_payload(path):
+            return clip
+        return _load_via_ffmpeg(path, sample_rate)
     return _load_via_ffmpeg(path, sample_rate)
 
 

@@ -15,11 +15,12 @@ from hansard.adapters.asr.biasing import VocabularyBiaser
 from hansard.adapters.capture.registry import build_capture
 from hansard.adapters.delivery.dispatcher import dispatcher_from_settings
 from hansard.adapters.summarization.registry import build_minutes_writer
-from hansard.application.jobs import InMemoryJobStore, JobQueue, JobRecord
+from hansard.application.jobs import InMemoryJobStore, JobQueue, JobRecord, JobStore
 from hansard.application.meeting_service import MeetingService, artifact_key
+from hansard.application.persistence import JOBS_DIRECTORY, FilesystemJobStore, recover_jobs
 from hansard.config import Settings, load_settings
 from hansard.domain.errors import ArtifactNotFound, ConfigurationError
-from hansard.domain.meeting import DeliveryChannel, DeliveryTarget, MeetingRequest
+from hansard.domain.meeting import DeliveryChannel, DeliveryTarget, JobState, MeetingRequest
 from hansard.factory import Composition
 from hansard.interfaces.api.schemas import (
     HealthReport,
@@ -30,6 +31,7 @@ from hansard.interfaces.api.schemas import (
 )
 from hansard.observability import metrics
 from hansard.observability.logging import configure_logging, get_logger
+from hansard.observability.metrics import record_job_state
 from hansard.ports.delivery import Payload
 from hansard.ports.storage import ArtifactStore
 
@@ -42,9 +44,15 @@ QUEUE_GROUP = "api"
 @dataclass(slots=True)
 class Runtime:
     settings: Settings
-    store: InMemoryJobStore
+    store: JobStore
     queue: JobQueue
     artifacts: ArtifactStore
+
+
+def _build_store(settings: Settings) -> JobStore:
+    if settings.runtime.job_store == "memory":
+        return InMemoryJobStore()
+    return FilesystemJobStore(root=settings.runtime.workspace / JOBS_DIRECTORY)
 
 
 def _build_runtime(settings: Settings) -> Runtime:
@@ -66,16 +74,31 @@ def _build_runtime(settings: Settings) -> Runtime:
     )
     dispatcher = dispatcher_from_settings(settings.delivery)
 
+    store = _build_store(settings)
+
     async def handler(record: JobRecord) -> JobRecord:
-        completed = await service.execute(record)
+        async def report(state: JobState) -> None:
+            record_job_state(state.value)
+            await store.save(record.advanced(state))
+
+        completed = await service.execute(record, on_state=report)
         targets = service.delivery_targets(completed.request)
         if targets and completed.artifacts:
             await dispatcher.deliver(targets, _payload(completed))
         return completed
 
-    store = InMemoryJobStore()
     queue = JobQueue(store=store, handler=handler, concurrency=settings.runtime.max_concurrent_meetings)
     return Runtime(settings=settings, store=store, queue=queue, artifacts=artifacts)
+
+
+async def _resume(runtime: Runtime) -> None:
+    if not runtime.settings.runtime.recover_jobs:
+        return
+    recovery = await recover_jobs(runtime.store, runtime.settings.runtime.workspace)
+    for record in recovery.resumed:
+        await runtime.queue.resubmit(record)
+    for record in recovery.abandoned:
+        LOGGER.warning("job.abandoned", meeting=record.identifier, reason=record.error)
 
 
 def _payload(record: JobRecord) -> Payload:
@@ -153,6 +176,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await runtime.queue.start()
+        await _resume(runtime)
         yield
         await runtime.queue.stop()
 

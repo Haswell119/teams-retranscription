@@ -122,7 +122,7 @@ Prefix `HANSARD_ASR__`.
 | --- | --- | --- | --- |
 | `ENGINE` | `parakeet` \| `whisper` \| `qwen3` \| `null` | `parakeet` | `parakeet` and `qwen3` both build the ONNX recogniser. `whisper` builds the faster-whisper recogniser and needs the `asr-whisper` extra — see below. `null` produces an empty transcript, for testing the rest of the pipeline. |
 | `MODEL_ID` | str | `nemo-parakeet-tdt-0.6b-v3` | Directory name under `runtime.models_dir`, and the id passed to `onnx-asr`. |
-| `QUANTIZATION` | `none` \| `int8` | `none` | `none` is the shipped default: float32 weights, about 2.5 GB on disk and 2.8 GB resident, and the numbers published in [benchmarks](benchmarks.md). `int8` is the opt-in low-memory profile: about 640 MB on disk and 1.4 GB resident, **no faster**, about 2.0 WER points worse on French read speech — and far worse than that on real meeting audio, where it deletes words wholesale. Both sets of weights are in the bundle, so switching needs no download. Read the quality profile below before choosing it. |
+| `QUANTIZATION` | `none` \| `int8` | `none` | `none` is the shipped default: float32 weights, about 2.5 GB on disk and 2.8 GB resident, and the numbers published in [benchmarks](benchmarks.md). `int8` is the opt-in low-memory profile: about 670 MB on disk and 1.4 GB resident, **no faster**, about 2.0 WER points worse on French read speech — and far worse than that on real meeting audio, where it deletes words wholesale. Both sets of weights are in the bundle, so switching needs no download. Read the quality profile below before choosing it. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | `auto` selects the CUDA execution provider if ONNX Runtime reports one, and falls back to CPU. Pin to `cpu` when a GPU is present but you want it left for something else. |
 | `BEAM_SIZE` | int | `1` | Only reaches the Whisper adapter. It has no effect on Parakeet. |
 | `BATCH_SECONDS` | float | `240.0` | Ceiling on the **padded** audio held in flight for one decoding call. A batch is padded to its longest segment, so what it costs is that longest segment times the number of segments in it, not the sum of their durations — and that product is what this bounds. A two-minute segment therefore travels with at most one companion, while thirty-second segments still batch four at a time. Bounding the sum instead let a two-minute segment drag three short ones into its padding, which is where the 7.1 GB peak on real meeting audio came from. `0` disables it and leaves only `BATCH_SIZE`. |
@@ -155,7 +155,7 @@ Cost, same runs:
 
 | | `none` (float32, default) | `int8` |
 | --- | --- | --- |
-| On disk | 2.5 GB | 640 MB |
+| On disk | 2.5 GB | 670 MB |
 | Peak resident memory, read speech | 2.74 – 2.86 GB | 1.38 – 1.40 GB |
 | Peak resident memory, meeting pipeline | 3.21 – 3.59 GB | 2.09 – 2.73 GB |
 | CPU-seconds per second of audio | 0.645 | 0.650 |
@@ -438,6 +438,7 @@ of this works is in [Teams setup](teams-setup.md).
 | `AUDIO_REPAIR_AFTER_SECONDS` | int | `45` | How long the recording has to stay flat before the browser's playback stream is moved back onto the capture sink. |
 | `AUDIO_REPAIR_ATTEMPTS` | int | `4` | How many such repairs one meeting may attempt. Past that the capture keeps running and the failure is left to the diagnostics. |
 | `RECORDER_RESTART_ATTEMPTS` | int | `3` | How many times ffmpeg may be restarted into a fresh segment after it dies or stalls mid-meeting. The segments are stitched back together at the end. `0` restores the old behaviour: one failure ends the capture. |
+| `FAIL_ON_SILENCE` | bool | `false` | `true` makes a capture that measured as silence raise `CaptureError` instead of being handed to the pipeline. The recording is finished and on disk either way; failing the job throws away a meeting that may simply have been quiet, which is why this is off. The silence is still logged as `capture.silent_recording`, counted by `hansard_capture_silent_total`, and carried in `diagnostics.silence`. |
 
 ---
 
@@ -589,6 +590,8 @@ Prefix `HANSARD_RUNTIME__`.
 | `WORKSPACE` | path | `/var/lib/hansard` | Scratch directory for captured audio and intermediate files. On a bare-metal install point it somewhere your user can write. |
 | `MODELS_DIR` | path | `/var/lib/hansard/models` | Root of the model bundle. **The setting you will change first on a laptop.** The container images override it to `/models`. Layout in [installation](installation.md#the-expected-layout). |
 | `ALLOW_MODEL_DOWNLOADS` | bool | `false` | When `false`, a missing model is a hard error rather than a silent download. Leave it off: it is the property that makes an air gap enforceable, and CI runs transcription with the network disabled to prove it. |
+| `JOB_STORE` | `filesystem` \| `memory` | `filesystem` | Where `hansard serve` keeps its job records. `filesystem` writes one small JSON per job under `<WORKSPACE>/jobs/`, so a worker restart does not lose meetings that were in flight. `memory` restores the old behaviour: faster, and everything in flight is lost with the process. |
+| `RECOVER_JOBS` | bool | `true` | On start-up, re-queue every job the previous process left unfinished. A job whose recording is on disk is resumed as a file transcription; a job interrupted before anything was recorded is failed with an explicit reason instead of being left `capturing` forever. Requires `JOB_STORE=filesystem` to have anything to recover. |
 | `MAX_CONCURRENT_MEETINGS` | int | `2` | Number of concurrent job workers inside one `hansard serve` process. Each concurrent meeting holds its own recogniser in memory, so budget roughly 2.8 GB per unit at the float32 default, or 1.4 GB with `HANSARD_ASR__QUANTIZATION=int8`, before raising it. It does not apply to `hansard transcribe` or `hansard join`, which process one meeting each. |
 | `LOG_LEVEL` | str | `INFO` | Level applied to Hansard and to every third-party library, through the stdlib root logger. `DEBUG` adds one `stage.started` event per pipeline stage. |
 | `LOG_FORMAT` | `json` \| `console` | `json` | `json` emits one JSON object per line on stdout; `console` emits a readable aligned line. Both go through the redaction and content-elision processors. See [observability](observability.md). |

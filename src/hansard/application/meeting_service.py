@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -31,6 +32,13 @@ from hansard.rendering.registry import minutes_renderer_for, transcript_renderer
 
 LOGGER = get_logger(__name__)
 
+StateReporter = Callable[[JobState], Awaitable[None]]
+
+
+async def _report(reporter: StateReporter | None, state: JobState) -> None:
+    if reporter is not None:
+        await reporter(state)
+
 
 @dataclass(slots=True)
 class MeetingService:
@@ -47,14 +55,19 @@ class MeetingService:
         return tuple(
             DeliveryTarget(
                 channel=DeliveryChannel(channel),
-                address=str(self.settings.delivery.output_dir),
+                address=self._default_address(DeliveryChannel(channel)),
                 formats=self.settings.delivery.formats,
             )
             for channel in self.settings.delivery.default_channels
             if channel in {item.value for item in DeliveryChannel}
         )
 
-    async def execute(self, record: JobRecord) -> JobRecord:
+    def _default_address(self, channel: DeliveryChannel) -> str:
+        if channel is DeliveryChannel.FILESYSTEM:
+            return ""
+        return str(self.settings.delivery.output_dir)
+
+    async def execute(self, record: JobRecord, on_state: StateReporter | None = None) -> JobRecord:
         request = record.request
         logger = LOGGER.bind(meeting=request.identifier)
         workspace = self.settings.runtime.workspace / request.identifier
@@ -63,13 +76,16 @@ class MeetingService:
             captured = await self._acquire(request, workspace)
             measured["audio_seconds"] = round(captured.duration, 1)
         request = replace(request, starts_at=request.starts_at or captured.started_at)
+        await _report(on_state, JobState.TRANSCRIBING)
         with stage_span(logger, "transcribe") as measured:
             transcript, roster, stages = await asyncio.to_thread(self._transcribe, captured, request)
             measured["words"] = float(transcript.word_count)
             measured["speakers"] = float(len(transcript.speakers))
+        await _report(on_state, JobState.SUMMARIZING)
         with stage_span(logger, "minutes") as measured:
             minutes = await asyncio.to_thread(self._compose, transcript, roster, request)
             measured["composed"] = float(minutes is not None)
+        await _report(on_state, JobState.DELIVERING)
         with stage_span(logger, "render") as measured:
             artifacts = await asyncio.to_thread(
                 self._render, transcript, minutes, roster, request, captured, workspace

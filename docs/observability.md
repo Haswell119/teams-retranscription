@@ -192,7 +192,7 @@ starts a standalone exporter over the same registry, on `HANSARD_API__PORT` (def
 | --- | --- | --- | --- |
 | `hansard_build_info` | info | — | Version, component, ASR engine, model, compute type, configured language. |
 | `hansard_meetings_scheduled_total` | counter | — | Meetings accepted by the API. |
-| `hansard_job_state_transitions_total` | counter | `state` | Job lifecycle, counted by the state entered (`pending`, `transcribing`, `completed`, `failed`). |
+| `hansard_job_state_transitions_total` | counter | `state` | Job lifecycle, counted by the state entered: `pending`, `capturing`, `transcribing`, `summarizing`, `delivering`, `completed`, `failed`. The phase a job is in is what decides whether a restart can resume it — see [troubleshooting](troubleshooting.md#the-worker-restarted-and-a-meeting-disappeared). |
 | `hansard_queue_pending` | gauge | `stream`, `group` | Jobs waiting in the in-process queue. |
 | `hansard_asr_transcribe_duration_seconds` | histogram | `model`, `compute`, `language` | Wall-clock seconds spent recognising one meeting. |
 | `hansard_asr_realtime_factor` | histogram | `model`, `compute`, `language` | Processing seconds ÷ audio seconds. Below 1 is faster than real time. |
@@ -206,6 +206,7 @@ starts a standalone exporter over the same registry, on `HANSARD_API__PORT` (def
 | `hansard_capture_audio_repairs_total` | counter | `result` | Attempts to move the browser's playback stream back onto the capture sink: `moved` when something changed, `noop` when the routing was already right, `failed` when PulseAudio would not answer. |
 | `hansard_capture_recorder_restarts_total` | counter | `result` | ffmpeg restarts after it died or stalled mid-meeting: `restarted`, or `exhausted` when the restart budget was spent and the capture had to stop. |
 | `hansard_capture_stops_total` | counter | `reason` | Why each finished capture stopped: `meeting_ended`, `removed`, `max_duration`, `silence_timeout`, `alone_timeout`, `state_lost`, `recorder_failed`. |
+| `hansard_capture_silent_total` | counter | — | Finished captures whose audio measured as silence. These are still transcribed; the counter is how you notice a fleet-wide routing regression. |
 
 The `language` label is bounded: it is normalised to a two-letter code from a known list, and
 anything else becomes `unknown`. A meeting in an unexpected language can therefore never create a

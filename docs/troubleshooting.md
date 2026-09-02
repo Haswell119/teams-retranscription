@@ -345,11 +345,17 @@ increase(hansard_capture_audio_repairs_total{result="moved"}[1h])
 If `capture.audio_rerouted` never appears and the peak stays flat, the routing
 was already correct and the cause is elsewhere in the list below.
 
-### `CaptureError: the capture contains no audible audio ...`
+### The transcript came back empty, and the log says `capture.silent_recording`
 
-The recorder measures the finished file with ffmpeg `volumedetect` and refuses to
-hand back silence. The full message lists the causes in order of likelihood, and
-they are worth taking in that order:
+The recorder measures the finished file with ffmpeg `volumedetect`. A capture
+that measures as silence is **not** thrown away: the meeting was recorded once
+and cannot be recorded again, and a peak a decibel under the floor is not
+grounds for destroying it. The recording goes to the pipeline, the reading is
+carried in `diagnostics.silence`, `hansard_capture_silent_total` counts it, and
+the log carries the full diagnosis at `error` level. Set
+`HANSARD_CAPTURE__FAIL_ON_SILENCE=true` if you would rather the job fail.
+
+The causes are worth taking in order of likelihood:
 
 1. **Playwright launched Chromium with its default `--mute-audio`.** The most
    common cause by a distance. Chromium must be launched with that default
@@ -365,6 +371,10 @@ they are worth taking in that order:
 3. **The meeting was never joined, or nobody spoke.** Cross-check
    `diagnostics.stop_reason` and the roster.
 4. **The tab was never granted audio permission** for the meeting origin.
+
+The first two are what the in-meeting probe above is there to catch and repair
+while the meeting is still running. If `diagnostics.audio_repairs` is zero and
+the peak is at the floor, the routing was never the problem.
 
 ### `CaptureError: ffmpeg stopped writing to ... for 20s; the PulseAudio monitor '...' produced no data`
 
@@ -540,6 +550,45 @@ shows which timeout is firing across a fleet.
 Lower `HANSARD_CAPTURE__SILENCE_TIMEOUT_SECONDS` for short test meetings — with
 the 600s default a bot that misses the end signal keeps recording silence for
 ten minutes.
+
+---
+
+## The worker restarted and a meeting disappeared
+
+Transcribing an hour of audio takes about forty-five minutes. That is a long
+window in which a pod can be rescheduled, and everything in it used to be lost:
+job records lived only in the process, so a restart left the recording sitting
+in `<WORKSPACE>/<meeting id>/<meeting id>.wav` with nothing that knew it was
+there.
+
+`hansard serve` now keeps one small JSON per job under `<WORKSPACE>/jobs/`
+(`HANSARD_RUNTIME__JOB_STORE`, `filesystem` by default) and, on start-up,
+re-queues what the previous process left unfinished
+(`HANSARD_RUNTIME__RECOVER_JOBS`):
+
+| What the previous process was doing | What happens on restart |
+| --- | --- |
+| `pending` — the job never started | queued again, exactly as submitted |
+| `capturing` and a recording is on disk | resumed **as a file transcription**: the join URL is dropped and the recorded WAV is transcribed |
+| `capturing` and nothing was recorded | failed with an explicit reason — a meeting that has moved on cannot be rejoined |
+| `transcribing`, `summarizing`, `delivering` | resumed from the recording |
+| `completed`, `failed`, `cancelled` | left alone |
+
+```
+job.recovered   resumed=2 abandoned=1
+job.abandoned   meeting=<id> reason=the worker stopped during the meeting ...
+```
+
+A recording interrupted mid-write has no valid length in its header — ffmpeg
+never got to rewrite it — and `libsndfile` reads such a file as **zero frames
+without raising**. That would resume a meeting into a confidently empty
+transcript, so a WAV that reads as empty while carrying real bytes is decoded
+again through ffmpeg, which reads it to the end.
+
+What this does *not* cover: `hansard transcribe`, `hansard join` and the inbox
+watcher each process one meeting in one process and keep their records in
+memory by design. For the watcher, the inbox is the durable queue — a file
+interrupted mid-run stays in `.processing/` and needs moving back by hand.
 
 ---
 
