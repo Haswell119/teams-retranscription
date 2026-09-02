@@ -487,8 +487,28 @@ resident set and 1.9 GB of disk — and it pays for that memory in accuracy.
 
 ## 6. Engineering findings worth knowing
 
-Two results from this benchmarking changed the design, and both are the kind of
-thing that is easy to get wrong silently.
+Four results from this benchmarking changed the design, and all four are the kind
+of thing that is easy to get wrong silently.
+
+**A recognizer's rank on read speech does not survive contact with a meeting.**
+Twice now. INT8 weights cost 0.1–2.0 points on FLEURS and LibriSpeech and
+**deleted nearly half the words** on real AMI audio. NVIDIA Canary 1B v2 beats
+Parakeet on the Open ASR multilingual French track (4.83 against 5.42) and scored
+**38.01 % against 30.82 %** on identical French meeting segments, losing in every
+overlap band and every duration band. A candidate recognizer is qualified on
+spontaneous multi-party audio or it is not qualified. `make bench-shootout` is
+the cheapest way to do that, because it decodes reference-boundary segments and
+takes the segmentation out of the argument.
+
+**A threshold belongs to an embedding space, not to a pipeline.** Swapping
+TitaNet-small for WeSpeaker ResNet34-LM — a model with roughly half the equal
+error rate — while keeping `merge_similarity = 0.77` collapsed four speakers into
+one and took cpWER from 63.19 % to 90.50 %. That is not a verdict on the
+embedding; it is a verdict on reusing a number calibrated in a different cosine
+geometry. Any embedding change has to carry its own threshold sweep, which is why
+the sweep tool shares one clustering pass across every threshold in a space.
+
+
 
 **Loudness normalisation degrades speaker attribution.** Applying EBU R128
 normalisation before diarization produced five clusters for a three-speaker
