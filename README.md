@@ -7,7 +7,7 @@ Runs entirely on your own infrastructure. Nothing leaves your network.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-1152%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-1220%20passing-brightgreen.svg)](tests/)
 [![Languages](https://img.shields.io/badge/languages-fran%C3%A7ais%20%7C%20english-blue.svg)](docs/benchmarks.md)
 
 </div>
@@ -73,6 +73,15 @@ languages, without being told in advance:
 | 6 | **5.56 %** | **6.48 %** |
 | 9 | **6.51 %** | **13.36 %** |
 
+**French and English in the same meeting**, which is the case Teams handles by
+making you pick one language. Three code-switched fixtures, no language tag
+given: macro **19.21 %** cpWER, **10.33 %** WER, **3.90 %** WDER, and **96.33 %**
+of words labelled with the language they were actually spoken in. That last
+number is under our own 98 % gate, and the errors run one way — 105 French words
+called English against 41 the other way — because the language is currently
+decided from our own recognized text rather than from the audio. See
+[benchmarks §2.3](docs/benchmarks.md#23-code-switched-meetings-french-and-english-in-one-room).
+
 **Real meetings.** Those fixtures are clean recordings mixed together, which is
 far easier than a real room, so we also measure on corpora of genuine
 spontaneous speech — and these are the numbers to judge us on:
@@ -93,6 +102,27 @@ the Azure figure comes from a third party using its own reference preparation.
 Where we lose, and why, is written down in
 [benchmarks §8](docs/benchmarks.md#8-where-we-lose).
 
+**We now know where the French words go, and it is not French.** Handing the
+recognizer the corpus's own utterance boundaries across seven SUMM-RE meetings
+leaves 30.82 % word error, so segmentation is worth about seven points and not
+the twenty-five that were missing. Splitting those same results by how much of
+each utterance somebody *else* is talking over gives the real answer:
+
+| Overlap with another speaker | Reference words | WER |
+| --- | ---: | ---: |
+| clean, under 5 % | 3758 | **20.60 %** |
+| light, 5–50 % | 2154 | 23.35 % |
+| heavy, over 50 % | 1232 | **70.54 %** |
+
+Heavily overlapped speech is 17 % of the words and 39 % of the errors. On clean
+French spontaneous speech the shipped model scores 20.6 %, close to what it
+scores on English AMI. It is not bad at French; it is bad at two people at once,
+and on the single mixed stream Teams hands us it has no way to be anything else.
+Replacing it with a bigger model does not help — NVIDIA Canary 1B v2, which
+outranks it on French read speech, scored 38.01 % on identical audio and lost in
+every band. The experiment log is
+[quality-research](docs/quality-research.md).
+
 **Speed and memory.** A 60-minute recording is transcribed and diarized in about
 44 minutes on that 4-core machine, peaking at 3.6 GB of RAM on the English
 fixtures and 4.1 GB on the French ones. INT8 weights ship alongside as an opt-in
@@ -100,10 +130,10 @@ low-memory profile (`HANSARD_ASR__QUANTIZATION=int8`, ~1.4 GB resident instead o
 ~2.8 GB). They are **not** the default and not faster: INT8 costs about **2.0 WER
 points in French**, and deletes words wholesale on real meeting audio.
 
-**Not yet measured:** a code-switched French/English meeting run, NOTSOFAR-1,
-more than one real French meeting, and a head-to-head against a live Teams
-transcript. [Benchmarks §9](docs/benchmarks.md#9-what-we-have-not-measured-yet)
-keeps that list honest.
+**Not yet measured:** NOTSOFAR-1, any speech-separation front-end, and a
+head-to-head against a live Teams transcript.
+[Benchmarks §9](docs/benchmarks.md#9-what-we-have-not-measured-yet) keeps that
+list honest.
 
 ## Quick start
 
