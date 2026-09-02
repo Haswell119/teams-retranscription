@@ -176,3 +176,26 @@ def test_french_numbers_glued_to_letters_are_left_alone(token):
 
 def test_french_standalone_numbers_still_expand():
     assert FRENCH.normalize("le 35 mm en 2005") == "le trente cinq mm en deux mille cinq"
+
+
+def test_okay_and_ok_are_the_same_word_in_both_languages():
+    from hansard.evaluation.normalizers import normalizer_for
+
+    for language in ("fr", "en", "mixed"):
+        normalizer = normalizer_for(language)
+        assert normalizer.normalize("okay") == normalizer.normalize("ok")
+
+
+def test_every_spelling_of_et_cetera_lands_on_one_token():
+    from hansard.evaluation.normalizers import normalizer_for
+
+    for language in ("fr", "en"):
+        normalizer = normalizer_for(language)
+        forms = {normalizer.normalize(form) for form in ("etc", "etc.", "et cetera", "etcetera")}
+        assert len(forms) == 1
+
+
+def test_unification_does_not_reach_inside_a_longer_word():
+    from hansard.evaluation.normalizers import normalizer_for
+
+    assert "sketchy" in normalizer_for("en").normalize("that looks sketchy")

@@ -12,7 +12,7 @@ from hansard.domain.language import MIXED
 from hansard.evaluation.english_numbers import normalize_digit_groups, words_to_digits
 from hansard.evaluation.french_numbers import expand_numbers
 
-NORMALIZER_VERSION = "hansard-normalizers-1.2.0"
+NORMALIZER_VERSION = "hansard-normalizers-1.3.0"
 
 _BRACKETED = re.compile(r"[<\[][^>\]]*[>\]]")
 _PARENTHESISED = re.compile(r"\(([^)]+?)\)")
@@ -27,6 +27,19 @@ _FRENCH_ISSUE_NUMBER = re.compile(r"n\s*[°ºo]\s*(?=\d)")
 _SPACE_BEFORE_APOSTROPHE = re.compile(r"\s+'")
 _TRAILING_SYMBOL = re.compile(r"[.$¢€£]([^0-9])")
 _PERCENT_AFTER_WORD = re.compile(r"([^0-9])%")
+_SPELLINGS: tuple[tuple[str, str], ...] = (
+    (r"\bokay\b", "ok"),
+    (r"\bet\s+cetera\b", "etcetera"),
+    (r"\betc\b", "etcetera"),
+)
+
+
+def unify_spellings(text: str) -> str:
+    result = text
+    for pattern, replacement in _SPELLINGS:
+        result = re.sub(pattern, replacement, result)
+    return result
+
 
 _ENGLISH_REPLACERS: tuple[tuple[str, str], ...] = (
     (r"\bwon't\b", "will not"),
@@ -190,8 +203,8 @@ class EnglishNormalizer:
         if self.prefer_installed_whisper and self.british_to_american:
             reference_implementation = load_whisper_english_normalizer()
             if reference_implementation is not None:
-                return collapse_whitespace(reference_implementation(text))
-        return self._normalize_locally(text)
+                return collapse_whitespace(unify_spellings(reference_implementation(text)))
+        return unify_spellings(self._normalize_locally(text))
 
     def _normalize_locally(self, text: str) -> str:
         result = unicodedata.normalize("NFKC", text).lower()
@@ -238,6 +251,7 @@ class FrenchNormalizer:
             result = remove_diacritics(result)
         result = replace_punctuation(result)
         result = _FRENCH_NUMBER_PLURALS.sub(r"\1", result)
+        result = unify_spellings(result)
         if self.remove_fillers:
             result = _FRENCH_FILLERS.sub(" ", result)
         return collapse_whitespace(result)

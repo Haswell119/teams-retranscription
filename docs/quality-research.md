@@ -87,6 +87,41 @@ corpus was widened before anything was tuned.
 
 ---
 
+## Running these experiments yourself
+
+Three commands cover everything in this log. All of them write to
+`bench/results/` and none of them publishes a headline number.
+
+```bash
+make bench-data-summre SUMM_RE_MEETINGS=8      # tuning split, streamed and deleted shard by shard
+make bench-shootout ENGINES=parakeet-fp32,canary-1b-v2-fr SHOOTOUT_SECONDS=1800
+make bench-sweep CORPUS=summ-re
+```
+
+**The shootout** decodes reference utterance spans — no detector, no padding, no
+seams — through every engine named, scores them with one normalizer, and reports
+word error split by language, by word category, and by how much of each segment
+another participant is talking over. Every hypothesis is written to
+`bench/results/transcripts/`, so a change to the reference or the normalizer can
+be re-scored in seconds without decoding anything again. That is how iteration 2
+below was measured.
+
+**The sweep** runs recognition once per meeting, caches the transcript and the
+speech spans, and then re-diarizes and re-attributes those same words for every
+point on the grid. A point is written on the command line:
+
+```bash
+.venv/bin/python -m hansard.evaluation.run diarization-sweep --corpus summ-re \
+  --point "default:" \
+  --point "no-gap-fill:min_duration_off=0.0" \
+  --point "wespeaker:embedding_model=wespeaker_en_voxceleb_resnet34_LM.onnx"
+```
+
+Because the words are identical across points, a difference in cpWER is a
+difference in speaker handling and nothing else.
+
+---
+
 ## Iterations
 
 Each iteration below states the hypothesis, the smallest experiment that could
@@ -283,6 +318,50 @@ benchmarks you expect to fail.
 
 The real-time-factor stretch gates fail across the board at 0.35 and are ignored
 for this campaign by instruction: quality first, speed later.
+
+### Iteration 6 — what the French errors actually are
+
+**Hypothesis.** Word error is a number, not a diagnosis. Before spending
+anything on French, look at which words are wrong.
+
+**Experiment.** Align every Parakeet hypothesis against its reference on the
+seven tuning meetings and count the individual substitutions, deletions and
+insertions.
+
+**Result.** Two findings, one a defect in our scoring and one a defect in the
+system.
+
+*The backchannels are being translated.* The most frequent substitutions are not
+mishearings, they are language switches on single words:
+
+| Reference | Produced | Count |
+| --- | --- | ---: |
+| `ouais` | `well` / `right` / `yeah` / `what` | 21 |
+| `non` | `no` | 7 |
+| `oui` | `yeah` / `right` | 5 |
+| `et` | `yeah` | 4 |
+| `voilà` | `no` | 3 |
+
+A monosyllabic French backchannel carries almost no acoustic evidence of which
+language it belongs to, and the recognizer resolves the ambiguity towards
+English. This is the same failure the code-switched run measures as 105 French
+words labelled English, arriving through word error instead of through language
+accuracy — and it is worth about 0.6 points here.
+
+*And `ok` was scoring as an error against `okay`.* Ten substitutions, plus three
+for `et cetera` against `etcetera`, were one word written two ways. The
+normalizer now unifies both spellings in French, in English and in the mixed
+path, which moves reference-boundary word error from **30.82 % to 30.59 %** on
+unchanged hypotheses. Normalizer version `hansard-normalizers-1.3.0`.
+
+*The deletions are function words and elisions.* `est` (56), `ouais` (39), `c`
+(32), `le` (29), `ça` (29), `je` (18). Not names, not numbers, not jargon — the
+unstressed glue of spoken French, which is exactly what disappears first under
+another speaker's voice.
+
+**Conclusion.** KEEP the normalizer fix. KEEP the backchannel finding as the
+first concrete demonstration that the bilingual defect costs words and not only
+labels.
 
 ---
 
