@@ -147,3 +147,60 @@ def test_the_real_time_factor_uses_the_audio_that_was_decoded():
     segments = [segment("a", 0.0, 10.0)]
     outcome = score_engine(EngineSpec(name="stub"), segments, ["bonjour"], 5.0, 100.0, 0)
     assert outcome.real_time_factor == 0.5
+
+
+def write_jsonl(path, records):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(json.dumps(item) for item in records), encoding="utf-8")
+    return path
+
+
+def test_a_saved_run_can_be_scored_again_without_the_recogniser(tmp_path):
+    from hansard.evaluation.shootout import rescore
+
+    path = write_jsonl(
+        tmp_path / "engine.jsonl",
+        [
+            {
+                "meeting": "a",
+                "speaker": "017",
+                "start": 0.0,
+                "end": 2.0,
+                "language": "fr",
+                "reference": "le budget",
+                "hypothesis": "le budget",
+            }
+        ],
+    )
+    _, hypotheses, outcome = rescore(path)
+    assert hypotheses == ("le budget",)
+    assert outcome.outcome_for("fr").wer == 0.0
+
+
+def test_rescoring_can_substitute_a_corrected_reference(tmp_path):
+    from hansard.evaluation.shootout import rescore
+
+    path = write_jsonl(
+        tmp_path / "engine.jsonl",
+        [
+            {
+                "meeting": "a",
+                "speaker": "017",
+                "start": 0.0,
+                "end": 2.0,
+                "language": "fr",
+                "reference": "le plus budget",
+                "hypothesis": "le budget",
+            }
+        ],
+    )
+    assert rescore(path)[2].outcome_for("fr").deletions == 1
+    corrected = {("a", 0.0, 2.0): "le budget"}
+    assert rescore(path, references=corrected)[2].outcome_for("fr").deletions == 0
+
+
+def test_the_reference_index_keys_on_meeting_and_span():
+    from hansard.evaluation.shootout import reference_index
+
+    index = reference_index([segment("a", 0.0, 2.0, reference="bonjour")])
+    assert index == {("a", 0.0, 2.0): "bonjour"}

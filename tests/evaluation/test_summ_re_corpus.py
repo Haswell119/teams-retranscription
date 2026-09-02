@@ -87,3 +87,48 @@ def test_the_mixture_spans_the_longest_track(tmp_path):
     info = sf.info(str(tmp_path / "m1" / "mixed.wav"))
     assert info.samplerate == 16_000
     assert round(info.duration) == 9
+
+
+def test_pause_markers_never_become_words():
+    from hansard.evaluation.corpora import strip_annotation
+
+    assert strip_annotation("ensuite euh + donc voilà") == "ensuite euh donc voilà"
+    assert strip_annotation("alors qui + qui + serait") == "alors qui qui serait"
+
+
+def test_laughter_and_unintelligible_markers_are_dropped():
+    from hansard.evaluation.corpora import strip_annotation
+
+    assert strip_annotation("donc * enfin @ oui") == "donc enfin oui"
+
+
+def test_multiword_joiners_become_spaces():
+    from hansard.evaluation.corpora import strip_annotation
+
+    assert strip_annotation("il_y a de#temps") == "il y a de temps"
+
+
+def test_a_word_containing_a_marker_character_survives():
+    from hansard.evaluation.corpora import strip_annotation
+
+    assert strip_annotation("c++ et j'ai") == "c++ et j'ai"
+
+
+def test_the_reader_strips_annotation_from_the_reference(tmp_path):
+    _write_summ_re_meeting(
+        tmp_path / "m1",
+        [track("017", [segment(0.5, 2.0, "alors + on commence @ le budget")])],
+    )
+    meeting = read_meeting(tmp_path / "m1")
+    assert meeting_transcript(meeting).text == "alors on commence le budget"
+
+
+def test_an_utterance_that_is_only_annotation_is_dropped(tmp_path):
+    _write_summ_re_meeting(
+        tmp_path / "m1",
+        [track("017", [segment(0.5, 1.0, "+ @"), segment(2.0, 3.0, "d'accord")])],
+    )
+    records = json.loads((tmp_path / "m1" / "017.json").read_text(encoding="utf-8"))
+    meeting = read_meeting(tmp_path / "m1")
+    assert len(records) == 2
+    assert [item.text for item in meeting.tracks[0].utterances] == ["d'accord"]

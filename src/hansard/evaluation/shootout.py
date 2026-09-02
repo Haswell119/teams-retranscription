@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -340,6 +340,44 @@ def run_shootout(
             _write_transcripts(transcripts_dir / f"{spec.name}.jsonl", ordered, hypotheses)
         outcomes.append(score_engine(spec, ordered, hypotheses, elapsed, memory, failures, glossary))
     return tuple(outcomes)
+
+
+def rescore(
+    path: Path,
+    name: str | None = None,
+    glossary: Iterable[str] = (),
+    references: Mapping[tuple[str, float, float], str] | None = None,
+) -> tuple[tuple[ShootoutSegment, ...], tuple[str, ...], EngineOutcome]:
+    segments: list[ShootoutSegment] = []
+    hypotheses: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        key = (str(record["meeting"]), float(record["start"]), float(record["end"]))
+        reference = record["reference"] if references is None else references.get(key, record["reference"])
+        segments.append(
+            ShootoutSegment(
+                corpus=str(record.get("corpus", "summ-re")),
+                meeting=key[0],
+                speaker=str(record.get("speaker", "")),
+                language=str(record.get("language", "fr")),
+                audio=Path(str(record.get("audio", ""))),
+                span=TimeSpan(key[1], key[2]),
+                reference=str(reference),
+            )
+        )
+        hypotheses.append(str(record.get("hypothesis", "")))
+    spec = EngineSpec(name=name or path.stem)
+    outcome = score_engine(spec, segments, hypotheses, 0.0, 0.0, 0, glossary)
+    return tuple(segments), tuple(hypotheses), outcome
+
+
+def reference_index(segments: Sequence[ShootoutSegment]) -> dict[tuple[str, float, float], str]:
+    return {
+        (segment.meeting, round(segment.span.start, 3), round(segment.span.end, 3)): segment.reference
+        for segment in segments
+    }
 
 
 def shootout_payload(

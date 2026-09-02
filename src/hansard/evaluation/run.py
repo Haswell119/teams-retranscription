@@ -85,6 +85,7 @@ class RunOptions:
     transcripts: Path | None = None
     minimum_segment_seconds: float = 0.4
     points: tuple[str, ...] = ()
+    meetings: tuple[str, ...] = ()
     cache: Path = Path("bench/cache")
 
 
@@ -409,11 +410,14 @@ def run_shootout_benchmark(options: RunOptions) -> dict[str, object]:
     settings.asr.intra_op_threads = options.threads
     if options.corpus == "ami":
         segments = ami_segments(options.data_dir / "ami", options.data_dir / "ami" / "annotations")
+        if options.meetings:
+            segments = tuple(item for item in segments if item.meeting in options.meetings)
     else:
         segments = summ_re_segments(
             options.data_dir / "summ-re",
             minimum_seconds=options.minimum_segment_seconds,
             split=options.split,
+            meetings=options.meetings or None,
         )
     selected = budgeted(segments, options.seconds)
     specs = tuple(preset(name) for name in options.engines) or (preset("parakeet-fp32"),)
@@ -445,6 +449,8 @@ def sweep_meetings(options: RunOptions) -> tuple[SweepMeeting, ...]:
         return ()
     meetings: list[SweepMeeting] = []
     for directory in sorted(item for item in root.iterdir() if item.is_dir()):
+        if options.meetings and directory.name not in options.meetings:
+            continue
         if options.split is not None and summ_re_split(directory.name) != options.split:
             continue
         meeting = read_meeting(directory)
@@ -528,6 +534,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="a sweep point, as label:key=value,key=value",
     )
     parser.add_argument("--cache", type=Path, default=Path("bench/cache"))
+    parser.add_argument(
+        "--meetings", default="", help="comma separated meeting identifiers to restrict the run to"
+    )
     return parser
 
 
@@ -547,6 +556,7 @@ def main(argv: list[str] | None = None) -> int:
         minimum_segment_seconds=arguments.min_segment_seconds,
         points=tuple(arguments.point),
         cache=arguments.cache,
+        meetings=tuple(name for name in arguments.meetings.split(",") if name),
     )
     runners = {
         "asr": run_asr,
