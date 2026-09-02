@@ -278,10 +278,14 @@ WER averages that away.
 
 ## Limits, stated plainly
 
-- **No French/English meeting benchmark has been published yet.** The fixtures and
-  the gates exist and run; the numbers in [benchmarks](benchmarks.md) do not yet
-  include a mixed row, because none has been recorded on real hardware. We would
-  rather leave the cell empty than fill it with a monolingual number.
+- **The French/English meeting benchmark is now published, and it does not pass
+  the stretch gate.** Three fixtures, macro **19.21 %** cpWER, **10.33 %** WER,
+  **3.90 %** WDER and **96.33 %** language accuracy — over the 95 % must-pass and
+  under the 98 % stretch. The full table is in
+  [benchmarks §2.3](benchmarks.md#23-code-switched-meetings-french-and-english-in-one-room).
+  The errors are not symmetric: **105 French words were labelled English and 41
+  English words were labelled French**, which is the failure the next bullet
+  predicts, now measured rather than asserted.
 - **The synthetic mixed fixtures model inter-speaker switching only.** Each
   synthetic speaker speaks one language, because the source corpora are
   monolingual and splicing French audio onto an English speaker's voice would
@@ -291,7 +295,13 @@ WER averages that away.
   recogniser produced. If the recogniser mis-transcribes a French passage as
   English words, the identifier will faithfully report English — it measures output,
   not truth. That is the correct behaviour for a comparison harness and a real
-  limitation for error analysis.
+  limitation for error analysis. The measured asymmetry above is this loop closing
+  on itself: the recognition error and the language error share a cause and
+  confirm each other. Breaking it needs a language decision taken from the audio
+  rather than from our own transcript, and that has not been built. Note what it
+  does **not** cost today: Parakeet TDT v3 has no language token — the
+  `language` argument is accepted and ignored — so a wrong label changes what the
+  transcript *says about itself*, not which words come out.
 - **Only French and English.** Parakeet decodes 25 languages, and the pipeline will
   transcribe them, but the cue sets, stopwords, date grammars and identification
   markers exist for `fr` and `en` only. A third language will transcribe and will
