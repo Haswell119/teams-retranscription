@@ -67,6 +67,8 @@ MEETING_FIXTURES: tuple[tuple[str, str], ...] = (
     ("meeting_mixed_4spk", MIXED),
     ("meeting_mixed_6spk", MIXED),
     ("meeting_mixed_8spk", MIXED),
+    ("meeting_mixed_5spk_heldout", MIXED),
+    ("meeting_mixed_7spk_heldout", MIXED),
 )
 AMI_CONDITION = "Mix-Headset"
 

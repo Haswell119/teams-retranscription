@@ -110,6 +110,10 @@ class UtteranceLanguageTagger:
     identifier: TextLanguageIdentifier = TextLanguageIdentifier()
     default_language: str | None = None
     trust_engine_tags: bool = False
+    revise_weak_verdicts: bool = True
+    weak_confidence: float = 0.55
+    weak_evidence: float = 3.0
+    context_confidence: float = 0.70
 
     def _verdicts(self, transcript: Transcript) -> list[LanguageVerdict]:
         return [self.identifier.identify(utterance) for utterance in transcript.utterances]
@@ -127,8 +131,33 @@ class UtteranceLanguageTagger:
         verdicts = self._verdicts(transcript)
         seeded = self._seed(transcript, verdicts)
         speakers = tuple(utterance.speaker for utterance in transcript.utterances)
+        if self.revise_weak_verdicts:
+            seeded = self._revised(seeded, verdicts, speakers)
         fallback = _fallback(tags_of(verdicts), self.default_language)
         return transcript.with_languages(_smooth(seeded, speakers, fallback))
+
+    def _is_weak(self, verdict: LanguageVerdict) -> bool:
+        evidence = verdict.french_score + verdict.english_score
+        return verdict.confidence < self.weak_confidence or evidence < self.weak_evidence
+
+    def _revised(
+        self,
+        tags: list[str | None],
+        verdicts: Sequence[LanguageVerdict],
+        speakers: Sequence[str],
+    ) -> list[str | None]:
+        strong = [
+            tag if verdict.language is not None and not self._is_weak(verdict) else None
+            for tag, verdict in zip(tags, verdicts, strict=True)
+        ]
+        revised = list(tags)
+        for index, verdict in enumerate(verdicts):
+            if verdict.language is None or not self._is_weak(verdict):
+                continue
+            context = _agreed_context(strong, speakers, index, self.context_confidence, verdicts)
+            if context is not None and context != verdict.language:
+                revised[index] = context
+        return revised
 
 
 def tags_of(verdicts: Sequence[LanguageVerdict]) -> tuple[str, ...]:
@@ -176,4 +205,34 @@ def _nearest(
         for position in ordered:
             if 0 <= position < len(tags) and tags[position] is not None and accepts(position):
                 return tags[position]
+    return None
+
+
+def _agreed_context(
+    strong: Sequence[str | None],
+    speakers: Sequence[str],
+    index: int,
+    confidence: float,
+    verdicts: Sequence[LanguageVerdict],
+) -> str | None:
+    before = _scan(strong, speakers, index, -1, confidence, verdicts)
+    after = _scan(strong, speakers, index, 1, confidence, verdicts)
+    if before is not None and before == after:
+        return before
+    return None
+
+
+def _scan(
+    strong: Sequence[str | None],
+    speakers: Sequence[str],
+    index: int,
+    step: int,
+    confidence: float,
+    verdicts: Sequence[LanguageVerdict],
+) -> str | None:
+    position = index + step
+    while 0 <= position < len(strong):
+        if speakers[position] == speakers[index] and strong[position] is not None:
+            return strong[position] if verdicts[position].confidence >= confidence else None
+        position += step
     return None

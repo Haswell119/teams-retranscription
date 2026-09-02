@@ -257,6 +257,33 @@ from the other direction.
 
 Recorded so nobody buys it twice.
 
+### Iteration 5 — where the gates actually stand
+
+Not a hypothesis, a checkpoint. `make gates` scores whatever result files exist,
+so adding the code-switched run added its gates to the tally for the first time.
+
+```
+143/206 gates met  (20 must-pass failures, 43 stretch misses)
+```
+
+The must-pass failures worth naming:
+
+| Gate | Measured | Required |
+| --- | ---: | ---: |
+| `meeting_mixed_8spk` language accuracy | **0.94** | ≥ 0.95 |
+| `meeting_mixed_4spk` CER | 10.39 % | ≤ 10.00 % |
+| `020c_EBPZ` cpWER | 53.16 % | ≤ 30.00 % |
+| `020c_EBPZ` WER | 37.52 % | ≤ 20.00 % |
+| `020c_EBPZ` WDER | 17.17 % | ≤ 12.00 % |
+| `020c_EBPZ` DER | 36.22 % | ≤ 15.00 % |
+
+The bilingual language-accuracy gate is a **new** must-pass failure, and it is
+new only because nobody had run the benchmark. That is the argument for running
+benchmarks you expect to fail.
+
+The real-time-factor stretch gates fail across the board at 0.35 and are ignored
+for this campaign by instruction: quality first, speed later.
+
 ---
 
 ## Dead hypotheses inherited from earlier work

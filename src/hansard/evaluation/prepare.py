@@ -99,6 +99,11 @@ MIXED_MEETING_RECIPES: tuple[MeetingRecipe, ...] = (
     MeetingRecipe("meeting_mixed_8spk", 8, 0.20, 66, utterances_per_speaker=6, language=MIXED),
 )
 
+MIXED_HELD_OUT_RECIPES: tuple[MeetingRecipe, ...] = (
+    MeetingRecipe("meeting_mixed_5spk_heldout", 5, 0.15, 177, language=MIXED),
+    MeetingRecipe("meeting_mixed_7spk_heldout", 7, 0.22, 188, utterances_per_speaker=7, language=MIXED),
+)
+
 
 def _download(url: str, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -620,7 +625,7 @@ def main(argv: list[str] | None = None) -> int:
     if not arguments.skip_meetings and not arguments.skip_mixed_meetings and french_speakers:
         combined, spoken = merge_speaker_pools({"en": speakers, "fr": french_speakers})
         print(f"code-switched pool: {len(combined)} speakers")
-        for recipe in MIXED_MEETING_RECIPES:
+        for recipe in MIXED_MEETING_RECIPES + MIXED_HELD_OUT_RECIPES:
             path = synthesise_meeting(recipe, combined, output, spoken)
             print(f"{recipe.name} -> {path}")
     return 0
