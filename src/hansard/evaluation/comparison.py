@@ -263,13 +263,15 @@ def comparison_payload(comparison: Comparison) -> dict[str, object]:
 
 def comparison_markdown(comparison: Comparison) -> str:
     languages = comparison.reference_languages
-    header = ["| System | WER | cpWER | WDER | Language accuracy | Languages detected |"]
-    header.append("| --- | ---: | ---: | ---: | ---: | --- |")
+    header = ["| System | WER | cpWER | tcpWER@5s | WDER | Names kept | Language accuracy |"]
+    header.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
     for score in comparison.scores:
+        names = score.decomposition.counts_for("proper_noun")
+        kept = f"{_percent(names.recall):.1f} %" if names.reference_words else "n/a"
         header.append(
             f"| {score.name} | {_percent(score.wer):.2f} % | {_percent(score.cpwer):.2f} % | "
-            f"{_percent(score.wder):.2f} % | {_percent(score.language_accuracy):.2f} % | "
-            f"{', '.join(score.detected_languages) or 'none'} |"
+            f"{_percent(score.tcpwer):.2f} % | {_percent(score.wder):.2f} % | {kept} | "
+            f"{_percent(score.language_accuracy):.2f} % |"
         )
     lines = [f"# Comparison — {comparison.meeting}", "", *header]
     if len(languages) > 1:
@@ -282,4 +284,24 @@ def comparison_markdown(comparison: Comparison) -> str:
                 item = score.slice_for(language)
                 cells.append(f"{_percent(item.wer):.2f} %" if item is not None else "n/a")
             lines.append(f"| {score.name} | {' | '.join(cells)} |")
+    lines.extend(_speaker_section(comparison))
     return "\n".join(lines) + "\n"
+
+
+def _speaker_section(comparison: Comparison) -> list[str]:
+    scored = [score for score in comparison.scores if score.speakers is not None]
+    if not scored:
+        return []
+    buckets = tuple(
+        dict.fromkeys(item.bucket for score in scored for item in score.speakers.buckets)  # type: ignore[union-attr]
+    )
+    if not buckets:
+        return []
+    lines = ["", "## Word recall by how long each speaker actually spoke", ""]
+    lines.append(f"| System | {' | '.join(buckets)} |")
+    lines.append(f"| --- | {' | '.join('---:' for _ in buckets)} |")
+    for score in scored:
+        found = {item.bucket: item for item in score.speakers.buckets}  # type: ignore[union-attr]
+        cells = [f"{_percent(found[name].word_recall):.1f} %" if name in found else "n/a" for name in buckets]
+        lines.append(f"| {score.name} | {' | '.join(cells)} |")
+    return lines

@@ -446,6 +446,58 @@ recognized. This means a Teams transcript can be used either as the **hypothesis
 Microsoft against Hansard on your own meetings) or as the **reference** (when Teams output has
 been manually corrected).
 
+### 7.4.1 Running the head-to-head against Teams
+
+The whole point of parsing Teams exports is the one comparison that settles the
+argument: the same meeting, the same audio, one scoring pipeline. It takes four
+files and one command.
+
+1. **The audio and the Teams transcript** from the meeting itself — Graph
+   delivers the transcript as `.vtt`.
+2. **Hansard's transcript** of the same recording:
+   `hansard transcribe meeting.m4a --format json`.
+3. **A human reference.** Correct one of the two transcripts by hand rather than
+   typing from scratch, and correct it *without looking at which system produced
+   it* — a reference edited from Teams output inherits Teams' segmentation and
+   flatters Teams. Save it as `.ref.json` (`{"language", "utterances": [{"start",
+   "end", "speaker", "language", "text"}]}`) or as corrected `.vtt`.
+4. **Optionally a glossary**, one term per line: the company names, product
+   codes and jargon that a general recognizer has never seen. This is the axis
+   where a self-hosted system with custom vocabulary is supposed to win, and
+   without the file it is not measured.
+
+```bash
+hansard compare reference.ref.json \
+  --system teams=teams-export.vtt \
+  --system hansard=artifacts/meeting/transcript.json \
+  --glossary glossary.txt \
+  --meeting "Board, 3 June" \
+  --output bench/results/teams_head_to_head.json \
+  --report bench/results/teams_head_to_head.md
+```
+
+What comes back, for every system, from one normalizer:
+
+* WER, CER, **cpWER** and **tcpWER@5s** — recognition and speaker attribution,
+  scored together and scored with a time constraint;
+* **WDER** — how many correctly recognized words went to the wrong person;
+* **word error by language actually spoken**, which is where a system that
+  commits to one language for the whole meeting loses;
+* **language accuracy**, and which languages each system claims to have heard;
+* **the error decomposition** — proper nouns, numbers, code-switched words,
+  fillers, function words and content words, each with its own recall, so
+  "kept 90 % of the names" and "kept 60 % of the names" stop being the same
+  number;
+* **word recall per speaker and per duration bucket** (`<15 s`, `15–60 s`,
+  `1–5 min`, `>5 min`), which is the only way the participant who spoke for
+  twelve seconds shows up at all.
+
+Two rules keep the result honest. Score both systems from the same reference and
+the same normalizer version — the JSON records `normalizer_version` and
+`comparison_version` for exactly this reason. And do not correct the reference
+against one system's output; if you only have time to correct one transcript,
+correct it against the audio.
+
 ### 7.5 SUMM-RE — French meetings (optional, large)
 
 French *meeting* speech is much harder than French *read* speech, so read-speech corpora cannot

@@ -310,6 +310,10 @@ def compare(
     report: Annotated[
         Path | None, typer.Option("--report", help="Write the Markdown comparison here")
     ] = None,
+    glossary: Annotated[
+        Path | None,
+        typer.Option("--glossary", help="One term per line; scored separately as proper nouns"),
+    ] = None,
 ) -> None:
     from hansard.evaluation.comparison import compare as compare_systems
     from hansard.evaluation.comparison import (
@@ -325,7 +329,8 @@ def compare(
         if not separator:
             raise typer.BadParameter(f"expected name=path, got {entry!r}")
         systems.append((name, load_transcript(Path(location))))
-    comparison = compare_systems(meeting, truth, systems)  # type: ignore[arg-type]
+    terms = _glossary_terms(glossary)
+    comparison = compare_systems(meeting, truth, systems, terms)  # type: ignore[arg-type]
     payload = comparison_payload(comparison)
     markdown = comparison_markdown(comparison)
     if output is not None:
@@ -340,16 +345,21 @@ def compare(
     table.add_column("system")
     table.add_column("WER", justify="right")
     table.add_column("cpWER", justify="right")
+    table.add_column("tcpWER", justify="right")
     table.add_column("WDER", justify="right")
+    table.add_column("names kept", justify="right")
     table.add_column("language accuracy", justify="right")
     for language in comparison.reference_languages:
         table.add_column(f"WER {language}", justify="right")
     for score in comparison.scores:
+        names = score.decomposition.counts_for("proper_noun")
         cells = [
             score.name,
             f"{score.wer * 100:.2f} %",
             f"{score.cpwer * 100:.2f} %",
+            f"{score.tcpwer * 100:.2f} %",
             f"{score.wder * 100:.2f} %",
+            f"{names.recall * 100:.1f} % of {names.reference_words}" if names.reference_words else "n/a",
             f"{score.language_accuracy * 100:.2f} %",
         ]
         for language in comparison.reference_languages:
@@ -357,6 +367,12 @@ def compare(
             cells.append(f"{item.wer * 100:.2f} %" if item is not None else "n/a")
         table.add_row(*cells)
     console.print(table)
+
+
+def _glossary_terms(path: Path | None) -> tuple[str, ...]:
+    if path is None:
+        return ()
+    return tuple(line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
 
 
 def main() -> None:
