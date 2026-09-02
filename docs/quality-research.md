@@ -458,6 +458,70 @@ embedding rather than one per threshold — is the honest version of this test.
 
 ---
 
+## What to do next, in the order the evidence supports
+
+Written down because the ordering changed twice during this campaign and the
+reasons are worth keeping.
+
+**1. Overlapped speech, and nothing else, is the French meeting problem.**
+Seventeen percent of the reference words, thirty-nine percent of the errors, and
+a recognizer that returns silence for utterances buried under another voice
+84.3 % of the time. Every other lever measured here is worth one to seven points;
+this one is worth the difference between 20.60 % and 70.54 %.
+
+The honest position is that we cannot afford the fix on this hardware. Every
+credible single-channel separator for meetings — the NOTSOFAR-1 baseline's
+Conformer CSS, TF-GridNet, MossFormer2, SepFormer — costs one to two orders of
+magnitude more compute than this entire pipeline, and NOTSOFAR's own baseline
+then runs three parallel ASR decodes on the separated streams. On 4 vCPU with no
+GPU that is not a tuning exercise, it is a different machine. **The first thing
+to do with a GPU is measure a separation front-end**, and the harness is ready
+for it: the shootout already reports word error per overlap band, so the question
+"did separation help where it was supposed to?" has a one-command answer.
+
+Two cheaper things are worth trying first, and neither needs a GPU:
+
+- **Teams already tells us who is overlapping.** The browser instrumentation
+  polls `getContributingSources()` on the WebRTC receivers, so during overlap we
+  know *which participants* are contributing even though the audio arrives
+  pre-mixed. That cannot recover a lost word, but it is a strong prior for
+  attribution and speaker counting that no open corpus benchmark can measure and
+  that AMI and SUMM-RE therefore under-state.
+- **Overlap-aware output.** The pyannote segmentation model already emits
+  powerset labels with up to two concurrent speakers; sherpa-onnx collapses them
+  to one. Surfacing the overlap mask would at minimum let the transcript say "two
+  people are talking here" instead of silently dropping one, and would let
+  attribution stop charging an overlapped word to a single speaker.
+
+**2. Speaker over-detection, not quiet speakers, is the diarization problem.**
+Four, five and six clusters where there are three or four people
+([iteration 7](#iteration-7--one-meeting-was-an-anecdote-and-it-was-the-flattering-one)),
+and cpWER charges for every fragment. Quiet-speaker recall is already 100 % on
+these four meetings. The merge threshold is the lever and it is corpus-sensitive:
+0.70 collapsed speakers on `020c_EBPZ`, 0.77 over-splits three other meetings.
+A per-meeting decision — eigengap on the similarity matrix, or the constrained
+reassignment pyannote's community-1 back-end uses — is the principled version of
+what is currently one global constant.
+
+**3. Language identification should come from the audio.** 105 French words
+labelled English against 41 the other way, and the same defect shows up in word
+error as `ouais` produced as `well`, `right` or `yeah` twenty-one times. Text-based
+identification reads our own transcript, so the recognition error and the language
+error confirm each other. Note the bound on what this costs today: Parakeet has no
+language token, so a wrong label changes what the transcript says about itself and
+not which words it contains. That makes this a correctness-of-metadata problem
+rather than a word-error problem — which is why it sits below the first two.
+
+**4. What is not worth doing.** Replacing the recognizer, on the evidence here.
+Parakeet at 20.60 % on clean French spontaneous speech is not the bottleneck, and
+the one larger, newer, better-ranked candidate measured seven points worse. A
+French-specialised model — LinTO's FastConformer is the only open model trained
+on French meeting and telephone corpora — is worth a shootout run if somebody
+exports it to ONNX, but it should be expected to move the clean band, which is
+already the good one.
+
+---
+
 ## Dead hypotheses inherited from earlier work
 
 These were measured before this campaign and are **not** worth re-running
