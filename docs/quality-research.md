@@ -139,6 +139,7 @@ difference in speaker handling and nothing else.
 | 10 | Gate absorption on voice similarity | same words | no gate value restores speaker counts; ordering was the cause | **REVERT** |
 | 11 | Merge threshold, re-measured after the revert | same words | 0.72 worth 0.17 points, and costs a quiet speaker | **No change** |
 | 12 | Score eight meetings end to end | 8 SUMM-RE meetings | macro **71.92 %** cpWER, **57.49 %** WER | The honest French figure |
+| 13 | Segment ceiling 120 s → 15 s | dense + sparse meeting | dense **83.05 % → 54.02 %** WER; sparse also improves | Verifying on AMI |
 
 ## Iterations
 
@@ -629,6 +630,49 @@ That points at a default this project has already tested and retired.
 seconds of audio and is the *sparsest* meeting in the corpus. A dead hypothesis
 tested on one meeting is a dead hypothesis about one meeting. It is being
 re-measured on a dense one.
+
+### Iteration 13 — the segment ceiling, on a meeting that is not `020c_EBPZ`
+
+**Hypothesis.** [Iteration 12](#iteration-12--eight-real-french-meetings-and-the-number-is-much-worse)
+found `006b_EADH` handed 45 segments for 21 minutes because its speakers overlap
+so much the detector hears one continuous utterance. The retired
+`max_segment_seconds` sweep was run on the sparsest meeting in the corpus. On a
+dense one, the ceiling should matter.
+
+**Experiment.** `006b_EADH` (1377 s of reference speech in 1281 s of audio, 18.9 %
+overlap) and `020c_EBPZ` (777 s in 1094 s, 5.0 % overlap) as a control, at
+ceilings of 120 s, 30 s and 15 s.
+
+**Result.**
+
+| Meeting | Ceiling | Words produced | WER | cpWER | WDER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `006b_EADH` | 120 s (shipped) | 1586 / 6462 | 83.05 % | 89.79 % | 40.97 % |
+| `006b_EADH` | 30 s | 2036 | 76.23 % | 85.11 % | 34.63 % |
+| **`006b_EADH`** | **15 s** | **3334** | **54.02 %** | **74.92 %** | 34.12 % |
+| `020c_EBPZ` | 120 s (shipped) | 2369 / 3376 | 36.36 % | 51.99 % | 17.03 % |
+| `020c_EBPZ` | 30 s | 2339 | 37.80 % | 53.43 % | 17.35 % |
+| **`020c_EBPZ`** | **15 s** | 2362 | **35.28 %** | **50.49 %** | 16.59 % |
+
+**Conclusion. Twenty-nine points of word error on the dense meeting, and the
+control improves too.** The word count more than doubles, 1586 → 3334, which is
+the tell: at 120 seconds the recognizer was not getting these words wrong, it was
+never emitting them. And the sparse meeting is not the price — it gains 1.1 points
+of word error and 1.5 of cpWER at the same setting, and the real-time factor
+improves as well, 0.34 → 0.33.
+
+This is the largest single effect measured in the campaign, and the project had
+already ruled it out. The earlier sweep was not wrong about what it measured; it
+measured `020c_EBPZ`, where the effect is 1.1 points, and generalised. **A default
+tuned on one corpus is a hypothesis** — the configuration page already says
+so about `merge_similarity`, and it applies with equal force to a default
+*retired* on one meeting.
+
+Not yet adopted. Two things have to hold first: the effect has to survive on all
+eight meetings, and it must not undo the finding that raising the ceiling from
+28 s to 120 s was worth 4.1 points of word error **on AMI**, which is a corpus of
+genuine close-talk mixing rather than summed per-speaker tracks. Both are
+running.
 
 ---
 
