@@ -11,7 +11,7 @@ from hansard.domain.speakers import Diarization, SpeakerTurn
 from hansard.domain.transcript import Transcript
 from hansard.evaluation.datasets import load_reference_json
 from hansard.evaluation.formats.subtitles import load_subtitles
-from hansard.evaluation.metrics.decomposition import Decomposition, decompose
+from hansard.evaluation.metrics.decomposition import Decomposition, decompose, sentence_joined
 from hansard.evaluation.metrics.language import language_identification, reference_language_at
 from hansard.evaluation.metrics.quiet import QuietSpeakerReport, quiet_speaker_report
 from hansard.evaluation.metrics.speaker import (
@@ -167,7 +167,7 @@ def score_system(
                     language_normalizer.normalize(expected.text),
                     language_normalizer.normalize(observed.text),
                     language,
-                    expected.text,
+                    sentence_joined(item.text for item in expected.utterances),
                     glossary,
                 ),
             )
@@ -188,7 +188,7 @@ def score_system(
             scoring.normalize(reference.text),
             scoring.normalize(hypothesis.text),
             _scoring_language(reference),
-            reference.text,
+            sentence_joined(utterance.text for utterance in reference.utterances),
             glossary,
         ),
         speakers=quiet_speaker_report(

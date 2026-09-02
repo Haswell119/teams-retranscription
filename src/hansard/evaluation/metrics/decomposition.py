@@ -30,6 +30,7 @@ CATEGORIES: tuple[str, ...] = (
     CONTENT_WORD,
 )
 
+_ALWAYS_CAPITALISED: frozenset[str] = frozenset(("i",))
 _DIGIT = re.compile(r"\d")
 _SENTENCE_START = re.compile(r"(?:^|[.!?…:;]\s+|\n)\s*$")
 _TOKEN = re.compile(r"[^\W\d_]+(?:[\u0027\u2019-][^\W\d_]+)*|\d+(?:[.,]\d+)*", re.UNICODE)
@@ -215,17 +216,33 @@ def fold(text: str) -> str:
     return "".join(character for character in stripped if not unicodedata.combining(character))
 
 
+def sentence_joined(texts: Iterable[str]) -> str:
+    return ". ".join(text.strip() for text in texts if text.strip())
+
+
 def proper_nouns(raw: str) -> frozenset[str]:
-    found: set[str] = set()
+    capitalised: set[str] = set()
+    lowercased: set[str] = set()
     for match in _TOKEN.finditer(raw):
         token = match.group(0)
+        folded = fold(token)
         if not token[:1].isupper():
+            lowercased.add(folded)
             continue
         prefix = raw[: match.start()]
         if _SENTENCE_START.search(prefix) or not prefix.strip():
             continue
-        found.add(fold(token))
-    return frozenset(found)
+        capitalised.add(folded)
+    return frozenset(name for name in capitalised - lowercased if _is_name_like(name))
+
+
+def _is_name_like(folded: str) -> bool:
+    if len(folded) < 2:
+        return False
+    base = folded.split("'")[0]
+    if base in _ALWAYS_CAPITALISED:
+        return False
+    return not (folded in _FILLERS or folded in ENGLISH_FUNCTION_WORDS or folded in FRENCH_FUNCTION_WORDS)
 
 
 def classify(token: str, language: str, names: frozenset[str], glossary: frozenset[str]) -> str:

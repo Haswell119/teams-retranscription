@@ -61,3 +61,18 @@ def test_a_cluster_without_a_centroid_is_left_where_it_is():
     centroids = {"a": unit(1.0, 0.0)}
     speaking = {"a": 400.0, "b": 2.0}
     assert _absorb_quiet_clusters(assignment, centroids, speaking, 10.0, 0.55)["b"] == "b"
+
+
+def test_the_diarizer_stops_absorbing_when_the_consolidator_will_do_it():
+    from hansard.adapters.diarization.registry import _diarizer_floor
+    from hansard.config import DiarizationSettings
+
+    assert _diarizer_floor(DiarizationSettings(cluster_consolidation=True)) == 0.0
+
+
+def test_the_diarizer_keeps_the_floor_when_there_is_no_consolidator():
+    from hansard.adapters.diarization.registry import _diarizer_floor
+    from hansard.config import DiarizationSettings
+
+    settings = DiarizationSettings(cluster_consolidation=False, minimum_speaker_seconds=10.0)
+    assert _diarizer_floor(settings) == 10.0

@@ -23,7 +23,7 @@ from hansard.evaluation.corpora import (
     summ_re_split,
 )
 from hansard.evaluation.datasets import load_manifest, load_reference_json
-from hansard.evaluation.metrics.decomposition import decompose
+from hansard.evaluation.metrics.decomposition import decompose, sentence_joined
 from hansard.evaluation.metrics.language import language_identification
 from hansard.evaluation.metrics.quiet import quiet_speaker_report
 from hansard.evaluation.metrics.speaker import (
@@ -304,7 +304,7 @@ def _score_corpus_meeting(
             normalizer.normalize(reference.text),
             normalizer.normalize(hypothesis.text),
             language if language != MIXED else "fr",
-            reference.text,
+            sentence_joined(utterance.text for utterance in reference.utterances),
         ).as_dict(),
         "real_time_factor": round(elapsed / clip.duration, 4),
         "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),

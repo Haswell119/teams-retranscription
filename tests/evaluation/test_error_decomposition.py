@@ -94,3 +94,34 @@ def test_decompositions_add_up_across_utterances():
     )
     assert total.reference_words == 4
     assert total.deletions == 1
+
+
+def test_a_word_that_also_appears_lowercase_is_not_a_proper_noun():
+    from hansard.evaluation.metrics.decomposition import proper_nouns
+
+    assert proper_nouns("on garde Le budget et le reste") == frozenset()
+
+
+def test_a_name_that_only_ever_appears_capitalised_is_kept():
+    from hansard.evaluation.metrics.decomposition import proper_nouns
+
+    assert "sarah" in proper_nouns("on voit Sarah demain et Sarah confirme")
+
+
+def test_the_english_pronoun_is_not_mistaken_for_a_name():
+    from hansard.evaluation.metrics.decomposition import proper_nouns
+
+    assert proper_nouns("we said I would and I will") == frozenset()
+
+
+def test_single_letters_are_not_names():
+    from hansard.evaluation.metrics.decomposition import proper_nouns
+
+    assert proper_nouns("the point is D and then more") == frozenset()
+
+
+def test_utterances_are_joined_with_a_sentence_boundary():
+    from hansard.evaluation.metrics.decomposition import proper_nouns, sentence_joined
+
+    joined = sentence_joined(["And then we left", "And then we arrived"])
+    assert proper_nouns(joined) == frozenset()
