@@ -24,7 +24,7 @@ as the English ones do. French read speech is measured and passing
 ([§1](#1-speech-recognition-french-and-english)); French synthetic meetings are
 built by the same generator as the English ones and recorded beside them
 ([§2.2](#22-french-synthetic-meetings)); one real French meeting is recorded too,
-and it is our worst published result ([§2.4](#24-summ-re-real-french-meeting-audio)).
+and it is our worst published result ([§2.5](#25-summ-re-real-french-meetings)).
 Nothing here is an English measurement with a French claim attached to it.
 
 ## 1. Speech recognition, French and English
@@ -142,7 +142,42 @@ French cpWER rises more steeply with speaker count than English does (4.20 %,
 nine speakers French WDER is 3.42 % against 1.52 % in English, so the extra
 error is speaker attribution rather than recognition.
 
-### 2.3 AMI, real meeting audio
+### 2.3 Code-switched meetings, French and English in one room
+
+Source:
+[`bench/results/mixed_meetings.json`](../bench/results/mixed_meetings.json).
+Three fixtures built from the same French and English speaker pools as above,
+with each speaker's utterances drawn from both languages so that the language
+changes within the meeting and within a speaker's turns. No language tag is
+given to the recognizer.
+
+| Fixture | Speakers (reference → detected) | WER | **cpWER** | tcpWER@5s | WDER | **Language accuracy** |
+| --- | :---: | ---: | ---: | ---: | ---: | ---: |
+| `meeting_mixed_4spk` | 4 → **4** | 13.83 % | 23.56 % | 24.15 % | 3.55 % | 97.58 % |
+| `meeting_mixed_6spk` | 6 → 7 | 4.44 % | 21.62 % | 22.30 % | 7.28 % | 97.79 % |
+| `meeting_mixed_8spk` | 8 → **8** | 12.71 % | **12.45 %** | 12.45 % | **0.88 %** | 93.63 % |
+| **macro average** | | **10.33 %** | **19.21 %** | 19.63 % | **3.90 %** | **96.33 %** |
+
+```bash
+make bench-mixed
+```
+
+**Language accuracy is 96.33 %, under the 98 % gate, and the errors run one
+way.** 105 French words were labelled English; 41 English words were labelled
+French. Language is currently decided from the recognized *text*, so a French
+utterance that decodes into English-looking words is then confidently labelled
+English — the recognition error and the language error have the same cause and
+reinforce each other. Fixing this needs a language decision that comes from the
+audio rather than from our own output; it has not been done.
+
+Two further caveats. These fixtures are clean close-talk recordings summed
+together, so they measure code-switching and not a real room — the same caveat
+that applies to §2.1 and §2.2, and the reason [§2.4](#24-ami-real-meeting-audio)
+and [§2.5](#25-summ-re-real-french-meetings) exist. And the code-switching
+is *between* utterances, not inside them; a fixture where a speaker switches
+language mid-sentence is not built yet.
+
+### 2.4 AMI, real meeting audio
 
 Source:
 [`bench/results/ami_mix_headset.json`](../bench/results/ami_mix_headset.json).
@@ -151,19 +186,31 @@ four-person meeting audio, run end to end through the full pipeline and scored
 with our own harness. No participant list is supplied — the system is told
 nothing about how many people are in the room.
 
+> Measured on the machine described in [§4](#4-efficiency) under normalizer
+> 1.3.0. An earlier edition of this page published 20.44 % / 28.75 % from another
+> machine under normalizer 1.1.0; that figure could not be reproduced here, and a
+> control run establishes the difference is not the adaptive segmentation added
+> since — see [§2.6](#26-how-this-compares-to-microsoft).
+
 | Meeting | Duration | Speakers (reference → detected) | Words (reference → produced) | WER | **cpWER** | tcpWER@5s | WDER | DER (collar 0) | Reference overlap | RTF | Peak RAM |
 | --- | ---: | :---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ES2004a | 17.5 min | 4 → 5 | 2614 → 2239 | 18.87 % | **28.30 %** | 29.93 % | 7.47 % | 31.06 % | 21.3 % | 0.57 | 4770 MB |
-| IS1009a | 14.0 min | 4 → **4** | 1986 → 1729 | 22.66 % | **31.70 %** | 33.38 % | 8.25 % | 25.87 % | 18.6 % | 0.61 | 4805 MB |
-| TS3003a | 25.1 min | 4 → 5 | 2518 → 2233 | 19.79 % | **26.25 %** | 27.75 % | 4.63 % | 28.74 % | 12.9 % | 0.40 | 4805 MB |
-| **Macro average** | — | — | — | **20.44 %** | **28.75 %** | **30.35 %** | **6.78 %** | **28.56 %** | 17.6 % | — | — |
+| ES2004a | 17.5 min | 4 → 5 | 2614 → 2210 | 20.07 % | **29.34 %** | 30.45 % | 7.67 % | 31.10 % | 21.3 % | 0.18 | 4900 MB |
+| IS1009a | 14.0 min | 4 → 5 | 1986 → 1720 | 21.58 % | **34.66 %** | 36.34 % | 10.42 % | 27.42 % | 18.6 % | 0.19 | 4900 MB |
+| TS3003a | 25.1 min | 4 → 5 | 2518 → 2154 | 22.09 % | **27.83 %** | 29.52 % | 4.66 % | 29.12 % | 12.9 % | 0.16 | 4900 MB |
+| **Macro average** | — | — | — | **21.25 %** | **30.61 %** | **32.10 %** | **7.58 %** | **29.21 %** | 17.6 % | — | — |
 
 ```bash
 make bench-data-ami
 make bench-ami
 ```
 
-Word-weighted cpWER is 28.52 %; DER at the 0.25-second collar is 18.34 %.
+Word-weighted cpWER is 30.29 %; DER at the 0.25-second collar is 18.93 %.
+
+> `IS1009a` used to find its exact four speakers and now finds five, which is the
+> whole of a 1.24-point macro regression introduced deliberately: taking speaker
+> embeddings from uncontested turns rather than the longest ones is worth 6.79
+> points of cpWER on French meetings and costs this. The roster table below is
+> unaffected — see [quality-research iteration 15](quality-research.md#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio).
 
 **With a participant list, which is what the bot has.** When Hansard joins a
 meeting it knows who is present, and the roster becomes a ceiling on the speaker
@@ -172,14 +219,21 @@ count. Source:
 
 | Meeting | Speakers (reference → detected) | **cpWER** | WDER | DER (collar 0) | RTF |
 | --- | :---: | ---: | ---: | ---: | ---: |
-| ES2004a | 4 → **4** | **25.89 %** | 6.71 % | 29.87 % | 0.28 |
-| IS1009a | 4 → **4** | **31.70 %** | 8.25 % | 25.87 % | 0.28 |
-| TS3003a | 4 → **4** | **24.44 %** | 3.47 % | 27.46 % | 0.24 |
-| **Macro average** | — | **27.34 %** | **6.14 %** | **27.73 %** | — |
+| ES2004a | 4 → **4** | **26.63 %** | 6.44 % | 29.91 % | 0.17 |
+| IS1009a | 4 → **4** | **30.94 %** | 8.21 % | 25.74 % | 0.19 |
+| TS3003a | 4 → **4** | **26.09 %** | 3.57 % | 27.93 % | 0.16 |
+| **Macro average** | — | **27.89 %** | **6.07 %** | **27.86 %** | — |
 
 Every meeting finds the right number of speakers, and macro cpWER lands at
-**27.34 %**. Recognition is untouched — WER is 20.44 % in both configurations —
-so the whole gain is attribution.
+**27.89 %** against **30.61 %** told nothing. Recognition is untouched — word
+error is 21.25 % in both configurations, to two decimal places — so the whole
+gain is attribution, which is what a roster can and cannot do.
+
+These three numbers have not moved through any of the diarization work in
+[quality-research](quality-research.md): when the participant count is known, the
+ceiling drives agglomeration to four clusters whatever the centroids were built
+from. Every regression and every gain that page reports on AMI lives entirely in
+the told-nothing column.
 
 **How this run differs from the one it replaces.** The previously published
 figure on this page was 49.39 % macro cpWER. That run used **INT8 weights**,
@@ -189,13 +243,17 @@ diarization retune and a batch-padding fix account for the rest:
 
 | | Superseded (INT8) | Current (float32) | With a roster |
 | --- | ---: | ---: | ---: |
-| Macro WER | 41.38 % | **20.44 %** | 20.44 % |
-| Macro cpWER | 49.39 % | **28.75 %** | **27.34 %** |
-| Macro WDER | 9.38 % | 6.78 % | 6.14 % |
-| Macro DER | 32.19 % | 28.56 % | 27.73 % |
-| Speakers detected | 6, 6, 6 | 5, 4, 5 | **4, 4, 4** |
-| Peak RSS | 7138 MB | **4805 MB** | 4794 MB |
-| RTF | 0.61 – 0.74 | 0.40 – 0.61 | **0.24 – 0.28** |
+| Macro WER | 41.38 % | **21.25 %** | 21.25 % |
+| Macro cpWER | 49.39 % | **30.61 %** | **27.89 %** |
+| Macro WDER | 9.38 % | 7.58 % | 6.07 % |
+| Macro DER | 32.19 % | 29.21 % | 27.86 % |
+| Speakers detected | 6, 6, 6 | 5, 5, 5 | **4, 4, 4** |
+| RTF | 0.61 – 0.74 | 0.16 – 0.19 | **0.16 – 0.19** |
+
+The INT8 column is from an older edition of this page and was produced under
+normalizer 1.1.0 on other hardware; the two float32 columns are current. The
+comparison across the row is still the right one — INT8 deletes words — but do
+not read the last decimal of the first column against the other two.
 
 The superseded run is kept as
 [`ami_mix_headset_short_segments.json`](../bench/results/ami_mix_headset_short_segments.json),
@@ -210,96 +268,141 @@ for any single-stream system, ours included. The gate stays where it is because
 it is right for the audio a Teams meeting produces; on AMI, read the confusion
 and false-alarm components instead.
 
-### 2.4 SUMM-RE, real French meeting audio
+### 2.5 SUMM-RE, real French meetings
 
-Source: [`bench/results/summ_re.json`](../bench/results/summ_re.json). AMI gave
-us a real spontaneous *English* meeting to be measured against. SUMM-RE, a French
-meeting corpus published by Linagora under CC-BY-SA-4.0, is the French
-counterpart: per-speaker tracks summed into one mixed stream, which is the same
-construction as the AMI Mix-Headset condition and the same thing Teams delivers.
+Source: [`bench/results/summ_re.json`](../bench/results/summ_re.json). SUMM-RE is
+a French meeting corpus published by Linagora under CC-BY-SA-4.0, distributed as
+per-speaker tracks which we sum into one mixed stream — the same construction as
+the AMI Mix-Headset condition and the same thing Teams delivers.
 
-| Meeting | Duration | Speakers (reference → detected) | Words (reference → produced) | WER | **cpWER** | tcpWER@5s | WDER | DER (collar 0) | Reference overlap | RTF |
-| --- | ---: | :---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `020c_EBPZ` | 18.2 min | 4 → **4** | 3283 → 2356 | 37.52 % | **53.16 %** | 56.52 % | 17.17 % | 36.22 % | 5.06 % | 0.59 |
+**Twelve meetings, 230.8 minutes.** Meetings fall into a `tuning` or `held-out`
+half by a deterministic hash of the meeting identifier
+(`hansard.evaluation.corpora.summ_re_split`), so a default developed on one half
+can be reported on the other. Everything in
+[quality-research](quality-research.md) was developed on `tuning`.
+
+| Split | Meetings | Minutes | WER | **cpWER** | tcpWER@5s | WDER | DER (collar 0) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| tuning | 8 | 151.9 | 45.20 % | **59.59 %** | 62.86 % | 19.25 % | 41.66 % |
+| **held-out** | 4 | 78.9 | **38.18 %** | **51.95 %** | 54.01 % | 16.54 % | 38.28 % |
+| all | 12 | 230.8 | 42.86 % | 57.04 % | 59.91 % | 18.35 % | 40.54 % |
+
+Per meeting, ordered by how much of the reference is two people talking at once:
+
+| Meeting | Split | Overlap | Duration | Speakers (ref → detected) | Words (ref → produced) | WER | **cpWER** | WDER |
+| --- | --- | ---: | ---: | :---: | :---: | ---: | ---: | ---: |
+| `020b_EBDZ` | held-out | 4.13 % | 18.4 min | 4 → **4** | 3602 → 2923 | **24.53 %** | 39.02 % | 11.94 % |
+| `020c_EBPZ` | tuning | 5.04 % | 18.2 min | 4 → **4** | 3376 → 2369 | 36.36 % | 51.99 % | 17.03 % |
+| `017a_EBRZ` | tuning | 8.06 % | 12.5 min | 3 → **3** | 1131 → 718 | 52.19 % | 55.76 % | 4.22 % |
+| `018a_EARZ` | held-out | 9.33 % | 22.0 min | 4 → 7 | 5028 → 3567 | 30.78 % | **37.72 %** | 6.77 % |
+| `021a_EARD` | tuning | 9.55 % | 18.8 min | 4 → 6 | 3751 → 2543 | 33.86 % | 37.15 % | 5.13 % |
+| `004c_PAPH` | tuning | 10.97 % | 21.1 min | 4 → 7 | 4110 → 2561 | 40.74 % | 51.64 % | 12.06 % |
+| `018b_EADZ` | tuning | 12.57 % | 19.4 min | 4 → **4** | 4377 → 2116 | 59.00 % | 64.11 % | 12.30 % |
+| `035b_EADH` | tuning | 12.57 % | 19.8 min | 4 → **4** | 4402 → 2894 | 37.54 % | 53.72 % | 20.15 % |
+| `011c_ECPL` | held-out | 15.17 % | 16.9 min | 4 → **4** | 3078 → 1911 | 44.70 % | 49.27 % | 8.49 % |
+| `006b_EADH` | tuning | 18.89 % | 21.4 min | 4 → 6 | 6462 → 3472 | 51.88 % | 76.41 % | 37.13 % |
+| `033c_EBPH` | tuning | 21.83 % | 20.7 min | 4 → 5 | 5472 → 3083 | 50.00 % | 85.94 % | 45.99 % |
+| `015b_EBDD` | held-out | 26.83 % | 21.6 min | 4 → 6 | 5383 → 2890 | 52.70 % | 81.77 % | 38.98 % |
 
 ```bash
-make bench-data-summre
+make bench-data-summre SUMM_RE_MEETINGS=8
 make bench-summre
 ```
 
-**This is our worst published result, and it is the honest one.** 53.16 % cpWER
-on a real French meeting, against 28.75 % on real English meetings. A participant
-list does not help here — `summ_re_roster.json` scores identically, because the
-speaker count is already right and there is nothing for a roster to fix.
+**Overlap predicts the score and speaker-count error does not.** Across the
+twelve meetings, reference overlap correlates with cpWER at Spearman **ρ = +0.67**
+(p = 0.018), with WDER at ρ = +0.67 (p = 0.018) and with word error at ρ = +0.64
+(p = 0.025). The number of speakers we get wrong correlates with cpWER at
+**ρ = −0.11** (p = 0.73) — no relationship at all. Twelve meetings is a small
+sample and these are rank correlations on it, but the ordering is the same one
+[§8](#8-where-we-lose) finds inside a single meeting by splitting its utterances
+by overlap, which is a different measurement reaching the same place.
 
-**The run this replaces caught a real defect.** The first recorded run used
-`merge_similarity = 0.70`, a value tuned on AMI. On this meeting that threshold
-fused genuinely different people, collapsing four speakers into two and carrying
-cpWER to **89.82 %**. The default is now 0.77, the speaker count is exact, and
-cpWER fell by 36 points. That run is not kept as a file; see
-[configuration](configuration.md#minimum_speaker_seconds-and-merge_similarity-the-pair-that-was-retuned)
-for the sweep and [§8](#8-where-we-lose) for what it means.
+The overlap correlation was +0.77 in the previous edition of this page. It fell
+because the two most overlapped meetings improved the most — cleaner speaker
+embeddings ([quality-research iteration 15](quality-research.md#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio))
+took `033c_EBPH` from 111.68 % to 85.94 % and `035b_EADH` from 98.57 % to
+53.72 % — which is the correlation weakening for the right reason. Overlap is
+still the strongest predictor on this corpus.
 
-Three things are worth reading off the current row. Missed speech is 3.69 %
-against 5.06 % reference overlap, so coverage of the audio is at the structural
-floor — the pipeline is hearing the meeting. False alarm is 18.58 %, over half
-of the 36.22 % DER and now the largest component: the diarizer claims speech
-where the reference has none. Confusion is 13.96 %, another 38.5 %. Between them
-they say this is an attribution failure, not a recognition failure — and yet
-WER alone is 37.52 %, so recognition on casual French is not doing well either.
+**No meeting collapses its speakers any more.** The previous edition of this page
+reported `035b_EADH` at two clusters for four people and `033c_EBPH` at three,
+scoring 98.57 % and 111.68 % cpWER — over 100 % because the optimal assignment
+leaves a reference speaker matched to nothing and charges all of their words as
+deletions on top of the merged cluster's insertions. Both now find at least four,
+and the worst row in the corpus is 85.94 %. The remaining error is in the other
+direction: five meetings detect six or seven clusters where there are four.
 
-The corpus is also a harder speaker-count problem than AMI. Its four speakers
-talk for 380, 326, 59 and 12 seconds; AMI's four each talk for minutes. A
-meeting where two participants barely speak is the ordinary case in an
-organisation, and it is exactly the case the synthetic fixtures do not test.
+**This replaces a single-meeting figure of 53.16 %, and the replacement is
+worse.** `020c_EBPZ` was the only meeting this project had ever scored and it has
+the second-lowest overlap of the twelve. The corpus figure is **57.04 %**, and the
+held-out half — four meetings, no default developed against them — is **51.95 %**.
+The earlier number was not wrong; it was unrepresentative. That is the argument
+for scoring twelve meetings instead of one, and for keeping a half of them back.
 
-### 2.5 How this compares to Microsoft
+Read the two halves separately when judging the diarization work in
+[quality-research](quality-research.md): the corpus moved 63.83 % → 57.04 % and
+the held-out half moved 54.18 % → 51.95 %, because the meetings that gained most
+are in the tuning half. The held-out figure is the one that generalises.
+
+### 2.6 How this compares to Microsoft
 
 | System | Corpus | cpWER |
 | --- | --- | ---: |
 | Azure Speech (the engine behind Teams transcription) | AMI | 27.39 % |
 | Azure Speech | NOTSOFAR-1 test (Microsoft's own office-meeting corpus) | 35.68 % |
 | Azure Speech | NOTSOFAR-1 dev | 45.38 % |
-| **Hansard, with a participant list** | **AMI Mix-Headset, 3 meetings** | **27.34 %** |
-| **Hansard, told nothing** | **AMI Mix-Headset, 3 meetings** | **28.75 %** |
-| Hansard | SUMM-RE, real French meeting | 53.16 % |
+| **Hansard, with a participant list** | **AMI Mix-Headset, 3 meetings** | **27.89 %** |
+| **Hansard, told nothing** | **AMI Mix-Headset, 3 meetings** | **30.61 %** |
+| Hansard | SUMM-RE, 12 real French meetings | 57.04 % |
+| Hansard | SUMM-RE, 4 held-out French meetings | 51.95 % |
 | Hansard | our synthetic meetings, 3–9 speakers, French and English | 2.52 – 13.36 % |
 
 *Azure figures: AssemblyAI's January 2026 competitive benchmark, which is the
 only public source that scores Azure with cpWER on meeting corpora.*
 
-**On AMI we are now level with Azure, and that claim needs three caveats before
-you believe it.**
+**On AMI we are marginally behind Azure, and that comparison needs four
+caveats.** 27.89 % with a roster against Azure's 27.39 % is half a point, on
+three meetings, measured by two different toolchains.
 
 - The Azure number comes from a third party using their own reference
   preparation and normalizer, on conditions we cannot inspect. Many published
   cpWER figures score against reference utterance boundaries; ours starts from
   nothing but the raw audio, which is harder. That difference alone can be worth
   several points in either direction.
-- Three meetings is a small sample. Per-meeting cpWER ranges from 24.44 % to
-  31.70 %, so the macro average carries real variance.
+- Three meetings is a small sample. Per-meeting cpWER ranges from 27.83 % to
+  34.66 % told nothing, and from 26.09 % to 30.94 % with a roster.
+- **The AMI figure moved twice, once for a reason that is not a regression and
+  once for one that is.** This page previously published 20.44 % / 28.75 %,
+  produced on other hardware under normalizer 1.1.0; the current code on the
+  current machine measures 21.25 % / 29.37 % *with the segmentation and
+  consolidation work switched off*, and a control run confirms the difference is
+  the normalizer version and the hardware. It is recorded here rather than
+  quietly replaced because *the earlier figure was never reproduced on this
+  machine before the work began*, which is a methodology gap and not a rounding
+  one. The remaining move, 29.37 % → **30.61 %**, is real and deliberate: one
+  meeting loses its speaker count so that French meetings gain 6.79 points. See
+  [quality-research](quality-research.md).
 - The only rigorous comparison is running Teams on the same recordings and
   scoring both outputs with one toolchain. The protocol is in
-  [metrics](metrics.md); it needs real meetings and real consent, and we have
-  not done it.
+  [metrics](metrics.md#741-running-the-head-to-head-against-teams); it needs real
+  meetings and real consent, and we have not done it.
 
-So: treat parity on AMI as *measured but not established*. What is not in doubt
-is the direction — this page previously published 49.39 % against the same Azure
-figure, and the change came from fixing our own defects rather than from
-changing how we score.
+So: treat parity on AMI as *measured but not established*.
 
-**On French meetings we are behind, and nobody has a number to be behind.** Our
-real French meeting scores 53.16 % cpWER. Neither Microsoft nor anyone else
-publishes a French meeting figure, so there is nothing to compare it against —
-which cuts both ways. It is not evidence that we are better than Teams in
-French, and it is the reason [§2.4](#24-summ-re-real-french-meeting-audio) exists
-at all.
+**On French meetings we are well behind, and now we know by how much.** Twelve
+SUMM-RE meetings score **57.04 %** cpWER, and the four held-out ones **51.95 %**
+([§2.5](#25-summ-re-real-french-meetings)). The single meeting this page used to
+report at 53.16 % turned out to be the second-easiest of the twelve. Neither
+Microsoft nor anyone else publishes a French meeting figure, so there is nothing
+to compare against — which is not evidence that we are better, and is the reason
+§2.5 exists at all.
 
 Note also the gap in Microsoft's own numbers: Azure markets **2.4 % WER** on
 curated short clips and scores **27.4 % cpWER** on AMI. That is not dishonesty —
 it is the difference between read speech and a real meeting, and it is exactly
 why this page separates the two. We are subject to the same gap: 4.63 % on
-French read speech, 53.16 % on a French meeting.
+French read speech, 57.04 % on twelve French meetings.
 
 ## 3. What the metrics mean
 
@@ -443,8 +546,28 @@ resident set and 1.9 GB of disk — and it pays for that memory in accuracy.
 
 ## 6. Engineering findings worth knowing
 
-Two results from this benchmarking changed the design, and both are the kind of
-thing that is easy to get wrong silently.
+Four results from this benchmarking changed the design, and all four are the kind
+of thing that is easy to get wrong silently.
+
+**A recognizer's rank on read speech does not survive contact with a meeting.**
+Twice now. INT8 weights cost 0.1–2.0 points on FLEURS and LibriSpeech and
+**deleted nearly half the words** on real AMI audio. NVIDIA Canary 1B v2 beats
+Parakeet on the Open ASR multilingual French track (4.83 against 5.42) and scored
+**38.01 % against 30.82 %** on identical French meeting segments, losing in every
+overlap band and every duration band. A candidate recognizer is qualified on
+spontaneous multi-party audio or it is not qualified. `make bench-shootout` is
+the cheapest way to do that, because it decodes reference-boundary segments and
+takes the segmentation out of the argument.
+
+**A threshold belongs to an embedding space, not to a pipeline.** Swapping
+TitaNet-small for WeSpeaker ResNet34-LM — a model with roughly half the equal
+error rate — while keeping `merge_similarity = 0.77` collapsed four speakers into
+one and took cpWER from 63.19 % to 90.50 %. That is not a verdict on the
+embedding; it is a verdict on reusing a number calibrated in a different cosine
+geometry. Any embedding change has to carry its own threshold sweep, which is why
+the sweep tool shares one clustering pass across every threshold in a space.
+
+
 
 **Loudness normalisation degrades speaker attribution.** Applying EBU R128
 normalisation before diarization produced five clusters for a three-speaker
@@ -499,41 +622,64 @@ normalizer version, the hardware, and the per-stage timings. A file with a
 `profile` field — the INT8 runs, the historical AMI runs — is kept for comparison
 and is excluded from the gate check.
 
-**One reproduction caveat, stated rather than hidden:** `make bench-meetings`
-follows `HANSARD_ASR__QUANTIZATION` and therefore reproduces
-[§2.1](#21-english-synthetic-meetings-exact-ground-truth) as shipped, but
-`make bench-asr` currently pins its own recognizer to INT8 inside
-`hansard.evaluation.run`, so it reproduces the INT8 read-speech row of
-[§5](#5-choosing-a-quantization-profile) rather than the float32 table in
-[§1](#1-speech-recognition-french-and-english).
+Two more targets exist for asking questions rather than publishing answers.
+`make bench-shootout` runs one or more recognizers over byte-identical
+reference-boundary segments and scores them with one normalizer, reporting word
+error split by overlap band and by word category; `ENGINES=parakeet-fp32,canary-1b-v2-fr`
+selects what to compare. `make bench-sweep` runs recognition **once** per
+meeting, caches the transcript, and then re-diarizes and re-attributes those same
+words for every point on a grid, so a diarization question costs one recognition
+pass instead of one per configuration. Neither writes a published number; both
+write to `bench/results/` for the [quality-research log](quality-research.md).
+
+**The read-speech benchmark used to build its own recognizer**, bypassing the
+registry, which meant it ignored `HANSARD_RUNTIME__MODELS_DIR` and would fetch
+weights from the network instead of using the verified local bundle. It now goes
+through `build_recognizer` like everything else, so `make bench-asr` reproduces
+[§1](#1-speech-recognition-french-and-english) offline and follows
+`HANSARD_ASR__QUANTIZATION` the way the rest of the harness does.
 
 ## 8. Where we lose
 
 Publishing this matters more than publishing the wins.
 
-**On real English meetings we are level with Azure, not ahead of it.** We ran
-three AMI test meetings (ES2004a, IS1009a, TS3003a — 56.6 minutes of real,
-spontaneous, four-person meeting audio in the Mix-Headset condition) end to end
-through the full pipeline, and scored them with our own harness. The macro
-average is **28.75 % cpWER** told nothing, **27.34 %** with a participant list,
-against Azure's published **27.39 %**. Level is not ahead, and on a three-meeting
-sample it is not even reliably level. The per-meeting numbers are in
-[§2.3](#23-ami-real-meeting-audio) and the raw file is
+**On real English meetings we are marginally behind Azure.** We ran three AMI
+test meetings (ES2004a, IS1009a, TS3003a — 56.6 minutes of real, spontaneous,
+four-person meeting audio in the Mix-Headset condition) end to end through the
+full pipeline, and scored them with our own harness. The macro average is
+**30.61 % cpWER** told nothing, **27.89 %** with a participant list, against
+Azure's published **27.39 %**.
+
+An earlier edition of this page reported 27.34 % here and called it level. The
+number moved because the run moved — different machine, normalizer 1.1.0 rather
+than 1.3.0 — not because anything got worse; the same code measures 21.25 % word
+error in both roster configurations, to two decimal places. Half a point on three
+meetings between two different scoring toolchains is not a result in either
+direction, and reporting it as parity was already more than the evidence
+supported. The per-meeting numbers are in
+[§2.4](#24-ami-real-meeting-audio) and the raw file is
 [`bench/results/ami_mix_headset.json`](../bench/results/ami_mix_headset.json).
 
-The most legible symptom left is speaker counting: five, four and five clusters
-detected where there are four speakers. It was ten in all three meetings before
-the segmentation and clustering fixes, and 49.39 % macro cpWER; the direction of
-travel is right and the distance left is real. Spontaneous overlapping speech
+The most legible symptom left is speaker counting: five clusters detected in each
+of the three meetings where there are four speakers. It was ten in all three
+before the segmentation and clustering fixes, and 49.39 % macro cpWER; the
+direction of travel is right and the distance left is real. One of those fives
+was a four until the consolidator started building centroids from uncontested
+turns — a change that costs AMI 1.24 points told nothing, costs it nothing at all
+with a roster, and is worth 6.79 points on French meetings
+([quality-research iteration 15](quality-research.md#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio)). Spontaneous overlapping speech
 fragments a speaker across clusters in a way clean fixtures never do, and cpWER
 charges for every fragment. A Teams roster removes this particular error, which
 is why the roster row exists. Work on it is tracked by re-running
 `make bench-ami`, not by rewording this paragraph.
 
 **On real French meetings we are clearly behind, and nobody publishes a number
-to be behind.** 53.16 % cpWER on SUMM-RE against 28.75 % on AMI. Half of that
-gap is recognition — 37.52 % WER on casual French against 20.44 % on AMI — and
-half is attribution. This is the largest open quality problem in the project.
+to be behind.** **57.04 %** cpWER over twelve SUMM-RE meetings against 30.61 % on
+AMI, with the held-out four at 51.95 %. Roughly two-thirds of that gap is
+recognition — 42.86 % word error on casual French against 21.25 % on AMI — and
+the rest is attribution. This is the largest open quality problem in the project,
+and [§2.5](#25-summ-re-real-french-meetings) shows what predicts it: overlap,
+at Spearman ρ = +0.67 against cpWER.
 
 Two things about that comparison need saying plainly:
 
@@ -595,7 +741,8 @@ SUMM-RE `020c_EBPZ`, the shipped `merge_similarity` of 0.70 fused genuinely
 different speakers and collapsed four people into two, taking cpWER to 89.82 %.
 The synthetic French fixtures gave no hint of it: their speakers all talk for
 minutes, while two of SUMM-RE's talk for 59 and 12 seconds. The default is now
-0.77, the speaker count is exact and cpWER is 53.16 %. The durable lesson is not
+0.77, the speaker count is exact, and cpWER on that meeting was 53.16 % when this
+was written and is 51.99 % today. The durable lesson is not
 the number — **a default
 tuned on one corpus is a hypothesis, not a result**, and the fixtures that pass
 are the ones least likely to catch its failure.
@@ -615,21 +762,62 @@ are dead:**
 | We feed too much silence | 756 s → 26.59 %, 871 s → **25.46 %**, 907 s → 37.52 %, 1002 s → 32.19 % | Dead — not monotone; adding silence *helped* twice |
 | The overlap and seam mechanism | Removing the overlap entirely: −0.56 points at a 20 s ceiling, **+0.69** at 8 s | Dead — noise |
 
-Every configuration we can reach lands between 35.6 % and 37.5 %. The corpus's
-own boundaries reach 26.59 %. **What is different about them is untested**, and
-the leading remaining candidate is boundary precision — spans that begin and end
-on real speech edges rather than on detector output plus padding. That is written
-here as an open question, not as a finding, and it will stay that way until
-someone measures it.
+Every configuration we can reach lands between 35.6 % and 37.5 %.
+
+**That open question is now closed, and the answer is not boundaries.** Handing
+the recognizer the corpus's own utterance spans across **seven** SUMM-RE tuning
+meetings — 855 segments, 1803 seconds, no detector, no padding, no seams — leaves
+**30.82 %** word error. Perfect boundaries are worth about seven points. Thirty-one
+remain. Boundary precision was the leading candidate; it is a real term and it is
+not the dominant one.
+
+**The dominant term is the second voice.** Splitting the same hypotheses by how
+much of each reference utterance another participant is talking over:
+
+| Overlap with another speaker | Segments | Reference words | WER | Utterances returned empty |
+| --- | ---: | ---: | ---: | ---: |
+| clean, under 5 % | 414 | 3758 | **20.60 %** | 9 |
+| light, 5–50 % | 177 | 2154 | 23.35 % | 7 |
+| **heavy, over 50 %** | 238 | 1232 | **70.54 %** | **48** |
+
+Heavily overlapped speech is **17 % of the reference words and 39 % of the
+errors**. And the 66 utterances the recognizer answers with silence are buried
+under another speaker **84.3 %** of the time, against **31.6 %** for the ones it
+does transcribe; 75.8 % of them are more than half covered, against 27.4 % of the
+rest.
+
+Read the first row again: **on clean French spontaneous meeting speech the
+shipped recognizer scores 20.60 %**, which is close to what it scores on English
+AMI. It is not bad at French. It is bad at two people at once, and on one mixed
+stream it has no way to be anything else. That is why
+[§9](#9-what-we-have-not-measured-yet) now names speech separation as the largest
+unexplored lever, and why it also explains why we cannot afford it.
+
+**A bigger, newer, better-ranked recognizer does not fix it.** NVIDIA Canary 1B
+v2 — CC-BY-4.0, ONNX, explicitly conditioned on French, and ahead of Parakeet on
+the Open ASR multilingual French track (4.83 against 5.42) — was run on
+byte-identical segments and scored **38.01 %** against Parakeet's 30.82 %. It
+loses in every overlap band and every duration band, at twice the memory. Its
+failure has a shape worth recording: it produced 1 empty output where Parakeet
+produced 66, and paid for that with **672 insertions against 369** and 1190
+substitutions against 879. On a short, half-buried turn Parakeet says nothing and
+Canary says something wrong. For a verbatim record, invention is the worse
+failure. The full table is in
+[quality-research](quality-research.md#iteration-4--canary-1b-v2-instead-of-parakeet).
 
 The floor underneath all of it is the register rather than the machinery. One
 participant's own isolated 32 kHz track, scored against that participant's own
 reference with oracle boundaries and no mixing or segmentation of ours involved,
-still scores **28.05 %**, against 4.63 % on French read speech. Summing the four
-tracks into one stream costs a further 3.3 points, which is the fair price of a
-single-channel mixture and not a corpus defect. Expect the mid-twenties on casual
-multi-party French, and treat any claim that a segmentation change alone will
-reach read-speech numbers as unsupported.
+still scores **28.05 %**, against 4.63 % on French read speech. Expect the low
+twenties on clean casual multi-party French, and treat any claim that a
+segmentation change alone will reach read-speech numbers as unsupported.
+
+**One point of the published SUMM-RE figure was our own scoring.** SUMM-RE is
+annotated in the SPPAS convention, where `+` marks a short pause. The French
+normalizer expands a bare `+` into the word "plus", so 533 pause marks — 1.61 %
+of every reference token — became words no recognizer could produce, each one a
+guaranteed deletion. The corpus reader now strips them, which moved the
+reference-boundary figure from 31.54 % to 30.82 % on unchanged hypotheses.
 
 **We also do not beat Azure on read speech.** Azure Speech reports 2.78 % on
 FLEURS `fr_fr`; we measure 4.63 %. Read-speech benchmarks are not what a meeting
@@ -646,29 +834,26 @@ generated claim, and open export formats.
 
 Being explicit about this is part of the point.
 
-- **NOTSOFAR-1.** The harness supports it; we have not run it.
-- **More than one real French meeting.** SUMM-RE is a 91-hour corpus and we have
-  scored **one** meeting from it ([§2.4](#24-summ-re-real-french-meeting-audio)).
-  One meeting is an anecdote: it is enough to have found a defect, not enough to
-  claim a French meeting figure with a straight face. Preparation code ships in
-  `hansard.evaluation.corpora`, so the cost of the next ten is machine time.
-  For context, published results for other open models on this corpus sit at
-  19–23 % WER against our 37.52 %.
-- **A code-switched French/English meeting run.** This is the newest empty cell
-  and the most conspicuous, because the feature it measures shipped without it.
-  The fixtures exist (`meeting_mixed_4spk`, `_6spk`, `_8spk`), `make bench-mixed`
-  scores them, `MIXED_MEETING_GATES` grades them and `language_accuracy` is
-  implemented — but no result file has been committed, so this page carries no
-  mixed cpWER and no measured language accuracy. Everything currently known about
-  bilingual behaviour comes from unit tests on text, which prove the extraction
-  logic and prove nothing about the audio. See [multilingual](multilingual.md).
+- **NOTSOFAR-1.** The harness supports it; we have not run it. The corpus is
+  CC-BY-4.0 and downloadable, but the dev and eval splits are 40 GB and 84 GB,
+  and the official metric is `tcpWER` scored with `fgnt/meeteval` — which we
+  already depend on. It is a machine-time problem, not a code problem.
 - **A recorded head-to-head against a live Teams transcript.** The protocol is
   written up in [metrics.md](metrics.md); it needs real meetings and real consent.
   `hansard compare` is the tool for it: it scores several systems against one
-  reference and breaks the result down by the language actually spoken, which is
-  the comparison that matters for a bilingual meeting. The tool is tested; the
-  head-to-head is not run.
+  reference and now breaks the result down by the language actually spoken, by
+  word category (names, numbers, code-switched words, function words) and by how
+  long each reference speaker actually spoke. The tool is tested; the head-to-head
+  is not run.
 - **Minutes quality against Copilot's recap**, blind and rated by humans.
+- **Any speech separation front-end.** [§8](#8-where-we-lose) now shows that
+  overlapped speech is where the French words go. Every credible single-channel
+  separator for meetings — the NOTSOFAR-1 baseline's Conformer CSS, TF-GridNet,
+  MossFormer2, SepFormer — costs one to two orders of magnitude more compute than
+  this entire pipeline, and the NOTSOFAR baseline additionally runs three
+  parallel ASR decodes on the separated streams. On 4 vCPU with no GPU that is
+  not affordable, and we have not measured it. It remains the largest known
+  unexplored lever.
 
 ## 10. Checking the gates
 
@@ -687,75 +872,38 @@ must-pass gate fails. A must-pass failure means the work is not finished.
 
 Only the shipped profile is scored. Result files carrying a `profile` field —
 the INT8 runs and the historical AMI runs — are skipped, so a gate can never be
-passed by a configuration nobody installs.
+passed by a configuration nobody installs. Diagnostic runs live in
+[`bench/results/experiments/`](../bench/results/experiments/), which the checker
+does not read at all: a sweep that deliberately misconfigures the pipeline to
+learn something must not be able to fail a release gate, and a lucky point in a
+grid must not be able to pass one.
 
 Current status on the hardware described at the top of this page, over every
 shipped-profile result in `bench/results/`:
 
 ```
-FAIL must_pass ES2004a                            cpwer                   28.30% <= 27.00%
-FAIL stretch   ES2004a                            cpwer                   28.30% <= 20.00%
-FAIL stretch   ES2004a                            wder                     7.47% <= 5.00%
-FAIL must_pass ES2004a                            wer                     18.87% <= 15.00%
-FAIL stretch   ES2004a                            wer                     18.87% <= 12.00%
-FAIL must_pass ES2004a                            cer                     16.13% <= 8.00%
-FAIL must_pass ES2004a                            der                     31.06% <= 15.00%
-FAIL stretch   ES2004a                            der                     31.06% <= 8.00%
-FAIL stretch   ES2004a                            rtf                      0.57 <= 0.35
-FAIL must_pass IS1009a                            cpwer                   31.70% <= 27.00%
-FAIL stretch   IS1009a                            cpwer                   31.70% <= 20.00%
-FAIL must_pass IS1009a                            tcpwer                  33.38% <= 30.00%
-FAIL stretch   IS1009a                            wder                     8.25% <= 5.00%
-FAIL must_pass IS1009a                            wer                     22.66% <= 15.00%
-FAIL stretch   IS1009a                            wer                     22.66% <= 12.00%
-FAIL must_pass IS1009a                            cer                     18.22% <= 8.00%
-FAIL must_pass IS1009a                            der                     25.87% <= 15.00%
-FAIL stretch   IS1009a                            der                     25.87% <= 8.00%
-FAIL stretch   IS1009a                            rtf                      0.61 <= 0.35
-FAIL stretch   TS3003a                            cpwer                   26.25% <= 20.00%
-FAIL must_pass TS3003a                            wer                     19.79% <= 15.00%
-FAIL stretch   TS3003a                            wer                     19.79% <= 12.00%
-FAIL must_pass TS3003a                            cer                     14.73% <= 8.00%
-FAIL must_pass TS3003a                            der                     28.74% <= 15.00%
-FAIL stretch   TS3003a                            der                     28.74% <= 8.00%
-FAIL stretch   TS3003a                            rtf                      0.40 <= 0.35
-FAIL stretch   FLEURS en_us (read speech)         wer                      4.47% <= 3.00%
-FAIL stretch   FLEURS en_us (read speech)         rtf                      0.49 <= 0.35
-FAIL stretch   LibriSpeech dev-clean (read speech) wer                      3.34% <= 3.00%
-FAIL stretch   LibriSpeech dev-clean (read speech) rtf                      0.57 <= 0.35
-FAIL must_pass 020c_EBPZ                          cpwer                   53.16% <= 30.00%
-FAIL stretch   020c_EBPZ                          cpwer                   53.16% <= 22.00%
-FAIL must_pass 020c_EBPZ                          tcpwer                  56.52% <= 33.00%
-FAIL must_pass 020c_EBPZ                          wder                    17.17% <= 12.00%
-FAIL stretch   020c_EBPZ                          wder                    17.17% <= 6.00%
-FAIL must_pass 020c_EBPZ                          wer                     37.52% <= 20.00%
-FAIL stretch   020c_EBPZ                          wer                     37.52% <= 17.00%
-FAIL must_pass 020c_EBPZ                          cer                     28.69% <= 10.00%
-FAIL must_pass 020c_EBPZ                          der                     36.22% <= 15.00%
-FAIL stretch   020c_EBPZ                          der                     36.22% <= 8.00%
-FAIL stretch   020c_EBPZ                          rtf                      0.59 <= 0.35
-FAIL stretch   meeting_3spk                       der                      8.64% <= 8.00%
-FAIL stretch   meeting_3spk                       rtf                      0.78 <= 0.35
-FAIL stretch   meeting_6spk                       der                      9.40% <= 8.00%
-FAIL stretch   meeting_6spk                       rtf                      0.81 <= 0.35
-FAIL stretch   meeting_9spk                       der                      9.94% <= 8.00%
-FAIL stretch   meeting_9spk                       rtf                      0.61 <= 0.35
-FAIL stretch   meeting_fr_3spk                    der                     11.88% <= 8.00%
-FAIL stretch   meeting_fr_6spk                    der                      8.87% <= 8.00%
-FAIL stretch   meeting_fr_9spk                    der                     13.98% <= 8.00%
-
-108/158 gates met  (18 must-pass failures, 32 stretch misses)
-
+190/360 gates met  (89 must-pass failures, 81 stretch misses)
 Must-pass gates are not met. The work is not finished.
 ```
 
-**Every one of the eighteen must-pass failures is a real meeting** — twelve on
-the three AMI meetings, six on SUMM-RE. That is the open problem of
-[§8](#8-where-we-lose), stated by the tooling rather than by us. Nothing on the
-synthetic meetings or on read speech blocks a release any more, and
-`speaker_count_error` no longer appears at all: the count is within the gate on
-every corpus that reaches it, where it was two over on all three AMI meetings
-before the diarization retune and six over before the clustering fixes.
+**Eighty-seven of the eighty-nine must-pass failures are real meetings** —
+fifteen on the three AMI meetings, seventy-two across the twelve SUMM-RE
+meetings. The remaining two are the code-switched fixtures: character error on
+`meeting_mixed_4spk` and language accuracy on `meeting_mixed_8spk`. That is the
+open problem of [§8](#8-where-we-lose), stated by the tooling rather than by us.
+
+The split between the two corpora moved by one in each direction with the
+consolidation change in [quality-research iteration 15](quality-research.md#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio):
+`IS1009a` picked up a speaker-count failure, `011c_ECPL` shed one. The total is
+unchanged because these gates are thresholds, and a French corpus that improves
+by 6.79 points of cpWER is still nowhere near a 30 % blocker.
+
+The count jumped when the corpus did. This section previously reported eighteen
+failures, because SUMM-RE contributed one meeting; it now contributes twelve, and
+each meeting is graded against the same six or seven French meeting gates. More
+failures here is more measurement, not more breakage — and it is why the number
+in this block should be read alongside the corpus sizes in
+[§2](#2-meeting-transcription-with-speaker-attribution) rather than on its own.
 
 Two things changed when float32 became the default, and both show up here as
 failures that have disappeared — the command prints only what fails:

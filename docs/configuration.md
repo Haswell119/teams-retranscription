@@ -85,6 +85,8 @@ Prefix `HANSARD_AUDIO__`.
 | `TARGET_LUFS` | float | `-23.0` | The loudness target, in LUFS. `-23` is the EBU broadcast reference. Raise it towards `-18` for very quiet conference-room recordings; going higher trades headroom for nothing useful. |
 | `HIGH_PASS_HZ` | float | `60.0` | Corner frequency of the high-pass filter, applied to **both** chains. Raise to 80–100 Hz for recordings with heavy HVAC rumble. Set to `0` to disable filtering entirely, which also removes the only filter the diarization chain has. |
 | `DENOISE` | bool | `false` | Adds ffmpeg `afftdn` to the recognition chain. Off by default: on meeting audio it removes as much speech detail as noise. Try it only on a recording with constant, stationary hiss. |
+| `DENSE_MAX_SEGMENT_SECONDS` | float | `15.0` | The segment ceiling used instead of `MAX_SEGMENT_SECONDS` when the recording is almost continuous speech. Set it to `0` or to `MAX_SEGMENT_SECONDS` to disable the adaptation and get a single fixed ceiling back. See the note below — this is worth up to **29 points of word error** on a densely overlapped meeting. |
+| `DENSE_SPEECH_RATIO` | float | `0.85` | The share of the recording that has to be speech before the dense ceiling applies. Measured over the voice-activity spans, so it counts detected speech rather than reference speech. |
 | `MAX_SEGMENT_SECONDS` | float | `120.0` | Longest chunk handed to the recogniser. Longer chunks give the model more context and cost memory: measured on an AMI meeting, 120 s beats 28 s by 4.1 points of word error rate and costs about 1.9 GB more at peak. Lower it on small nodes and expect worse transcription. See [benchmarks](benchmarks.md#6-engineering-findings-worth-knowing). |
 | `MIN_SEGMENT_SECONDS` | float | `1.0` | Segments shorter than this are dropped before recognition. Raise it if you see one-word phantom utterances between real turns. |
 | `SEGMENT_PADDING_SECONDS` | float | `0.2` | Padding added either side of each speech segment, so a word is not clipped at the boundary. |
@@ -128,6 +130,7 @@ Prefix `HANSARD_ASR__`.
 | `BATCH_SECONDS` | float | `240.0` | Ceiling on the **padded** audio held in flight for one decoding call. A batch is padded to its longest segment, so what it costs is that longest segment times the number of segments in it, not the sum of their durations — and that product is what this bounds. A two-minute segment therefore travels with at most one companion, while thirty-second segments still batch four at a time. Bounding the sum instead let a two-minute segment drag three short ones into its padding, which is where the 7.1 GB peak on real meeting audio came from. `0` disables it and leaves only `BATCH_SIZE`. |
 | `BATCH_SIZE` | int | `4` | Speech segments decoded per call, subject to `BATCH_SECONDS`. **Raise it to 8–16 on a machine with 8+ cores** for noticeably higher throughput on long recordings; each concurrent segment costs memory, so lower it to `1`–`2` on a small container. |
 | `LANGUAGE` | str \| null | unset | `fr`, `en`, `mixed`, … **With the default Parakeet engine this setting does not reach the recogniser at all.** `onnx-asr` passes a language only to Whisper and Canary; Parakeet TDT carries one shared vocabulary for 25 languages and infers the language acoustically, per segment, with no way to be told. Setting it here still matters downstream — it labels the meeting and supplies the fallback for utterances the identifier cannot decide — but it cannot stop the recogniser choosing wrongly. That failure is handled by `LANGUAGE_DRIFT_GUARD` instead. On the Whisper engine the tag *is* honoured and does force decoding, so pinning a single language there will mis-transcribe speech in the other one. |
+| `LANGUAGE_REVISION` | bool | `false` | Lets a speaker's settled language overrule a *weak* verdict on one of their own short utterances — low margin, thin evidence, and both neighbouring confident utterances by the same speaker agreeing on the other language. Written to attack the measured asymmetry in [benchmarks §2.3](benchmarks.md#23-code-switched-meetings-french-and-english-in-one-room), where French words are labelled English three times more often than the reverse. **Off by default because it has not been benchmarked yet**; turn it on only alongside a `make bench-mixed` run you are prepared to read. |
 | `IDENTIFY_LANGUAGE` | bool | `true` | Label every utterance with the language it was spoken in, and mark the meeting `mixed` when more than one language passes the minority threshold. This is what makes decisions, action items and deadlines get extracted with the right language's rules on both sides of a code-switch — with it off, a bilingual meeting is scored entirely against one language and the other language's items are silently dropped. It reads the transcribed text, costs no model and no extra pass, and is measured by the `language_accuracy` gate. **This is the only switch that turns per-utterance identification off.** Pinning `LANGUAGE=fr` or `LANGUAGE=en` does not: that tag forces the recogniser's decoding language and becomes the fallback for utterances the identifier cannot decide, but utterances it *can* decide keep the language they were actually spoken in. Set `HANSARD_ASR__IDENTIFY_LANGUAGE=false` to reproduce the pre-1.1 single-language behaviour. |
 | `LANGUAGE_DRIFT_GUARD` | bool | `true` | Detect and repair the recogniser deciding on the wrong language. Parakeet infers language acoustically and, on long segments, can settle on the wrong one — transcribing French speech as English-spelled nonsense while deleting more than half the words. The guard decodes a handful of short probes, compares the language they yield against the language of the full transcript, and re-decodes on shorter segments only when the two disagree. On a meeting where they agree it costs one short probe and nothing else. Measured effect on a 6-minute French recording: 318 words of English became 858 words of French. See [multilingual](multilingual.md#when-the-recogniser-picks-the-wrong-language). |
 | `DRIFT_PROBE_SECONDS` | float | `4.0` | Length of each probe window. **Keep it equal to the lowest rung of `DRIFT_LADDER_SECONDS`** — the probe is only useful if it runs at the setting the recogniser is most reliable at. At 4 s the probe on the reference recording returned French with no English evidence at all; at 6 s it was wrong often enough to miss the drift entirely. |
@@ -260,7 +263,10 @@ tuning, because it is the one that decides who is credited with what.
 | `CLUSTERING_THRESHOLD` | float | `0.99` | The cosine-distance threshold at which two segments are treated as different speakers. **The single most useful knob.** See below. |
 | `MINIMUM_SPEAKER_SECONDS` | float | `10.0` | Any speaker whose total speaking time across the whole meeting is below this is absorbed into its nearest stable neighbour. This is what removes phantom speakers created by crosstalk, laughter or a single overlapping syllable. **It does not run when the speaker count is already known** — see the note below. Lower it to 1–3 s for a file-based transcription where a genuinely brief contributor must survive as their own speaker. |
 | `CLUSTER_CONSOLIDATION` | bool | `true` | Merges clusters whose speaker centroids are too close to be different people, which is what repairs one person fragmented across several speakers. Turn it off only to measure what it is doing. |
+| `CLEAN_EMBEDDING_SAMPLES` | bool | `true` | Which segments consolidation extracts speaker embeddings from. With it on, a cluster's samples are its **least contested** turns — the ones the segmentation model does not also assign to somebody else — with duration breaking ties among equally clean candidates. With it off, the longest turns are used, which on a densely overlapped meeting are exactly the most contaminated ones. **Worth +6.8 cpWER on French, at a cost of 1.2 on English; see `docs/quality-research.md`.** |
 | `MERGE_SIMILARITY` | float | `0.77` | The cosine similarity two cluster centroids must exceed before consolidation treats them as the same person. Raising it merges less; lowering it merges more. **Both directions measured worse.** Read the note below before you touch it. |
+| `MIN_DURATION_ON` | float | `0.25` | Speech shorter than this is discarded by the segmentation model before clustering. |
+| `MIN_DURATION_OFF` | float | `0.40` | A silence shorter than this *inside one speaker's turn* is filled in rather than splitting the turn. Against a word-aligned reference such as SUMM-RE's, filling gaps manufactures false alarm; lower it toward `0.0` if the diarization error is dominated by false alarm rather than by missed speech. |
 | `MAX_SPEAKERS` | int | `8` | Reaches the diarization request but the sherpa engine does not read it. It does not cap anything today. |
 | `MIN_SPEAKERS` | int | `1` | Same: carried, not used. |
 | `DEVICE` | `auto` \| `cpu` \| `cuda` | `auto` | Only the literal value `cuda` selects the GPU provider. `auto` resolves to CPU. Diarization is a small share of total time, so this rarely matters. |
@@ -705,13 +711,18 @@ HANSARD_ASR__INTRA_OP_THREADS=0
 
 HANSARD_AUDIO__HIGH_PASS_HZ=80
 HANSARD_AUDIO__MAX_SEGMENT_SECONDS=30
+HANSARD_AUDIO__DENSE_MAX_SEGMENT_SECONDS=15
+HANSARD_AUDIO__DENSE_SPEECH_RATIO=0.85
 HANSARD_AUDIO__SEGMENT_PADDING_SECONDS=0.35
 
 HANSARD_VAD__THRESHOLD=0.35
 HANSARD_VAD__MIN_SPEECH_SECONDS=0.15
 HANSARD_VAD__SPEECH_PAD_SECONDS=0.25
 
+HANSARD_DIARIZATION__CLEAN_EMBEDDING_SAMPLES=true
 HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS=1.5
+HANSARD_DIARIZATION__MIN_DURATION_ON=0.25
+HANSARD_DIARIZATION__MIN_DURATION_OFF=0.40
 HANSARD_DIARIZATION__SPEECH_COVERAGE_REFINEMENT=true
 HANSARD_DIARIZATION__MAXIMUM_TURN_EXTENSION=2.5
 
@@ -724,6 +735,12 @@ which stop quiet speech being discarded before it reaches the recogniser, and
 the much lower `MINIMUM_SPEAKER_SECONDS` — the default of `10.0` absorbs anyone
 who speaks for less than ten seconds in total, which is exactly what an archival
 transcript must not do. Expect to spend that on a few phantom speakers.
+
+Making that absorption conditional on voice similarity was tried and reverted:
+it cost speaker counting badly and bought nothing measurable, because on the
+SUMM-RE tuning meetings quiet-speaker recall is already 100 % with the
+unconditional floor. The measurement is in
+[quality-research](quality-research.md).
 `BATCH_SIZE=1` does not improve accuracy on its own; it lowers peak memory so you
 can afford everything else. `QUANTIZATION=none` is the shipped default and the
 right one here — see [the accuracy profile](#choosing-a-quantization-the-accuracy-profile).
@@ -754,3 +771,41 @@ validate and appear in `model_dump()`, but no code reads them today:
 - [Delivery](delivery.md) — the `delivery` section in depth
 - [Troubleshooting](troubleshooting.md) — symptom-first
 - [Multilingual](multilingual.md) — what the language settings do to a bilingual meeting
+
+
+### Why there are two segment ceilings
+
+`MAX_SEGMENT_SECONDS` trades memory for context, and raising it from 28 s to
+120 s was measured worth 4.1 points of word error on AMI, because the recognizer
+sees more of the conversation around each turn. That result is real and it is
+also the reason a single ceiling is wrong.
+
+The measurement that changed this is in
+[quality-research](quality-research.md). On a SUMM-RE meeting where four
+participants overlap enough that 96.8 % of the recording is speech, the detector
+finds almost no silence to split on, so the pipeline hands the recognizer
+**45 segments for 21 minutes** — 120-second spans of four people talking at once.
+It produced 1586 of 6462 reference words. At a 15-second ceiling it produced
+3334, and word error fell from 83.05 % to 54.02 %.
+
+Run the same change on AMI and it costs 2.4 points, because AMI is real
+microphones in a real room and its long spans are usually one person still
+talking. The two corpora want opposite settings, and what separates them is not
+the language — it is how much silence the recording contains:
+
+| Recording | Speech | Median detected span | Word error gained at a 15 s ceiling |
+| --- | ---: | ---: | ---: |
+| AMI `ES2004a` | 70.3 % | 3.05 s | −2.4 points (worse) |
+| SUMM-RE `017a_EBRZ` | 39.0 % | 1.29 s | +0.7 |
+| SUMM-RE `020c_EBPZ` | 75.9 % | 3.08 s | +1.1 |
+| SUMM-RE `004c_PAPH` | 89.9 % | 5.71 s | +7.1 |
+| SUMM-RE `021a_EARD` | 91.9 % | 5.20 s | +16.4 |
+| SUMM-RE `033c_EBPH` | 96.9 % | 15.47 s | +21.3 |
+| SUMM-RE `006b_EADH` | 96.8 % | 14.70 s | **+29.0** |
+
+So Hansard measures the speech ratio and picks the ceiling from it.
+`DENSE_SPEECH_RATIO = 0.85` sits in the gap between the recordings that gain
+7 points or more and the recordings that gain one or lose two. Teams delivers a
+server-mixed stream, which behaves like the dense end of this table when a
+meeting gets lively, so the adaptation matters in production and not only on a
+corpus.

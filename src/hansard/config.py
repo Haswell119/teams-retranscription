@@ -19,6 +19,8 @@ class AudioSettings(BaseModel):
     high_pass_hz: float = 60.0
     denoise: bool = False
     max_segment_seconds: float = 120.0
+    dense_max_segment_seconds: float = 15.0
+    dense_speech_ratio: float = 0.85
     min_segment_seconds: float = 1.0
     segment_padding_seconds: float = 0.2
 
@@ -42,6 +44,7 @@ class AsrSettings(BaseModel):
     batch_seconds: float = 240.0
     language: str | None = None
     identify_language: bool = True
+    language_revision: bool = False
     language_drift_guard: bool = True
     drift_probe_seconds: float = 4.0
     drift_probe_count: int = 8
@@ -57,12 +60,15 @@ class DiarizationSettings(BaseModel):
     embedding_model: str = "nemo_en_titanet_small.onnx"
     clustering_threshold: float = 0.99
     minimum_speaker_seconds: float = 10.0
+    min_duration_on: float = 0.25
+    min_duration_off: float = 0.40
     max_speakers: int = 8
     min_speakers: int = 1
     device: Device = "auto"
     speech_coverage_refinement: bool = True
     cluster_consolidation: bool = True
     merge_similarity: float = 0.77
+    clean_embedding_samples: bool = True
     maximum_turn_extension: float = 2.5
 
 

@@ -36,6 +36,8 @@ class SpeechRecognizer(Protocol):
 
     def transcribe(self, clip: AudioClip, hints: RecognitionHints) -> Transcript: ...
 
+    def warm_up(self) -> None: ...
+
 
 @runtime_checkable
 class LanguageIdentifier(Protocol):

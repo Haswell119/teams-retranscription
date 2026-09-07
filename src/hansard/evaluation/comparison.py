@@ -7,18 +7,22 @@ from pathlib import Path
 
 from hansard.adapters.language.identification import UtteranceLanguageTagger
 from hansard.domain.language import MIXED, normalise_tag
+from hansard.domain.speakers import Diarization, SpeakerTurn
 from hansard.domain.transcript import Transcript
 from hansard.evaluation.datasets import load_reference_json
 from hansard.evaluation.formats.subtitles import load_subtitles
+from hansard.evaluation.metrics.decomposition import Decomposition, decompose, sentence_joined
 from hansard.evaluation.metrics.language import language_identification, reference_language_at
+from hansard.evaluation.metrics.quiet import QuietSpeakerReport, quiet_speaker_report
 from hansard.evaluation.metrics.speaker import (
     concatenated_minimum_permutation_wer,
+    time_constrained_cpwer,
     word_diarization_error_rate,
 )
 from hansard.evaluation.metrics.text import word_error_rate
 from hansard.evaluation.normalizers import NORMALIZER_VERSION, TextNormalizer, normalizer_for
 
-COMPARISON_VERSION = "hansard-comparison-1.0.0"
+COMPARISON_VERSION = "hansard-comparison-1.1.0"
 SUBTITLE_SUFFIXES = frozenset({".vtt", ".srt"})
 
 
@@ -29,6 +33,7 @@ class LanguageSlice:
     hypothesis_words: int
     wer: float
     cer: float
+    decomposition: Decomposition | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,10 +44,13 @@ class SystemScore:
     wer: float
     cer: float
     cpwer: float
+    tcpwer: float
     wder: float
     language_accuracy: float
     detected_languages: tuple[str, ...]
     by_language: tuple[LanguageSlice, ...]
+    decomposition: Decomposition
+    speakers: QuietSpeakerReport | None = None
 
     def slice_for(self, language: str) -> LanguageSlice | None:
         return next((item for item in self.by_language if item.language == language), None)
@@ -117,11 +125,26 @@ def tagged_for_scoring(transcript: Transcript) -> Transcript:
     return UtteranceLanguageTagger().tag(transcript)
 
 
+def transcript_diarization(transcript: Transcript) -> Diarization:
+    turns = tuple(
+        SpeakerTurn(span=utterance.span, label=utterance.speaker)
+        for utterance in transcript.utterances
+        if utterance.span.duration > 0.0
+    )
+    return Diarization(turns=turns, labels=tuple(dict.fromkeys(turn.label for turn in turns)))
+
+
+def _scoring_language(reference: Transcript) -> str:
+    tag = reference.language_profile.tag
+    return "fr" if tag in (None, MIXED) else str(tag)
+
+
 def score_system(
     name: str,
     hypothesis: Transcript,
     reference: Transcript,
     normalizer: TextNormalizer | None = None,
+    glossary: Sequence[str] = (),
 ) -> SystemScore:
     scoring = normalizer or normalizer_for(reference.language_profile.tag or MIXED)
     scored_hypothesis = tagged_for_scoring(hypothesis)
@@ -131,7 +154,8 @@ def score_system(
     for language in reference_languages(reference):
         expected = _reference_in(reference, language)
         observed = _restricted(hypothesis, reference, language)
-        scored = word_error_rate(expected.text, observed.text, normalizer_for(language))
+        language_normalizer = normalizer_for(language)
+        scored = word_error_rate(expected.text, observed.text, language_normalizer)
         slices.append(
             LanguageSlice(
                 language=language,
@@ -139,6 +163,13 @@ def score_system(
                 hypothesis_words=observed.word_count,
                 wer=scored.wer,
                 cer=scored.cer,
+                decomposition=decompose(
+                    language_normalizer.normalize(expected.text),
+                    language_normalizer.normalize(observed.text),
+                    language,
+                    sentence_joined(item.text for item in expected.utterances),
+                    glossary,
+                ),
             )
         )
     return SystemScore(
@@ -148,10 +179,25 @@ def score_system(
         wer=overall.wer,
         cer=overall.cer,
         cpwer=concatenated_minimum_permutation_wer(reference, hypothesis, scoring).wer,
+        tcpwer=time_constrained_cpwer(reference, hypothesis, scoring, collar=5.0).wer,
         wder=word_diarization_error_rate(reference, hypothesis, scoring),
         language_accuracy=identified.accuracy,
         detected_languages=scored_hypothesis.language_profile.significant,
         by_language=tuple(slices),
+        decomposition=decompose(
+            scoring.normalize(reference.text),
+            scoring.normalize(hypothesis.text),
+            _scoring_language(reference),
+            sentence_joined(utterance.text for utterance in reference.utterances),
+            glossary,
+        ),
+        speakers=quiet_speaker_report(
+            reference,
+            hypothesis,
+            transcript_diarization(reference),
+            transcript_diarization(hypothesis),
+            scoring,
+        ),
     )
 
 
@@ -159,12 +205,15 @@ def compare(
     meeting: str,
     reference: Transcript,
     systems: Sequence[tuple[str, Transcript]],
+    glossary: Sequence[str] = (),
 ) -> Comparison:
     normalizer = normalizer_for(reference.language_profile.tag or MIXED)
     return Comparison(
         meeting=meeting,
         reference_languages=reference_languages(reference),
-        scores=tuple(score_system(name, hypothesis, reference, normalizer) for name, hypothesis in systems),
+        scores=tuple(
+            score_system(name, hypothesis, reference, normalizer, glossary) for name, hypothesis in systems
+        ),
     )
 
 
@@ -187,6 +236,7 @@ def comparison_payload(comparison: Comparison) -> dict[str, object]:
                 "wer_percent": _percent(score.wer),
                 "cer_percent": _percent(score.cer),
                 "cpwer_percent": _percent(score.cpwer),
+                "tcpwer_percent": _percent(score.tcpwer),
                 "wder_percent": _percent(score.wder),
                 "language_accuracy_percent": _percent(score.language_accuracy),
                 "detected_languages": list(score.detected_languages),
@@ -197,9 +247,14 @@ def comparison_payload(comparison: Comparison) -> dict[str, object]:
                         "hypothesis_words": item.hypothesis_words,
                         "wer_percent": _percent(item.wer),
                         "cer_percent": _percent(item.cer),
+                        "decomposition": item.decomposition.as_dict()
+                        if item.decomposition is not None
+                        else None,
                     }
                     for item in score.by_language
                 ],
+                "decomposition": score.decomposition.as_dict(),
+                "speakers": score.speakers.as_dict() if score.speakers is not None else None,
             }
             for score in comparison.scores
         ],
@@ -208,13 +263,15 @@ def comparison_payload(comparison: Comparison) -> dict[str, object]:
 
 def comparison_markdown(comparison: Comparison) -> str:
     languages = comparison.reference_languages
-    header = ["| System | WER | cpWER | WDER | Language accuracy | Languages detected |"]
-    header.append("| --- | ---: | ---: | ---: | ---: | --- |")
+    header = ["| System | WER | cpWER | tcpWER@5s | WDER | Names kept | Language accuracy |"]
+    header.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
     for score in comparison.scores:
+        names = score.decomposition.counts_for("proper_noun")
+        kept = f"{_percent(names.recall):.1f} %" if names.reference_words else "n/a"
         header.append(
             f"| {score.name} | {_percent(score.wer):.2f} % | {_percent(score.cpwer):.2f} % | "
-            f"{_percent(score.wder):.2f} % | {_percent(score.language_accuracy):.2f} % | "
-            f"{', '.join(score.detected_languages) or 'none'} |"
+            f"{_percent(score.tcpwer):.2f} % | {_percent(score.wder):.2f} % | {kept} | "
+            f"{_percent(score.language_accuracy):.2f} % |"
         )
     lines = [f"# Comparison — {comparison.meeting}", "", *header]
     if len(languages) > 1:
@@ -227,4 +284,24 @@ def comparison_markdown(comparison: Comparison) -> str:
                 item = score.slice_for(language)
                 cells.append(f"{_percent(item.wer):.2f} %" if item is not None else "n/a")
             lines.append(f"| {score.name} | {' | '.join(cells)} |")
+    lines.extend(_speaker_section(comparison))
     return "\n".join(lines) + "\n"
+
+
+def _speaker_section(comparison: Comparison) -> list[str]:
+    scored = [score for score in comparison.scores if score.speakers is not None]
+    if not scored:
+        return []
+    buckets = tuple(
+        dict.fromkeys(item.bucket for score in scored for item in score.speakers.buckets)  # type: ignore[union-attr]
+    )
+    if not buckets:
+        return []
+    lines = ["", "## Word recall by how long each speaker actually spoke", ""]
+    lines.append(f"| System | {' | '.join(buckets)} |")
+    lines.append(f"| --- | {' | '.join('---:' for _ in buckets)} |")
+    for score in scored:
+        found = {item.bucket: item for item in score.speakers.buckets}  # type: ignore[union-attr]
+        cells = [f"{_percent(found[name].word_recall):.1f} %" if name in found else "n/a" for name in buckets]
+        lines.append(f"| {score.name} | {' | '.join(cells)} |")
+    return lines

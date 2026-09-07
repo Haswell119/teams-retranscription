@@ -75,6 +75,8 @@ class Composition:
             max_seconds=audio.max_segment_seconds,
             min_seconds=audio.min_segment_seconds,
             padding_seconds=audio.segment_padding_seconds,
+            dense_max_seconds=audio.dense_max_segment_seconds,
+            dense_speech_ratio=audio.dense_speech_ratio,
         )
 
     def language_tagger(self) -> UtteranceLanguageTagger | None:
@@ -85,6 +87,7 @@ class Composition:
             identifier=TextLanguageIdentifier(),
             default_language=asr.language,
             trust_engine_tags=True,
+            revise_weak_verdicts=asr.language_revision,
         )
 
     def drift_guard(self) -> DriftGuardPolicy | None:
@@ -126,6 +129,7 @@ class Composition:
                     models_dir=settings.runtime.models_dir,
                     embedding_model=diarization.embedding_model,
                     merge_similarity=diarization.merge_similarity,
+                    clean_embedding_samples=diarization.clean_embedding_samples,
                 )
                 if diarization.cluster_consolidation and diarization.engine != "null"
                 else None

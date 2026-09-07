@@ -1,0 +1,107 @@
+{
+  "benchmark": "asr-shootout",
+  "shootout_version": "hansard-shootout-1.0.0",
+  "normalizer_version": "hansard-normalizers-1.2.0",
+  "corpus": "summ-re",
+  "boundaries": "reference utterances",
+  "segments": 855,
+  "meetings": [
+    "004c_PAPH",
+    "006b_EADH",
+    "017a_EBRZ",
+    "018b_EADZ",
+    "020c_EBPZ",
+    "021a_EARD",
+    "033c_EBPH"
+  ],
+  "audio_seconds": 1803.1,
+  "threads": 4,
+  "engines": [
+    {
+      "engine": {
+        "name": "canary-1b-v2-fr",
+        "engine": "parakeet",
+        "model_id": "nemo-canary-1b-v2",
+        "quantization": "none",
+        "beam_size": 1,
+        "language": "fr"
+      },
+      "audio_seconds": 1803.1,
+      "elapsed_seconds": 895.9,
+      "real_time_factor": 0.497,
+      "peak_memory_mb": 4598.6,
+      "empty_segments": 1,
+      "failures": 0,
+      "by_language": [
+        {
+          "language": "fr",
+          "segments": 855,
+          "reference_words": 7238,
+          "hypothesis_words": 6963,
+          "wer_percent": 38.59,
+          "cer_percent": 27.35,
+          "substitutions": 1206,
+          "deletions": 931,
+          "insertions": 656,
+          "deletion_share_percent": 33.33,
+          "decomposition": {
+            "reference_words": 7238,
+            "insertions": 656,
+            "substitutions": 1206,
+            "deletions": 931,
+            "categories": {
+              "proper_noun": {
+                "reference_words": 2,
+                "hits": 0,
+                "substitutions": 1,
+                "deletions": 1,
+                "error_rate_percent": 100.0,
+                "recall_percent": 0.0
+              },
+              "number": {
+                "reference_words": 339,
+                "hits": 249,
+                "substitutions": 52,
+                "deletions": 38,
+                "error_rate_percent": 26.55,
+                "recall_percent": 73.45
+              },
+              "code_switched": {
+                "reference_words": 23,
+                "hits": 13,
+                "substitutions": 6,
+                "deletions": 4,
+                "error_rate_percent": 43.48,
+                "recall_percent": 56.52
+              },
+              "filler": {
+                "reference_words": 117,
+                "hits": 59,
+                "substitutions": 28,
+                "deletions": 30,
+                "error_rate_percent": 49.57,
+                "recall_percent": 50.43
+              },
+              "function_word": {
+                "reference_words": 3239,
+                "hits": 2323,
+                "substitutions": 458,
+                "deletions": 458,
+                "error_rate_percent": 28.28,
+                "recall_percent": 71.72
+              },
+              "content_word": {
+                "reference_words": 3518,
+                "hits": 2457,
+                "substitutions": 661,
+                "deletions": 400,
+                "error_rate_percent": 30.16,
+                "recall_percent": 69.84
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

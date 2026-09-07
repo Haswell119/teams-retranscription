@@ -22,6 +22,9 @@ class NullRecognizer:
             license_identifier="apache-2.0",
         )
 
+    def warm_up(self) -> None:
+        return None
+
     def transcribe(self, clip: AudioClip, hints: RecognitionHints) -> Transcript:
         spans = hints.segments or (clip.span,)
         return Transcript(

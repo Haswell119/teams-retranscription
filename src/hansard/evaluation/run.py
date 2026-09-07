@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from hansard.adapters.asr.onnx_engine import OnnxRecognizer
+from hansard.adapters.asr.registry import build_recognizer
 from hansard.adapters.audio import load_clip
 from hansard.config import Settings
 from hansard.domain.language import MIXED
@@ -16,12 +16,16 @@ from hansard.domain.transcript import Transcript
 from hansard.evaluation.ami import discover_meetings
 from hansard.evaluation.corpora import (
     SUMM_RE_LANGUAGE,
+    SUMM_RE_SPLITS,
     meeting_diarization,
     meeting_transcript,
     read_meeting,
+    summ_re_split,
 )
 from hansard.evaluation.datasets import load_manifest, load_reference_json
+from hansard.evaluation.metrics.decomposition import decompose, sentence_joined
 from hansard.evaluation.metrics.language import language_identification
+from hansard.evaluation.metrics.quiet import quiet_speaker_report
 from hansard.evaluation.metrics.speaker import (
     concatenated_minimum_permutation_wer,
     diarization_error_rate,
@@ -33,6 +37,15 @@ from hansard.evaluation.metrics.speaker import (
 from hansard.evaluation.metrics.system import ResourceProbe
 from hansard.evaluation.metrics.text import word_error_rate
 from hansard.evaluation.normalizers import NORMALIZER_VERSION, normalizer_for
+from hansard.evaluation.shootout import (
+    ami_segments,
+    budgeted,
+    preset,
+    run_shootout,
+    shootout_payload,
+    summ_re_segments,
+)
+from hansard.evaluation.sweep import SweepMeeting, SweepPoint, run_sweep
 from hansard.factory import Composition
 from hansard.ports.asr import RecognitionHints
 
@@ -54,6 +67,8 @@ MEETING_FIXTURES: tuple[tuple[str, str], ...] = (
     ("meeting_mixed_4spk", MIXED),
     ("meeting_mixed_6spk", MIXED),
     ("meeting_mixed_8spk", MIXED),
+    ("meeting_mixed_5spk_heldout", MIXED),
+    ("meeting_mixed_7spk_heldout", MIXED),
 )
 AMI_CONDITION = "Mix-Headset"
 
@@ -65,6 +80,15 @@ class RunOptions:
     threads: int
     language: str | None = None
     roster: bool = False
+    corpus: str = "summ-re"
+    engines: tuple[str, ...] = ()
+    seconds: float = 0.0
+    split: str | None = None
+    transcripts: Path | None = None
+    minimum_segment_seconds: float = 0.4
+    points: tuple[str, ...] = ()
+    meetings: tuple[str, ...] = ()
+    cache: Path = Path("bench/cache")
 
 
 def _percent(value: float) -> float:
@@ -86,12 +110,8 @@ def _recognition_profile(settings: Settings) -> dict[str, object]:
 
 def run_asr(options: RunOptions) -> dict[str, object]:
     settings = Settings()
-    engine = OnnxRecognizer(
-        quantization=None if settings.asr.quantization == "none" else settings.asr.quantization,
-        batch_size=settings.asr.batch_size,
-        memory_profile=settings.asr.memory_profile,
-        intra_op_threads=options.threads,
-    )
+    settings.asr.intra_op_threads = options.threads
+    engine = build_recognizer(settings.asr, settings.runtime.models_dir)
     engine.warm_up()
     rows: list[dict[str, object]] = []
     for filename, language, label in ASR_CORPORA:
@@ -196,6 +216,15 @@ def run_meetings(options: RunOptions) -> dict[str, object]:
                 "der_false_alarm_percent": _percent(strict.false_alarm_rate),
                 "der_confusion_percent": _percent(strict.confusion_rate),
                 "reference_overlap_percent": _percent(overlap_ratio(reference_diarization)),
+                "speakers": quiet_speaker_report(
+                    reference, hypothesis, reference_diarization, outcome.diarization, normalizer
+                ).as_dict(),
+                "decomposition": decompose(
+                    normalizer.normalize(reference.text),
+                    normalizer.normalize(hypothesis.text),
+                    language if language != MIXED else "fr",
+                    reference.text,
+                ).as_dict(),
                 "language_accuracy_percent": _percent(identified.accuracy),
                 "detected_languages": list(hypothesis.language_profile.significant),
                 "language_confusions": [
@@ -266,6 +295,15 @@ def _score_corpus_meeting(
         "der_false_alarm_percent": _percent(strict.false_alarm_rate),
         "der_confusion_percent": _percent(strict.confusion_rate),
         "reference_overlap_percent": _percent(overlap_ratio(reference_diarization)),
+        "speakers": quiet_speaker_report(
+            reference, hypothesis, reference_diarization, outcome.diarization, normalizer
+        ).as_dict(),
+        "decomposition": decompose(
+            normalizer.normalize(reference.text),
+            normalizer.normalize(hypothesis.text),
+            language if language != MIXED else "fr",
+            sentence_joined(utterance.text for utterance in reference.utterances),
+        ).as_dict(),
         "real_time_factor": round(elapsed / clip.duration, 4),
         "peak_rss_mb": round(probe.usage.peak_rss_mb, 1),
         "stage_seconds": outcome.stage_seconds,
@@ -309,20 +347,24 @@ def run_summ_re(options: RunOptions) -> dict[str, object]:
     if not root.is_dir():
         return {"benchmark": "summ-re", "normalizer_version": NORMALIZER_VERSION, "rows": rows}
     for directory in sorted(item for item in root.iterdir() if item.is_dir()):
+        if options.meetings and directory.name not in options.meetings:
+            continue
+        if options.split is not None and summ_re_split(directory.name) != options.split:
+            continue
         meeting = read_meeting(directory)
         if meeting.mixed_audio is None:
             continue
-        rows.append(
-            _score_corpus_meeting(
-                settings,
-                meeting.identifier,
-                meeting.mixed_audio,
-                meeting_transcript(meeting),
-                meeting_diarization(meeting),
-                SUMM_RE_LANGUAGE,
-                options.roster,
-            )
+        row = _score_corpus_meeting(
+            settings,
+            meeting.identifier,
+            meeting.mixed_audio,
+            meeting_transcript(meeting),
+            meeting_diarization(meeting),
+            SUMM_RE_LANGUAGE,
+            options.roster,
         )
+        row["split"] = summ_re_split(meeting.identifier)
+        rows.append(row)
     return {
         "benchmark": "summ-re",
         "profile": "roster" if options.roster else "default",
@@ -331,6 +373,11 @@ def run_summ_re(options: RunOptions) -> dict[str, object]:
         "normalizer_version": NORMALIZER_VERSION,
         "rows": rows,
         "summary": _aggregate(rows),
+        "by_split": {
+            name: _aggregate([row for row in rows if row.get("split") == name])
+            for name in SUMM_RE_SPLITS
+            if any(row.get("split") == name for row in rows)
+        },
     }
 
 
@@ -365,9 +412,106 @@ def _aggregate(rows: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
+def run_shootout_benchmark(options: RunOptions) -> dict[str, object]:
+    settings = Settings()
+    settings.asr.intra_op_threads = options.threads
+    if options.corpus == "ami":
+        segments = ami_segments(options.data_dir / "ami", options.data_dir / "ami" / "annotations")
+        if options.meetings:
+            segments = tuple(item for item in segments if item.meeting in options.meetings)
+    else:
+        segments = summ_re_segments(
+            options.data_dir / "summ-re",
+            minimum_seconds=options.minimum_segment_seconds,
+            split=options.split,
+            meetings=options.meetings or None,
+        )
+    selected = budgeted(segments, options.seconds)
+    specs = tuple(preset(name) for name in options.engines) or (preset("parakeet-fp32"),)
+    outcomes = run_shootout(
+        specs,
+        selected,
+        settings.runtime.models_dir,
+        threads=options.threads,
+        transcripts_dir=options.transcripts,
+    )
+    return shootout_payload(outcomes, selected, options.corpus, settings)
+
+
+def sweep_meetings(options: RunOptions) -> tuple[SweepMeeting, ...]:
+    if options.corpus == "ami":
+        audio_root = options.data_dir / "ami"
+        return tuple(
+            SweepMeeting(
+                identifier=meeting.identifier,
+                audio=meeting.audio_path,
+                language="en",
+                reference=meeting.reference,
+                reference_diarization=meeting.diarization,
+            )
+            for meeting in discover_meetings(audio_root, audio_root / "annotations")
+        )
+    root = options.data_dir / "summ-re"
+    if not root.is_dir():
+        return ()
+    meetings: list[SweepMeeting] = []
+    for directory in sorted(item for item in root.iterdir() if item.is_dir()):
+        if options.meetings and directory.name not in options.meetings:
+            continue
+        if options.split is not None and summ_re_split(directory.name) != options.split:
+            continue
+        meeting = read_meeting(directory)
+        if meeting.mixed_audio is None:
+            continue
+        meetings.append(
+            SweepMeeting(
+                identifier=meeting.identifier,
+                audio=meeting.mixed_audio,
+                language=SUMM_RE_LANGUAGE,
+                reference=meeting_transcript(meeting),
+                reference_diarization=meeting_diarization(meeting),
+            )
+        )
+    return tuple(meetings)
+
+
+def run_diarization_sweep(options: RunOptions) -> dict[str, object]:
+    settings = Settings()
+    settings.asr.intra_op_threads = options.threads
+    points = tuple(_sweep_point(entry) for entry in options.points) or (SweepPoint(label="default"),)
+    report = run_sweep(sweep_meetings(options), points, settings, options.cache)
+    report["corpus"] = options.corpus
+    report["split"] = options.split or "all"
+    return report
+
+
+def _sweep_point(entry: str) -> SweepPoint:
+    label, separator, body = entry.partition(":")
+    if not separator:
+        body, label = entry, entry
+    overrides: dict[str, object] = {}
+    for pair in body.split(","):
+        if not pair:
+            continue
+        key, _, raw = pair.partition("=")
+        overrides[key.strip()] = _sweep_value(raw.strip())
+    return SweepPoint(label=label, overrides=overrides)
+
+
+def _sweep_value(raw: str) -> object:
+    if raw in ("true", "false"):
+        return raw == "true"
+    try:
+        return float(raw)
+    except ValueError:
+        return raw
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hansard-bench")
-    parser.add_argument("benchmark", choices=("asr", "meetings", "ami", "summ-re"))
+    parser.add_argument(
+        "benchmark", choices=("asr", "meetings", "ami", "summ-re", "shootout", "diarization-sweep")
+    )
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--threads", type=int, default=0)
@@ -376,6 +520,29 @@ def build_parser() -> argparse.ArgumentParser:
         "--roster",
         action="store_true",
         help="supply the speakers as a participant list, as a Teams meeting would",
+    )
+    parser.add_argument("--corpus", default="summ-re", choices=("summ-re", "ami"))
+    parser.add_argument("--engines", default="", help="comma separated shootout engine presets")
+    parser.add_argument(
+        "--seconds", type=float, default=0.0, help="audio budget per engine, 0 for everything"
+    )
+    parser.add_argument("--split", default=None, choices=SUMM_RE_SPLITS)
+    parser.add_argument("--transcripts", type=Path, default=None)
+    parser.add_argument(
+        "--min-segment-seconds",
+        type=float,
+        default=0.4,
+        help="drop reference segments shorter than this from the shootout",
+    )
+    parser.add_argument(
+        "--point",
+        action="append",
+        default=[],
+        help="a sweep point, as label:key=value,key=value",
+    )
+    parser.add_argument("--cache", type=Path, default=Path("bench/cache"))
+    parser.add_argument(
+        "--meetings", default="", help="comma separated meeting identifiers to restrict the run to"
     )
     return parser
 
@@ -388,12 +555,23 @@ def main(argv: list[str] | None = None) -> int:
         threads=arguments.threads,
         language=arguments.language,
         roster=arguments.roster,
+        corpus=arguments.corpus,
+        engines=tuple(name for name in arguments.engines.split(",") if name),
+        seconds=arguments.seconds,
+        split=arguments.split,
+        transcripts=arguments.transcripts,
+        minimum_segment_seconds=arguments.min_segment_seconds,
+        points=tuple(arguments.point),
+        cache=arguments.cache,
+        meetings=tuple(name for name in arguments.meetings.split(",") if name),
     )
     runners = {
         "asr": run_asr,
         "meetings": run_meetings,
         "ami": run_ami,
         "summ-re": run_summ_re,
+        "shootout": run_shootout_benchmark,
+        "diarization-sweep": run_diarization_sweep,
     }
     report = runners[arguments.benchmark](options)
     options.output.parent.mkdir(parents=True, exist_ok=True)

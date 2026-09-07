@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,7 +18,15 @@ SUMM_RE_LANGUAGE = "fr"
 SUMM_RE_LICENSE = "CC-BY-SA-4.0"
 SUMM_RE_APPROXIMATE_SIZE_GB = 93
 SUMM_RE_SOURCE = "summ-re"
+SUMM_RE_DEV_SHARDS = 29
+SUMM_RE_TUNING_SPLIT = "tuning"
+SUMM_RE_HELD_OUT_SPLIT = "held-out"
+SUMM_RE_SPLITS = (SUMM_RE_TUNING_SPLIT, SUMM_RE_HELD_OUT_SPLIT)
 MIXED_AUDIO_NAMES = ("mixed.wav", "mix.wav", "meeting.wav")
+SUMM_RE_ANNOTATION_MARKERS: tuple[str, ...] = ("+", "@", "*")
+_SUMM_RE_MARKER = re.compile(r"(?:(?<=\s)|^)[+@*](?:(?=\s)|$)")
+_SUMM_RE_JOINER = re.compile(r"[#_]")
+_SUMM_RE_SPACES = re.compile(r"\s+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +56,25 @@ class SummReMeeting:
     @property
     def speakers(self) -> tuple[str, ...]:
         return tuple(track.speaker for track in self.tracks)
+
+
+def summ_re_split(identifier: str) -> str:
+    digest = hashlib.blake2b(identifier.encode("utf-8"), digest_size=8).digest()
+    return SUMM_RE_TUNING_SPLIT if digest[0] % 2 == 0 else SUMM_RE_HELD_OUT_SPLIT
+
+
+def summ_re_meetings_in_split(identifiers: Sequence[str], split: str | None) -> tuple[str, ...]:
+    if split is None:
+        return tuple(sorted(identifiers))
+    if split not in SUMM_RE_SPLITS:
+        raise ConfigurationError(f"unknown SUMM-RE split {split!r}, expected one of {SUMM_RE_SPLITS}")
+    return tuple(sorted(name for name in identifiers if summ_re_split(name) == split))
+
+
+def strip_annotation(text: str) -> str:
+    without_markers = _SUMM_RE_MARKER.sub(" ", text)
+    spelled = _SUMM_RE_JOINER.sub(" ", without_markers)
+    return _SUMM_RE_SPACES.sub(" ", spelled).strip()
 
 
 def read_speaker_track(path: Path, speaker: str, audio_path: Path | None = None) -> SpeakerTrack:
@@ -143,7 +172,7 @@ def _utterances(records: list[dict[str, object]], speaker: str) -> list[Utteranc
     for record in records:
         start = float(str(record.get("start", 0.0)))
         end = float(str(record.get("end", start)))
-        text = str(record.get("text", "")).strip()
+        text = strip_annotation(str(record.get("text", "")))
         if not text:
             continue
         utterances.append(

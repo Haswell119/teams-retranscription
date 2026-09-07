@@ -43,19 +43,19 @@
           "words": 18
         }
       ],
-      "real_time_factor": 0.1926,
-      "speedup": 5.2,
-      "peak_rss_mb": 3854.8,
+      "real_time_factor": 0.6005,
+      "speedup": 1.7,
+      "peak_rss_mb": 3856.8,
       "stage_seconds": {
-        "enhance": 6.238,
-        "voice_activity": 1.256,
-        "recognise": 25.695,
-        "language_drift": 1.554,
-        "identify_language": 0.002,
-        "diarise": 28.186,
-        "consolidate": 1.26,
-        "refine": 0.001,
-        "attribute": 0.027,
+        "enhance": 9.721,
+        "voice_activity": 3.665,
+        "recognise": 109.402,
+        "language_drift": 4.353,
+        "identify_language": 0.003,
+        "diarise": 70.345,
+        "consolidate": 2.714,
+        "refine": 0.002,
+        "attribute": 0.053,
         "resolve_names": 0.0
       }
     },
@@ -96,19 +96,19 @@
           "words": 12
         }
       ],
-      "real_time_factor": 0.1803,
-      "speedup": 5.5,
-      "peak_rss_mb": 3927.3,
+      "real_time_factor": 0.3942,
+      "speedup": 2.5,
+      "peak_rss_mb": 3931.1,
       "stage_seconds": {
-        "enhance": 9.465,
-        "voice_activity": 1.964,
-        "recognise": 40.752,
-        "language_drift": 1.525,
-        "identify_language": 0.004,
-        "diarise": 50.845,
-        "consolidate": 2.52,
-        "refine": 0.002,
-        "attribute": 0.104,
+        "enhance": 18.285,
+        "voice_activity": 5.355,
+        "recognise": 91.671,
+        "language_drift": 2.872,
+        "identify_language": 0.005,
+        "diarise": 108.767,
+        "consolidate": 7.217,
+        "refine": 0.003,
+        "attribute": 0.135,
         "resolve_names": 0.0
       }
     },
@@ -149,19 +149,19 @@
           "words": 16
         }
       ],
-      "real_time_factor": 0.1879,
-      "speedup": 5.3,
-      "peak_rss_mb": 4024.1,
+      "real_time_factor": 0.3785,
+      "speedup": 2.6,
+      "peak_rss_mb": 4026.6,
       "stage_seconds": {
-        "enhance": 9.479,
-        "voice_activity": 2.243,
-        "recognise": 41.396,
-        "language_drift": 1.403,
-        "identify_language": 0.003,
-        "diarise": 50.271,
-        "consolidate": 2.651,
-        "refine": 0.002,
-        "attribute": 0.064,
+        "enhance": 17.04,
+        "voice_activity": 7.438,
+        "recognise": 103.628,
+        "language_drift": 2.62,
+        "identify_language": 0.005,
+        "diarise": 81.271,
+        "consolidate": 4.453,
+        "refine": 0.003,
+        "attribute": 0.115,
         "resolve_names": 0.0
       }
     }

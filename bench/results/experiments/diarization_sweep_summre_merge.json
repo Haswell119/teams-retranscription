@@ -1,0 +1,1876 @@
+{
+  "benchmark": "diarization-sweep",
+  "sweep_version": "hansard-sweep-1.0.0",
+  "normalizer_version": "hansard-normalizers-1.3.0",
+  "meetings": [
+    "004c_PAPH",
+    "006b_EADH",
+    "017a_EBRZ",
+    "020c_EBPZ"
+  ],
+  "transcript_cache": "bench/cache/summre",
+  "rows": [
+    {
+      "point": "merge0.68",
+      "overrides": {
+        "merge_similarity": 0.68
+      },
+      "diarization_seconds": 594.6,
+      "macro": {
+        "cpwer_percent": 63.79,
+        "wder_percent": 21.05,
+        "der_percent": 45.89,
+        "der_missed_percent": 8.71,
+        "der_false_alarm_percent": 18.95,
+        "der_confusion_percent": 18.23,
+        "jer_percent": 56.27,
+        "quiet_speaker_recall_percent": 87.5,
+        "speaker_count_error": 1.0
+      },
+      "meetings": [
+        {
+          "meeting": "004c_PAPH",
+          "detected_speakers": 3,
+          "reference_speakers": 4,
+          "cpwer_percent": 57.91,
+          "wder_percent": 12.99,
+          "der_percent": 38.36,
+          "der_missed_percent": 6.0,
+          "der_false_alarm_percent": 18.14,
+          "der_confusion_percent": 14.21,
+          "jer_percent": 51.55,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "013",
+                "speech_seconds": 522.6,
+                "bucket": "over_5m",
+                "reference_words": 1954,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 55.53,
+                "word_recall_percent": 49.33,
+                "substitutions": 260,
+                "deletions": 730,
+                "insertions": 95
+              },
+              {
+                "speaker": "014",
+                "speech_seconds": 106.5,
+                "bucket": "1m_to_5m",
+                "reference_words": 320,
+                "matched_cluster": null,
+                "found": false,
+                "wer_percent": 100.0,
+                "word_recall_percent": 0.0,
+                "substitutions": 0,
+                "deletions": 320,
+                "insertions": 0
+              },
+              {
+                "speaker": "015",
+                "speech_seconds": 231.6,
+                "bucket": "1m_to_5m",
+                "reference_words": 634,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 55.21,
+                "word_recall_percent": 56.47,
+                "substitutions": 90,
+                "deletions": 186,
+                "insertions": 74
+              },
+              {
+                "speaker": "016",
+                "speech_seconds": 292.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1159,
+                "matched_cluster": "speaker_09",
+                "found": true,
+                "wer_percent": 51.77,
+                "word_recall_percent": 50.04,
+                "substitutions": 82,
+                "deletions": 497,
+                "insertions": 21
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 3,
+                "speakers_found": 2,
+                "speaker_recall_percent": 66.67,
+                "reference_words": 2113,
+                "word_recall_percent": 44.39,
+                "wer_percent": 60.1
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1954,
+                "word_recall_percent": 49.33,
+                "wer_percent": 55.53
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "006b_EADH",
+          "detected_speakers": 2,
+          "reference_speakers": 4,
+          "cpwer_percent": 93.21,
+          "wder_percent": 53.13,
+          "der_percent": 72.12,
+          "der_missed_percent": 18.55,
+          "der_false_alarm_percent": 10.8,
+          "der_confusion_percent": 42.78,
+          "jer_percent": 89.16,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 244.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1278,
+                "matched_cluster": null,
+                "found": false,
+                "wer_percent": 100.0,
+                "word_recall_percent": 0.0,
+                "substitutions": 0,
+                "deletions": 1278,
+                "insertions": 0
+              },
+              {
+                "speaker": "018",
+                "speech_seconds": 525.5,
+                "bucket": "over_5m",
+                "reference_words": 2709,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 83.57,
+                "word_recall_percent": 20.6,
+                "substitutions": 1034,
+                "deletions": 1117,
+                "insertions": 113
+              },
+              {
+                "speaker": "019",
+                "speech_seconds": 482.5,
+                "bucket": "over_5m",
+                "reference_words": 2054,
+                "matched_cluster": null,
+                "found": false,
+                "wer_percent": 100.0,
+                "word_recall_percent": 0.0,
+                "substitutions": 0,
+                "deletions": 2054,
+                "insertions": 0
+              },
+              {
+                "speaker": "020",
+                "speech_seconds": 124.8,
+                "bucket": "1m_to_5m",
+                "reference_words": 509,
+                "matched_cluster": null,
+                "found": false,
+                "wer_percent": 100.0,
+                "word_recall_percent": 0.0,
+                "substitutions": 0,
+                "deletions": 509,
+                "insertions": 0
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 0,
+                "speaker_recall_percent": 0.0,
+                "reference_words": 1787,
+                "word_recall_percent": 0.0,
+                "wer_percent": 100.0
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 1,
+                "speaker_recall_percent": 50.0,
+                "reference_words": 4763,
+                "word_recall_percent": 11.72,
+                "wer_percent": 90.66
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "017a_EBRZ",
+          "detected_speakers": 3,
+          "reference_speakers": 3,
+          "cpwer_percent": 55.32,
+          "wder_percent": 5.5,
+          "der_percent": 39.67,
+          "der_missed_percent": 6.28,
+          "der_false_alarm_percent": 28.85,
+          "der_confusion_percent": 4.54,
+          "jer_percent": 31.06,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "054",
+                "speech_seconds": 47.2,
+                "bucket": "15s_to_60s",
+                "reference_words": 191,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 48.69,
+                "word_recall_percent": 52.36,
+                "substitutions": 46,
+                "deletions": 45,
+                "insertions": 2
+              },
+              {
+                "speaker": "055",
+                "speech_seconds": 139.7,
+                "bucket": "1m_to_5m",
+                "reference_words": 536,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 64.74,
+                "word_recall_percent": 36.57,
+                "substitutions": 126,
+                "deletions": 214,
+                "insertions": 7
+              },
+              {
+                "speaker": "056",
+                "speech_seconds": 98.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 392,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 45.66,
+                "word_recall_percent": 58.16,
+                "substitutions": 41,
+                "deletions": 123,
+                "insertions": 15
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 191,
+                "word_recall_percent": 52.36,
+                "wer_percent": 48.69
+              },
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 928,
+                "word_recall_percent": 45.69,
+                "wer_percent": 56.68
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "020c_EBPZ",
+          "detected_speakers": 3,
+          "reference_speakers": 4,
+          "cpwer_percent": 48.73,
+          "wder_percent": 12.59,
+          "der_percent": 33.39,
+          "der_missed_percent": 4.02,
+          "der_false_alarm_percent": 18.0,
+          "der_confusion_percent": 11.37,
+          "jer_percent": 53.31,
+          "quiet_speaker_recall_percent": 50.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 59.0,
+                "bucket": "15s_to_60s",
+                "reference_words": 296,
+                "matched_cluster": "speaker_06",
+                "found": true,
+                "wer_percent": 53.38,
+                "word_recall_percent": 48.31,
+                "substitutions": 70,
+                "deletions": 83,
+                "insertions": 5
+              },
+              {
+                "speaker": "053",
+                "speech_seconds": 326.3,
+                "bucket": "over_5m",
+                "reference_words": 1307,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 42.46,
+                "word_recall_percent": 60.37,
+                "substitutions": 150,
+                "deletions": 368,
+                "insertions": 37
+              },
+              {
+                "speaker": "057",
+                "speech_seconds": 379.9,
+                "bucket": "over_5m",
+                "reference_words": 1672,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 50.84,
+                "word_recall_percent": 57.89,
+                "substitutions": 261,
+                "deletions": 443,
+                "insertions": 146
+              },
+              {
+                "speaker": "063",
+                "speech_seconds": 12.4,
+                "bucket": "under_15s",
+                "reference_words": 64,
+                "matched_cluster": null,
+                "found": false,
+                "wer_percent": 100.0,
+                "word_recall_percent": 0.0,
+                "substitutions": 0,
+                "deletions": 64,
+                "insertions": 0
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "under_15s",
+                "speakers": 1,
+                "speakers_found": 0,
+                "speaker_recall_percent": 0.0,
+                "reference_words": 64,
+                "word_recall_percent": 0.0,
+                "wer_percent": 100.0
+              },
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 296,
+                "word_recall_percent": 48.31,
+                "wer_percent": 53.38
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2979,
+                "word_recall_percent": 58.98,
+                "wer_percent": 47.16
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "point": "merge0.72",
+      "overrides": {
+        "merge_similarity": 0.72
+      },
+      "diarization_seconds": 0.0,
+      "macro": {
+        "cpwer_percent": 62.89,
+        "wder_percent": 12.12,
+        "der_percent": 41.35,
+        "der_missed_percent": 5.27,
+        "der_false_alarm_percent": 22.4,
+        "der_confusion_percent": 13.67,
+        "jer_percent": 43.15,
+        "quiet_speaker_recall_percent": 87.5,
+        "speaker_count_error": 1.0
+      },
+      "meetings": [
+        {
+          "meeting": "004c_PAPH",
+          "detected_speakers": 5,
+          "reference_speakers": 4,
+          "cpwer_percent": 55.52,
+          "wder_percent": 10.39,
+          "der_percent": 35.54,
+          "der_missed_percent": 5.28,
+          "der_false_alarm_percent": 18.75,
+          "der_confusion_percent": 11.5,
+          "jer_percent": 39.84,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "013",
+                "speech_seconds": 522.6,
+                "bucket": "over_5m",
+                "reference_words": 1954,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 53.74,
+                "word_recall_percent": 47.9,
+                "substitutions": 194,
+                "deletions": 824,
+                "insertions": 32
+              },
+              {
+                "speaker": "014",
+                "speech_seconds": 106.5,
+                "bucket": "1m_to_5m",
+                "reference_words": 320,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 76.25,
+                "word_recall_percent": 24.38,
+                "substitutions": 63,
+                "deletions": 179,
+                "insertions": 2
+              },
+              {
+                "speaker": "015",
+                "speech_seconds": 231.6,
+                "bucket": "1m_to_5m",
+                "reference_words": 634,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 55.36,
+                "word_recall_percent": 56.47,
+                "substitutions": 90,
+                "deletions": 186,
+                "insertions": 75
+              },
+              {
+                "speaker": "016",
+                "speech_seconds": 292.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1159,
+                "matched_cluster": "speaker_09",
+                "found": true,
+                "wer_percent": 51.77,
+                "word_recall_percent": 50.04,
+                "substitutions": 82,
+                "deletions": 497,
+                "insertions": 21
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 3,
+                "speakers_found": 3,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2113,
+                "word_recall_percent": 48.08,
+                "wer_percent": 56.55
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1954,
+                "word_recall_percent": 47.9,
+                "wer_percent": 53.74
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "006b_EADH",
+          "detected_speakers": 5,
+          "reference_speakers": 4,
+          "cpwer_percent": 85.76,
+          "wder_percent": 17.08,
+          "der_percent": 41.82,
+          "der_missed_percent": 5.98,
+          "der_false_alarm_percent": 23.16,
+          "der_confusion_percent": 12.67,
+          "jer_percent": 43.26,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 244.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1278,
+                "matched_cluster": "speaker_08",
+                "found": true,
+                "wer_percent": 91.47,
+                "word_recall_percent": 8.76,
+                "substitutions": 151,
+                "deletions": 1015,
+                "insertions": 3
+              },
+              {
+                "speaker": "018",
+                "speech_seconds": 525.5,
+                "bucket": "over_5m",
+                "reference_words": 2709,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 83.79,
+                "word_recall_percent": 16.69,
+                "substitutions": 265,
+                "deletions": 1992,
+                "insertions": 13
+              },
+              {
+                "speaker": "019",
+                "speech_seconds": 482.5,
+                "bucket": "over_5m",
+                "reference_words": 2054,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 83.11,
+                "word_recall_percent": 17.38,
+                "substitutions": 277,
+                "deletions": 1420,
+                "insertions": 10
+              },
+              {
+                "speaker": "020",
+                "speech_seconds": 124.8,
+                "bucket": "1m_to_5m",
+                "reference_words": 509,
+                "matched_cluster": "speaker_13",
+                "found": true,
+                "wer_percent": 92.53,
+                "word_recall_percent": 7.66,
+                "substitutions": 25,
+                "deletions": 445,
+                "insertions": 1
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1787,
+                "word_recall_percent": 8.45,
+                "wer_percent": 91.77
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 4763,
+                "word_recall_percent": 16.99,
+                "wer_percent": 83.5
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "017a_EBRZ",
+          "detected_speakers": 4,
+          "reference_speakers": 3,
+          "cpwer_percent": 61.57,
+          "wder_percent": 8.44,
+          "der_percent": 54.64,
+          "der_missed_percent": 5.8,
+          "der_false_alarm_percent": 29.69,
+          "der_confusion_percent": 19.15,
+          "jer_percent": 36.2,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "054",
+                "speech_seconds": 47.2,
+                "bucket": "15s_to_60s",
+                "reference_words": 191,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 48.69,
+                "word_recall_percent": 52.36,
+                "substitutions": 46,
+                "deletions": 45,
+                "insertions": 2
+              },
+              {
+                "speaker": "055",
+                "speech_seconds": 139.7,
+                "bucket": "1m_to_5m",
+                "reference_words": 536,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 67.91,
+                "word_recall_percent": 33.4,
+                "substitutions": 90,
+                "deletions": 267,
+                "insertions": 7
+              },
+              {
+                "speaker": "056",
+                "speech_seconds": 98.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 392,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 45.66,
+                "word_recall_percent": 58.16,
+                "substitutions": 41,
+                "deletions": 123,
+                "insertions": 15
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 191,
+                "word_recall_percent": 52.36,
+                "wer_percent": 48.69
+              },
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 928,
+                "word_recall_percent": 43.86,
+                "wer_percent": 58.51
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "020c_EBPZ",
+          "detected_speakers": 3,
+          "reference_speakers": 4,
+          "cpwer_percent": 48.73,
+          "wder_percent": 12.59,
+          "der_percent": 33.39,
+          "der_missed_percent": 4.02,
+          "der_false_alarm_percent": 18.0,
+          "der_confusion_percent": 11.37,
+          "jer_percent": 53.31,
+          "quiet_speaker_recall_percent": 50.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 59.0,
+                "bucket": "15s_to_60s",
+                "reference_words": 296,
+                "matched_cluster": "speaker_06",
+                "found": true,
+                "wer_percent": 53.38,
+                "word_recall_percent": 48.31,
+                "substitutions": 70,
+                "deletions": 83,
+                "insertions": 5
+              },
+              {
+                "speaker": "053",
+                "speech_seconds": 326.3,
+                "bucket": "over_5m",
+                "reference_words": 1307,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 42.46,
+                "word_recall_percent": 60.37,
+                "substitutions": 150,
+                "deletions": 368,
+                "insertions": 37
+              },
+              {
+                "speaker": "057",
+                "speech_seconds": 379.9,
+                "bucket": "over_5m",
+                "reference_words": 1672,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 50.84,
+                "word_recall_percent": 57.89,
+                "substitutions": 261,
+                "deletions": 443,
+                "insertions": 146
+              },
+              {
+                "speaker": "063",
+                "speech_seconds": 12.4,
+                "bucket": "under_15s",
+                "reference_words": 64,
+                "matched_cluster": null,
+                "found": false,
+                "wer_percent": 100.0,
+                "word_recall_percent": 0.0,
+                "substitutions": 0,
+                "deletions": 64,
+                "insertions": 0
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "under_15s",
+                "speakers": 1,
+                "speakers_found": 0,
+                "speaker_recall_percent": 0.0,
+                "reference_words": 64,
+                "word_recall_percent": 0.0,
+                "wer_percent": 100.0
+              },
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 296,
+                "word_recall_percent": 48.31,
+                "wer_percent": 53.38
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2979,
+                "word_recall_percent": 58.98,
+                "wer_percent": 47.16
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "point": "merge0.75",
+      "overrides": {
+        "merge_similarity": 0.75
+      },
+      "diarization_seconds": 0.0,
+      "macro": {
+        "cpwer_percent": 62.89,
+        "wder_percent": 12.12,
+        "der_percent": 41.35,
+        "der_missed_percent": 5.27,
+        "der_false_alarm_percent": 22.4,
+        "der_confusion_percent": 13.67,
+        "jer_percent": 43.15,
+        "quiet_speaker_recall_percent": 87.5,
+        "speaker_count_error": 1.25
+      },
+      "meetings": [
+        {
+          "meeting": "004c_PAPH",
+          "detected_speakers": 5,
+          "reference_speakers": 4,
+          "cpwer_percent": 55.52,
+          "wder_percent": 10.39,
+          "der_percent": 35.54,
+          "der_missed_percent": 5.28,
+          "der_false_alarm_percent": 18.75,
+          "der_confusion_percent": 11.5,
+          "jer_percent": 39.84,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "013",
+                "speech_seconds": 522.6,
+                "bucket": "over_5m",
+                "reference_words": 1954,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 53.74,
+                "word_recall_percent": 47.9,
+                "substitutions": 194,
+                "deletions": 824,
+                "insertions": 32
+              },
+              {
+                "speaker": "014",
+                "speech_seconds": 106.5,
+                "bucket": "1m_to_5m",
+                "reference_words": 320,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 76.25,
+                "word_recall_percent": 24.38,
+                "substitutions": 63,
+                "deletions": 179,
+                "insertions": 2
+              },
+              {
+                "speaker": "015",
+                "speech_seconds": 231.6,
+                "bucket": "1m_to_5m",
+                "reference_words": 634,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 55.36,
+                "word_recall_percent": 56.47,
+                "substitutions": 90,
+                "deletions": 186,
+                "insertions": 75
+              },
+              {
+                "speaker": "016",
+                "speech_seconds": 292.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1159,
+                "matched_cluster": "speaker_09",
+                "found": true,
+                "wer_percent": 51.77,
+                "word_recall_percent": 50.04,
+                "substitutions": 82,
+                "deletions": 497,
+                "insertions": 21
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 3,
+                "speakers_found": 3,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2113,
+                "word_recall_percent": 48.08,
+                "wer_percent": 56.55
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1954,
+                "word_recall_percent": 47.9,
+                "wer_percent": 53.74
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "006b_EADH",
+          "detected_speakers": 5,
+          "reference_speakers": 4,
+          "cpwer_percent": 85.76,
+          "wder_percent": 17.08,
+          "der_percent": 41.82,
+          "der_missed_percent": 5.98,
+          "der_false_alarm_percent": 23.16,
+          "der_confusion_percent": 12.67,
+          "jer_percent": 43.26,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 244.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1278,
+                "matched_cluster": "speaker_08",
+                "found": true,
+                "wer_percent": 91.47,
+                "word_recall_percent": 8.76,
+                "substitutions": 151,
+                "deletions": 1015,
+                "insertions": 3
+              },
+              {
+                "speaker": "018",
+                "speech_seconds": 525.5,
+                "bucket": "over_5m",
+                "reference_words": 2709,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 83.79,
+                "word_recall_percent": 16.69,
+                "substitutions": 265,
+                "deletions": 1992,
+                "insertions": 13
+              },
+              {
+                "speaker": "019",
+                "speech_seconds": 482.5,
+                "bucket": "over_5m",
+                "reference_words": 2054,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 83.11,
+                "word_recall_percent": 17.38,
+                "substitutions": 277,
+                "deletions": 1420,
+                "insertions": 10
+              },
+              {
+                "speaker": "020",
+                "speech_seconds": 124.8,
+                "bucket": "1m_to_5m",
+                "reference_words": 509,
+                "matched_cluster": "speaker_13",
+                "found": true,
+                "wer_percent": 92.53,
+                "word_recall_percent": 7.66,
+                "substitutions": 25,
+                "deletions": 445,
+                "insertions": 1
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1787,
+                "word_recall_percent": 8.45,
+                "wer_percent": 91.77
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 4763,
+                "word_recall_percent": 16.99,
+                "wer_percent": 83.5
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "017a_EBRZ",
+          "detected_speakers": 5,
+          "reference_speakers": 3,
+          "cpwer_percent": 61.57,
+          "wder_percent": 8.44,
+          "der_percent": 54.64,
+          "der_missed_percent": 5.8,
+          "der_false_alarm_percent": 29.69,
+          "der_confusion_percent": 19.15,
+          "jer_percent": 36.2,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "054",
+                "speech_seconds": 47.2,
+                "bucket": "15s_to_60s",
+                "reference_words": 191,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 48.69,
+                "word_recall_percent": 52.36,
+                "substitutions": 46,
+                "deletions": 45,
+                "insertions": 2
+              },
+              {
+                "speaker": "055",
+                "speech_seconds": 139.7,
+                "bucket": "1m_to_5m",
+                "reference_words": 536,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 67.91,
+                "word_recall_percent": 33.4,
+                "substitutions": 90,
+                "deletions": 267,
+                "insertions": 7
+              },
+              {
+                "speaker": "056",
+                "speech_seconds": 98.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 392,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 45.66,
+                "word_recall_percent": 58.16,
+                "substitutions": 41,
+                "deletions": 123,
+                "insertions": 15
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 191,
+                "word_recall_percent": 52.36,
+                "wer_percent": 48.69
+              },
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 928,
+                "word_recall_percent": 43.86,
+                "wer_percent": 58.51
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "020c_EBPZ",
+          "detected_speakers": 3,
+          "reference_speakers": 4,
+          "cpwer_percent": 48.73,
+          "wder_percent": 12.59,
+          "der_percent": 33.39,
+          "der_missed_percent": 4.02,
+          "der_false_alarm_percent": 18.0,
+          "der_confusion_percent": 11.37,
+          "jer_percent": 53.31,
+          "quiet_speaker_recall_percent": 50.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 59.0,
+                "bucket": "15s_to_60s",
+                "reference_words": 296,
+                "matched_cluster": "speaker_06",
+                "found": true,
+                "wer_percent": 53.38,
+                "word_recall_percent": 48.31,
+                "substitutions": 70,
+                "deletions": 83,
+                "insertions": 5
+              },
+              {
+                "speaker": "053",
+                "speech_seconds": 326.3,
+                "bucket": "over_5m",
+                "reference_words": 1307,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 42.46,
+                "word_recall_percent": 60.37,
+                "substitutions": 150,
+                "deletions": 368,
+                "insertions": 37
+              },
+              {
+                "speaker": "057",
+                "speech_seconds": 379.9,
+                "bucket": "over_5m",
+                "reference_words": 1672,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 50.84,
+                "word_recall_percent": 57.89,
+                "substitutions": 261,
+                "deletions": 443,
+                "insertions": 146
+              },
+              {
+                "speaker": "063",
+                "speech_seconds": 12.4,
+                "bucket": "under_15s",
+                "reference_words": 64,
+                "matched_cluster": null,
+                "found": false,
+                "wer_percent": 100.0,
+                "word_recall_percent": 0.0,
+                "substitutions": 0,
+                "deletions": 64,
+                "insertions": 0
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "under_15s",
+                "speakers": 1,
+                "speakers_found": 0,
+                "speaker_recall_percent": 0.0,
+                "reference_words": 64,
+                "word_recall_percent": 0.0,
+                "wer_percent": 100.0
+              },
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 296,
+                "word_recall_percent": 48.31,
+                "wer_percent": 53.38
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2979,
+                "word_recall_percent": 58.98,
+                "wer_percent": 47.16
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "point": "merge0.77",
+      "overrides": {
+        "merge_similarity": 0.77
+      },
+      "diarization_seconds": 0.0,
+      "macro": {
+        "cpwer_percent": 63.06,
+        "wder_percent": 12.25,
+        "der_percent": 41.94,
+        "der_missed_percent": 5.19,
+        "der_false_alarm_percent": 22.46,
+        "der_confusion_percent": 14.29,
+        "jer_percent": 43.23,
+        "quiet_speaker_recall_percent": 100.0,
+        "speaker_count_error": 1.25
+      },
+      "meetings": [
+        {
+          "meeting": "004c_PAPH",
+          "detected_speakers": 6,
+          "reference_speakers": 4,
+          "cpwer_percent": 56.09,
+          "wder_percent": 10.48,
+          "der_percent": 36.38,
+          "der_missed_percent": 5.01,
+          "der_false_alarm_percent": 18.92,
+          "der_confusion_percent": 12.46,
+          "jer_percent": 39.95,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "013",
+                "speech_seconds": 522.6,
+                "bucket": "over_5m",
+                "reference_words": 1954,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 53.74,
+                "word_recall_percent": 47.9,
+                "substitutions": 194,
+                "deletions": 824,
+                "insertions": 32
+              },
+              {
+                "speaker": "014",
+                "speech_seconds": 106.5,
+                "bucket": "1m_to_5m",
+                "reference_words": 320,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 76.56,
+                "word_recall_percent": 24.06,
+                "substitutions": 42,
+                "deletions": 201,
+                "insertions": 2
+              },
+              {
+                "speaker": "015",
+                "speech_seconds": 231.6,
+                "bucket": "1m_to_5m",
+                "reference_words": 634,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 55.36,
+                "word_recall_percent": 56.47,
+                "substitutions": 90,
+                "deletions": 186,
+                "insertions": 75
+              },
+              {
+                "speaker": "016",
+                "speech_seconds": 292.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1159,
+                "matched_cluster": "speaker_09",
+                "found": true,
+                "wer_percent": 51.77,
+                "word_recall_percent": 50.04,
+                "substitutions": 82,
+                "deletions": 497,
+                "insertions": 21
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 3,
+                "speakers_found": 3,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2113,
+                "word_recall_percent": 48.04,
+                "wer_percent": 56.6
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1954,
+                "word_recall_percent": 47.9,
+                "wer_percent": 53.74
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "006b_EADH",
+          "detected_speakers": 5,
+          "reference_speakers": 4,
+          "cpwer_percent": 85.76,
+          "wder_percent": 17.08,
+          "der_percent": 41.82,
+          "der_missed_percent": 5.98,
+          "der_false_alarm_percent": 23.16,
+          "der_confusion_percent": 12.67,
+          "jer_percent": 43.26,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 244.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1278,
+                "matched_cluster": "speaker_08",
+                "found": true,
+                "wer_percent": 91.47,
+                "word_recall_percent": 8.76,
+                "substitutions": 151,
+                "deletions": 1015,
+                "insertions": 3
+              },
+              {
+                "speaker": "018",
+                "speech_seconds": 525.5,
+                "bucket": "over_5m",
+                "reference_words": 2709,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 83.79,
+                "word_recall_percent": 16.69,
+                "substitutions": 265,
+                "deletions": 1992,
+                "insertions": 13
+              },
+              {
+                "speaker": "019",
+                "speech_seconds": 482.5,
+                "bucket": "over_5m",
+                "reference_words": 2054,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 83.11,
+                "word_recall_percent": 17.38,
+                "substitutions": 277,
+                "deletions": 1420,
+                "insertions": 10
+              },
+              {
+                "speaker": "020",
+                "speech_seconds": 124.8,
+                "bucket": "1m_to_5m",
+                "reference_words": 509,
+                "matched_cluster": "speaker_13",
+                "found": true,
+                "wer_percent": 92.53,
+                "word_recall_percent": 7.66,
+                "substitutions": 25,
+                "deletions": 445,
+                "insertions": 1
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1787,
+                "word_recall_percent": 8.45,
+                "wer_percent": 91.77
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 4763,
+                "word_recall_percent": 16.99,
+                "wer_percent": 83.5
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "017a_EBRZ",
+          "detected_speakers": 5,
+          "reference_speakers": 3,
+          "cpwer_percent": 61.57,
+          "wder_percent": 8.44,
+          "der_percent": 54.64,
+          "der_missed_percent": 5.8,
+          "der_false_alarm_percent": 29.69,
+          "der_confusion_percent": 19.15,
+          "jer_percent": 36.2,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "054",
+                "speech_seconds": 47.2,
+                "bucket": "15s_to_60s",
+                "reference_words": 191,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 48.69,
+                "word_recall_percent": 52.36,
+                "substitutions": 46,
+                "deletions": 45,
+                "insertions": 2
+              },
+              {
+                "speaker": "055",
+                "speech_seconds": 139.7,
+                "bucket": "1m_to_5m",
+                "reference_words": 536,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 67.91,
+                "word_recall_percent": 33.4,
+                "substitutions": 90,
+                "deletions": 267,
+                "insertions": 7
+              },
+              {
+                "speaker": "056",
+                "speech_seconds": 98.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 392,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 45.66,
+                "word_recall_percent": 58.16,
+                "substitutions": 41,
+                "deletions": 123,
+                "insertions": 15
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 191,
+                "word_recall_percent": 52.36,
+                "wer_percent": 48.69
+              },
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 928,
+                "word_recall_percent": 43.86,
+                "wer_percent": 58.51
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "020c_EBPZ",
+          "detected_speakers": 4,
+          "reference_speakers": 4,
+          "cpwer_percent": 48.82,
+          "wder_percent": 13.0,
+          "der_percent": 34.92,
+          "der_missed_percent": 3.97,
+          "der_false_alarm_percent": 18.09,
+          "der_confusion_percent": 12.87,
+          "jer_percent": 53.53,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 59.0,
+                "bucket": "15s_to_60s",
+                "reference_words": 296,
+                "matched_cluster": "speaker_06",
+                "found": true,
+                "wer_percent": 53.38,
+                "word_recall_percent": 48.31,
+                "substitutions": 70,
+                "deletions": 83,
+                "insertions": 5
+              },
+              {
+                "speaker": "053",
+                "speech_seconds": 326.3,
+                "bucket": "over_5m",
+                "reference_words": 1307,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 42.46,
+                "word_recall_percent": 60.37,
+                "substitutions": 150,
+                "deletions": 368,
+                "insertions": 37
+              },
+              {
+                "speaker": "057",
+                "speech_seconds": 379.9,
+                "bucket": "over_5m",
+                "reference_words": 1672,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 51.14,
+                "word_recall_percent": 57.36,
+                "substitutions": 251,
+                "deletions": 462,
+                "insertions": 142
+              },
+              {
+                "speaker": "063",
+                "speech_seconds": 12.4,
+                "bucket": "under_15s",
+                "reference_words": 64,
+                "matched_cluster": "speaker_04",
+                "found": true,
+                "wer_percent": 96.88,
+                "word_recall_percent": 3.12,
+                "substitutions": 21,
+                "deletions": 41,
+                "insertions": 0
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "under_15s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 64,
+                "word_recall_percent": 3.12,
+                "wer_percent": 96.88
+              },
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 296,
+                "word_recall_percent": 48.31,
+                "wer_percent": 53.38
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2979,
+                "word_recall_percent": 58.68,
+                "wer_percent": 47.33
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "point": "merge0.80",
+      "overrides": {
+        "merge_similarity": 0.8
+      },
+      "diarization_seconds": 0.0,
+      "macro": {
+        "cpwer_percent": 63.11,
+        "wder_percent": 12.14,
+        "der_percent": 42.14,
+        "der_missed_percent": 5.17,
+        "der_false_alarm_percent": 22.52,
+        "der_confusion_percent": 14.46,
+        "jer_percent": 43.22,
+        "quiet_speaker_recall_percent": 100.0,
+        "speaker_count_error": 1.5
+      },
+      "meetings": [
+        {
+          "meeting": "004c_PAPH",
+          "detected_speakers": 6,
+          "reference_speakers": 4,
+          "cpwer_percent": 56.09,
+          "wder_percent": 10.48,
+          "der_percent": 36.38,
+          "der_missed_percent": 5.01,
+          "der_false_alarm_percent": 18.92,
+          "der_confusion_percent": 12.46,
+          "jer_percent": 39.95,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "013",
+                "speech_seconds": 522.6,
+                "bucket": "over_5m",
+                "reference_words": 1954,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 53.74,
+                "word_recall_percent": 47.9,
+                "substitutions": 194,
+                "deletions": 824,
+                "insertions": 32
+              },
+              {
+                "speaker": "014",
+                "speech_seconds": 106.5,
+                "bucket": "1m_to_5m",
+                "reference_words": 320,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 76.56,
+                "word_recall_percent": 24.06,
+                "substitutions": 42,
+                "deletions": 201,
+                "insertions": 2
+              },
+              {
+                "speaker": "015",
+                "speech_seconds": 231.6,
+                "bucket": "1m_to_5m",
+                "reference_words": 634,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 55.36,
+                "word_recall_percent": 56.47,
+                "substitutions": 90,
+                "deletions": 186,
+                "insertions": 75
+              },
+              {
+                "speaker": "016",
+                "speech_seconds": 292.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1159,
+                "matched_cluster": "speaker_09",
+                "found": true,
+                "wer_percent": 51.77,
+                "word_recall_percent": 50.04,
+                "substitutions": 82,
+                "deletions": 497,
+                "insertions": 21
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 3,
+                "speakers_found": 3,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2113,
+                "word_recall_percent": 48.04,
+                "wer_percent": 56.6
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1954,
+                "word_recall_percent": 47.9,
+                "wer_percent": 53.74
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "006b_EADH",
+          "detected_speakers": 6,
+          "reference_speakers": 4,
+          "cpwer_percent": 85.97,
+          "wder_percent": 16.64,
+          "der_percent": 42.6,
+          "der_missed_percent": 5.89,
+          "der_false_alarm_percent": 23.36,
+          "der_confusion_percent": 13.35,
+          "jer_percent": 43.21,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 244.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 1278,
+                "matched_cluster": "speaker_08",
+                "found": true,
+                "wer_percent": 91.47,
+                "word_recall_percent": 8.76,
+                "substitutions": 152,
+                "deletions": 1014,
+                "insertions": 3
+              },
+              {
+                "speaker": "018",
+                "speech_seconds": 525.5,
+                "bucket": "over_5m",
+                "reference_words": 2709,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 83.57,
+                "word_recall_percent": 16.91,
+                "substitutions": 265,
+                "deletions": 1986,
+                "insertions": 13
+              },
+              {
+                "speaker": "019",
+                "speech_seconds": 482.5,
+                "bucket": "over_5m",
+                "reference_words": 2054,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 83.4,
+                "word_recall_percent": 17.09,
+                "substitutions": 262,
+                "deletions": 1441,
+                "insertions": 10
+              },
+              {
+                "speaker": "020",
+                "speech_seconds": 124.8,
+                "bucket": "1m_to_5m",
+                "reference_words": 509,
+                "matched_cluster": "speaker_13",
+                "found": true,
+                "wer_percent": 92.53,
+                "word_recall_percent": 7.66,
+                "substitutions": 25,
+                "deletions": 445,
+                "insertions": 1
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 1787,
+                "word_recall_percent": 8.45,
+                "wer_percent": 91.77
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 4763,
+                "word_recall_percent": 16.99,
+                "wer_percent": 83.5
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "017a_EBRZ",
+          "detected_speakers": 5,
+          "reference_speakers": 3,
+          "cpwer_percent": 61.57,
+          "wder_percent": 8.44,
+          "der_percent": 54.64,
+          "der_missed_percent": 5.8,
+          "der_false_alarm_percent": 29.69,
+          "der_confusion_percent": 19.15,
+          "jer_percent": 36.2,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "054",
+                "speech_seconds": 47.2,
+                "bucket": "15s_to_60s",
+                "reference_words": 191,
+                "matched_cluster": "speaker_05",
+                "found": true,
+                "wer_percent": 48.69,
+                "word_recall_percent": 52.36,
+                "substitutions": 46,
+                "deletions": 45,
+                "insertions": 2
+              },
+              {
+                "speaker": "055",
+                "speech_seconds": 139.7,
+                "bucket": "1m_to_5m",
+                "reference_words": 536,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 67.91,
+                "word_recall_percent": 33.4,
+                "substitutions": 90,
+                "deletions": 267,
+                "insertions": 7
+              },
+              {
+                "speaker": "056",
+                "speech_seconds": 98.1,
+                "bucket": "1m_to_5m",
+                "reference_words": 392,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 45.66,
+                "word_recall_percent": 58.16,
+                "substitutions": 41,
+                "deletions": 123,
+                "insertions": 15
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 191,
+                "word_recall_percent": 52.36,
+                "wer_percent": 48.69
+              },
+              {
+                "bucket": "1m_to_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 928,
+                "word_recall_percent": 43.86,
+                "wer_percent": 58.51
+              }
+            ]
+          }
+        },
+        {
+          "meeting": "020c_EBPZ",
+          "detected_speakers": 4,
+          "reference_speakers": 4,
+          "cpwer_percent": 48.82,
+          "wder_percent": 13.0,
+          "der_percent": 34.92,
+          "der_missed_percent": 3.97,
+          "der_false_alarm_percent": 18.09,
+          "der_confusion_percent": 12.87,
+          "jer_percent": 53.53,
+          "quiet_speaker_recall_percent": 100.0,
+          "speakers": {
+            "by_speaker": [
+              {
+                "speaker": "017",
+                "speech_seconds": 59.0,
+                "bucket": "15s_to_60s",
+                "reference_words": 296,
+                "matched_cluster": "speaker_06",
+                "found": true,
+                "wer_percent": 53.38,
+                "word_recall_percent": 48.31,
+                "substitutions": 70,
+                "deletions": 83,
+                "insertions": 5
+              },
+              {
+                "speaker": "053",
+                "speech_seconds": 326.3,
+                "bucket": "over_5m",
+                "reference_words": 1307,
+                "matched_cluster": "speaker_01",
+                "found": true,
+                "wer_percent": 42.46,
+                "word_recall_percent": 60.37,
+                "substitutions": 150,
+                "deletions": 368,
+                "insertions": 37
+              },
+              {
+                "speaker": "057",
+                "speech_seconds": 379.9,
+                "bucket": "over_5m",
+                "reference_words": 1672,
+                "matched_cluster": "speaker_00",
+                "found": true,
+                "wer_percent": 51.14,
+                "word_recall_percent": 57.36,
+                "substitutions": 251,
+                "deletions": 462,
+                "insertions": 142
+              },
+              {
+                "speaker": "063",
+                "speech_seconds": 12.4,
+                "bucket": "under_15s",
+                "reference_words": 64,
+                "matched_cluster": "speaker_04",
+                "found": true,
+                "wer_percent": 96.88,
+                "word_recall_percent": 3.12,
+                "substitutions": 21,
+                "deletions": 41,
+                "insertions": 0
+              }
+            ],
+            "by_duration": [
+              {
+                "bucket": "under_15s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 64,
+                "word_recall_percent": 3.12,
+                "wer_percent": 96.88
+              },
+              {
+                "bucket": "15s_to_60s",
+                "speakers": 1,
+                "speakers_found": 1,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 296,
+                "word_recall_percent": 48.31,
+                "wer_percent": 53.38
+              },
+              {
+                "bucket": "over_5m",
+                "speakers": 2,
+                "speakers_found": 2,
+                "speaker_recall_percent": 100.0,
+                "reference_words": 2979,
+                "word_recall_percent": 58.68,
+                "wer_percent": 47.33
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "corpus": "summ-re",
+  "split": "all"
+}

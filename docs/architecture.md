@@ -204,6 +204,15 @@ This runs on the diarization audio chain, not the recognition chain, for the
 reason given above. `diarization.merge_similarity` controls it and
 `diarization.cluster_consolidation` turns it off.
 
+Clusters that barely speak are handled earlier, in the diarizer, where any
+cluster under `diarization.minimum_speaker_seconds` is folded into its nearest
+stable neighbour in time. Moving that decision here, so it could be conditioned
+on whether the two clusters actually sound alike, was tried and measured worse:
+absorbing after agglomeration rather than before leaves the phantom clusters the
+floor exists to remove, and speaker-count error went from 1.25 to 8.00 across
+four SUMM-RE meetings while quiet-speaker recall stayed at 100 % either way. See
+[quality-research](quality-research.md).
+
 ### Word-level attribution
 
 `WordLevelAttributor` turns two independent views of the meeting — a sequence of
@@ -353,6 +362,9 @@ class MyRecognizer:
             license_identifier="apache-2.0",
         )
 
+    def warm_up(self) -> None:
+        self._decode(silence(), TimeSpan(0.0, 1.0))
+
     def transcribe(self, clip: AudioClip, hints: RecognitionHints) -> Transcript:
         spans = hints.segments or (clip.span,)
         utterances = tuple(self._decode(clip.extract(span), span) for span in spans)
@@ -385,6 +397,24 @@ register_recognizer("mine", _build_mine)
 
 Import the heavy dependency *inside* the factory. Registration must stay cheap,
 because the module is imported whether or not your engine is selected.
+
+**Then measure it before you believe it.** A registered engine is immediately
+available to the shootout, which decodes byte-identical reference-boundary
+segments through every engine named on the command line and scores them with one
+normalizer:
+
+```bash
+make bench-shootout ENGINES=parakeet-fp32,mine SHOOTOUT_SECONDS=1800
+```
+
+The report gives word error, character error, substitutions, deletions and
+insertions per language, the error decomposition by word category, and word error
+split by how much of each segment another speaker is talking over. That last
+column is the one that has changed decisions here: a model that looks better on
+read speech has repeatedly turned out to be worse on the overlapped half of a
+real meeting. `bench/results/transcripts/` keeps every hypothesis, so a change to
+the normalizer or to the reference can be re-scored without decoding anything
+again.
 
 **3. Make it selectable.** Add `"mine"` to the `AsrEngine` literal in
 `config.py`, then `HANSARD_ASR__ENGINE=mine`. An unknown name already fails
