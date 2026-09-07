@@ -129,6 +129,7 @@ class Composition:
                     models_dir=settings.runtime.models_dir,
                     embedding_model=diarization.embedding_model,
                     merge_similarity=diarization.merge_similarity,
+                    clean_embedding_samples=diarization.clean_embedding_samples,
                 )
                 if diarization.cluster_consolidation and diarization.engine != "null"
                 else None

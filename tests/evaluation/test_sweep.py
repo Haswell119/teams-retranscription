@@ -165,3 +165,41 @@ def test_changing_a_segmentation_duration_changes_the_signature():
     base = Settings()
     other = SweepPoint("b", {"min_duration_off": 0.0}).applied(base)
     assert diarizer_signature(base) != diarizer_signature(other)
+
+
+def test_a_cache_written_under_other_segmentation_settings_is_not_reused(tmp_path):
+    from hansard.evaluation.sweep import _matches, _write_transcript, recognition_signature
+
+    settings = Settings()
+    path = tmp_path / "m1.json"
+    _write_transcript(path, Transcript(), (), recognition_signature(settings))
+    assert _matches(path, settings)
+
+    other = settings.model_copy(deep=True)
+    other.audio.dense_max_segment_seconds = 0.0
+    assert not _matches(path, other)
+
+
+def test_a_cache_with_no_recognition_record_is_not_reused(tmp_path):
+    from hansard.evaluation.sweep import _matches
+
+    path = tmp_path / "m1.json"
+    path.write_text(json.dumps({"language": "fr", "utterances": []}), encoding="utf-8")
+    assert not _matches(path, Settings())
+
+
+def test_a_missing_or_unreadable_cache_is_not_reused(tmp_path):
+    from hansard.evaluation.sweep import _matches
+
+    path = tmp_path / "m1.json"
+    path.write_text("{not json", encoding="utf-8")
+    assert not _matches(path, Settings())
+
+
+def test_the_signature_covers_the_settings_that_change_the_words():
+    from hansard.evaluation.sweep import recognition_signature
+
+    signature = recognition_signature(Settings())
+    assert "max_segment_seconds" in signature
+    assert "dense_speech_ratio" in signature
+    assert signature["model_id"]

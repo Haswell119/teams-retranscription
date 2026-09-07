@@ -10,6 +10,8 @@ from hansard.domain.audio import AudioClip
 from hansard.domain.speakers import Diarization, SpeakerTurn
 from hansard.domain.timespan import TimeSpan
 
+_NEIGHBOURHOOD = 64
+
 
 @dataclass(slots=True)
 class EmbeddingClusterConsolidator:
@@ -20,6 +22,7 @@ class EmbeddingClusterConsolidator:
     merge_similarity: float = 0.60
     samples_per_cluster: int = 8
     minimum_segment_seconds: float = 1.2
+    clean_embedding_samples: bool = True
     _extractor: Any | None = field(default=None, init=False, repr=False)
 
     @property
@@ -65,14 +68,17 @@ class EmbeddingClusterConsolidator:
         labels = list(diarization.labels or dict.fromkeys(turn.label for turn in diarization.turns))
         if len(labels) < 2:
             return diarization
-        by_label: dict[str, list[TimeSpan]] = {label: [] for label in labels}
+        contested = contested_fractions(diarization)
+        by_label: dict[str, list[tuple[TimeSpan, float]]] = {label: [] for label in labels}
         for turn in diarization.turns:
             if turn.span.duration >= self.minimum_segment_seconds:
-                by_label[turn.label].append(turn.span)
+                by_label[turn.label].append((turn.span, contested.get(turn.span, 0.0)))
         extractor = self._load()
         centroids: dict[str, np.ndarray] = {}
-        for label, spans in by_label.items():
-            chosen = sorted(spans, key=lambda span: -span.duration)[: self.samples_per_cluster]
+        for label, samples in by_label.items():
+            chosen = [span for span, _ in _ranked(samples, self.clean_embedding_samples)][
+                : self.samples_per_cluster
+            ]
             centroid = self._centroid(extractor, clip, chosen)
             if centroid is not None:
                 centroids[label] = centroid
@@ -86,6 +92,35 @@ class EmbeddingClusterConsolidator:
             for turn in diarization.turns
         )
         return Diarization(turns=turns, labels=tuple(dict.fromkeys(turn.label for turn in turns)))
+
+
+def contested_fractions(diarization: Diarization) -> dict[TimeSpan, float]:
+    turns = sorted(diarization.turns, key=lambda turn: turn.span.start)
+    contested: dict[TimeSpan, float] = {}
+    for index, turn in enumerate(turns):
+        if turn.span.duration <= 0.0:
+            contested[turn.span] = 0.0
+            continue
+        covered = 0.0
+        cursor = turn.span.start
+        for other in turns[max(0, index - _NEIGHBOURHOOD) : index + _NEIGHBOURHOOD]:
+            if other.label == turn.label or other.span.end <= cursor:
+                continue
+            if other.span.start >= turn.span.end:
+                break
+            start = max(other.span.start, cursor)
+            end = min(other.span.end, turn.span.end)
+            if end > start:
+                covered += end - start
+                cursor = end
+        contested[turn.span] = min(1.0, covered / turn.span.duration)
+    return contested
+
+
+def _ranked(samples: list[tuple[TimeSpan, float]], prefer_clean: bool) -> list[tuple[TimeSpan, float]]:
+    if not prefer_clean:
+        return sorted(samples, key=lambda item: -item[0].duration)
+    return sorted(samples, key=lambda item: (round(item[1], 2), -item[0].duration))
 
 
 def _agglomerate(

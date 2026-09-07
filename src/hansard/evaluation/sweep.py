@@ -27,7 +27,15 @@ from hansard.evaluation.normalizers import NORMALIZER_VERSION, normalizer_for
 from hansard.factory import Composition
 from hansard.ports.diarization import DiarizationRequest
 
-SWEEP_VERSION = "hansard-sweep-1.0.0"
+SWEEP_VERSION = "hansard-sweep-1.1.0"
+
+RECOGNITION_KEYS: tuple[str, ...] = (
+    "max_segment_seconds",
+    "dense_max_segment_seconds",
+    "dense_speech_ratio",
+    "min_segment_seconds",
+    "segment_padding_seconds",
+)
 
 DIARIZER_KEYS: tuple[str, ...] = (
     "embedding_model",
@@ -40,6 +48,7 @@ DIARIZER_KEYS: tuple[str, ...] = (
 
 CONSOLIDATION_KEYS: tuple[str, ...] = (
     "merge_similarity",
+    "clean_embedding_samples",
     "minimum_speaker_seconds",
     "speech_coverage_refinement",
 )
@@ -70,12 +79,19 @@ class SweepPoint:
         return updated
 
 
+def recognition_signature(settings: Settings) -> dict[str, object]:
+    signature: dict[str, object] = {key: getattr(settings.audio, key) for key in RECOGNITION_KEYS}
+    signature["model_id"] = settings.asr.model_id
+    signature["quantization"] = settings.asr.quantization
+    return signature
+
+
 def cached_transcript(
     meeting: SweepMeeting, settings: Settings, cache: Path
 ) -> tuple[Transcript, AudioClip, tuple[TimeSpan, ...]]:
     clip = load_clip(meeting.audio)
     path = cache / f"{meeting.identifier}.json"
-    if path.exists():
+    if path.exists() and _matches(path, settings):
         return _read_transcript(path, meeting.language, clip.duration, clip)
     pipeline = Composition(settings).pipeline()
     pipeline.diarizer = None
@@ -87,8 +103,16 @@ def cached_transcript(
     outcome = pipeline.run(
         clip, MeetingRequest(audio_path=meeting.audio, title=meeting.identifier, language=meeting.language)
     )
-    _write_transcript(path, outcome.transcript, outcome.speech_spans)
+    _write_transcript(path, outcome.transcript, outcome.speech_spans, recognition_signature(settings))
     return outcome.transcript, clip, outcome.speech_spans
+
+
+def _matches(path: Path, settings: Settings) -> bool:
+    try:
+        recorded = json.loads(path.read_text(encoding="utf-8")).get("recognition")
+    except (OSError, json.JSONDecodeError):
+        return False
+    return bool(recorded == recognition_signature(settings))
 
 
 def clusters_only(
@@ -121,6 +145,7 @@ def consolidated(
         models_dir=models_dir,
         embedding_model=settings.diarization.embedding_model,
         merge_similarity=settings.diarization.merge_similarity,
+        clean_embedding_samples=settings.diarization.clean_embedding_samples,
     )
     return consolidator.consolidate(diarization, clip, speaker_ceiling)
 
@@ -268,9 +293,15 @@ def _speech_spans(transcript: Transcript) -> tuple[TimeSpan, ...]:
     return tuple(utterance.span for utterance in transcript.utterances)
 
 
-def _write_transcript(path: Path, transcript: Transcript, speech: Sequence[TimeSpan] = ()) -> None:
+def _write_transcript(
+    path: Path,
+    transcript: Transcript,
+    speech: Sequence[TimeSpan] = (),
+    recognition: Mapping[str, object] | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
+    payload: dict[str, object] = {
+        "recognition": dict(recognition or {}),
         "language": transcript.language,
         "audio_duration": transcript.audio_duration,
         "speech_spans": [[span.start, span.end] for span in speech],

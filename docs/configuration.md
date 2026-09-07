@@ -263,6 +263,7 @@ tuning, because it is the one that decides who is credited with what.
 | `CLUSTERING_THRESHOLD` | float | `0.99` | The cosine-distance threshold at which two segments are treated as different speakers. **The single most useful knob.** See below. |
 | `MINIMUM_SPEAKER_SECONDS` | float | `10.0` | Any speaker whose total speaking time across the whole meeting is below this is absorbed into its nearest stable neighbour. This is what removes phantom speakers created by crosstalk, laughter or a single overlapping syllable. **It does not run when the speaker count is already known** — see the note below. Lower it to 1–3 s for a file-based transcription where a genuinely brief contributor must survive as their own speaker. |
 | `CLUSTER_CONSOLIDATION` | bool | `true` | Merges clusters whose speaker centroids are too close to be different people, which is what repairs one person fragmented across several speakers. Turn it off only to measure what it is doing. |
+| `CLEAN_EMBEDDING_SAMPLES` | bool | `true` | Which segments consolidation extracts speaker embeddings from. With it on, a cluster's samples are its **least contested** turns — the ones the segmentation model does not also assign to somebody else — with duration breaking ties. With it off, the longest turns are used, which on a densely overlapped meeting are exactly the most contaminated ones. |
 | `MERGE_SIMILARITY` | float | `0.77` | The cosine similarity two cluster centroids must exceed before consolidation treats them as the same person. Raising it merges less; lowering it merges more. **Both directions measured worse.** Read the note below before you touch it. |
 | `MIN_DURATION_ON` | float | `0.25` | Speech shorter than this is discarded by the segmentation model before clustering. |
 | `MIN_DURATION_OFF` | float | `0.40` | A silence shorter than this *inside one speaker's turn* is filled in rather than splitting the turn. Against a word-aligned reference such as SUMM-RE's, filling gaps manufactures false alarm; lower it toward `0.0` if the diarization error is dominated by false alarm rather than by missed speech. |
@@ -718,6 +719,7 @@ HANSARD_VAD__THRESHOLD=0.35
 HANSARD_VAD__MIN_SPEECH_SECONDS=0.15
 HANSARD_VAD__SPEECH_PAD_SECONDS=0.25
 
+HANSARD_DIARIZATION__CLEAN_EMBEDDING_SAMPLES=true
 HANSARD_DIARIZATION__MINIMUM_SPEAKER_SECONDS=1.5
 HANSARD_DIARIZATION__MIN_DURATION_ON=0.25
 HANSARD_DIARIZATION__MIN_DURATION_OFF=0.40
