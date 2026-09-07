@@ -166,18 +166,18 @@
           }
         }
       },
-      "real_time_factor": 0.1795,
-      "peak_rss_mb": 4899.7,
+      "real_time_factor": 0.1809,
+      "peak_rss_mb": 4901.4,
       "stage_seconds": {
-        "enhance": 17.782,
-        "voice_activity": 3.712,
-        "recognise": 81.877,
-        "language_drift": 1.672,
+        "enhance": 17.614,
+        "voice_activity": 4.137,
+        "recognise": 81.19,
+        "language_drift": 1.794,
         "identify_language": 0.004,
-        "diarise": 81.179,
-        "consolidate": 1.904,
+        "diarise": 81.804,
+        "consolidate": 3.062,
         "refine": 0.002,
-        "attribute": 0.21,
+        "attribute": 0.189,
         "resolve_names": 0.0
       },
       "condition": "Mix-Headset"
@@ -188,20 +188,20 @@
       "roster": false,
       "duration_minutes": 14.0,
       "reference_speakers": 4,
-      "detected_speakers": 5,
+      "detected_speakers": 6,
       "reference_words": 1986,
       "hypothesis_words": 1720,
       "wer_percent": 21.58,
       "cer_percent": 17.34,
-      "cpwer_percent": 34.66,
-      "tcpwer_percent": 36.34,
-      "wder_percent": 10.42,
-      "der_percent": 27.42,
-      "der_collar_percent": 16.74,
-      "jer_percent": 41.53,
-      "der_missed_percent": 13.76,
-      "der_false_alarm_percent": 3.73,
-      "der_confusion_percent": 9.92,
+      "cpwer_percent": 41.39,
+      "tcpwer_percent": 41.79,
+      "wder_percent": 13.64,
+      "der_percent": 30.26,
+      "der_collar_percent": 19.32,
+      "jer_percent": 43.22,
+      "der_missed_percent": 13.09,
+      "der_false_alarm_percent": 4.05,
+      "der_confusion_percent": 13.12,
       "reference_overlap_percent": 18.55,
       "speakers": {
         "by_speaker": [
@@ -212,18 +212,18 @@
             "reference_words": 1175,
             "matched_cluster": "Speaker 2",
             "found": true,
-            "wer_percent": 19.15,
-            "word_recall_percent": 84.26,
+            "wer_percent": 19.06,
+            "word_recall_percent": 84.51,
             "substitutions": 49,
-            "deletions": 136,
-            "insertions": 40
+            "deletions": 133,
+            "insertions": 42
           },
           {
             "speaker": "B",
             "speech_seconds": 82.5,
             "bucket": "1m_to_5m",
             "reference_words": 178,
-            "matched_cluster": "Speaker 3",
+            "matched_cluster": "Speaker 4",
             "found": true,
             "wer_percent": 44.38,
             "word_recall_percent": 56.74,
@@ -236,7 +236,7 @@
             "speech_seconds": 87.7,
             "bucket": "1m_to_5m",
             "reference_words": 190,
-            "matched_cluster": "Speaker 5",
+            "matched_cluster": "Speaker 6",
             "found": true,
             "wer_percent": 67.89,
             "word_recall_percent": 33.16,
@@ -249,13 +249,13 @@
             "speech_seconds": 163.5,
             "bucket": "1m_to_5m",
             "reference_words": 419,
-            "matched_cluster": "Speaker 1",
+            "matched_cluster": "Speaker 3",
             "found": true,
-            "wer_percent": 35.32,
-            "word_recall_percent": 66.59,
-            "substitutions": 57,
-            "deletions": 83,
-            "insertions": 8
+            "wer_percent": 48.69,
+            "word_recall_percent": 52.51,
+            "substitutions": 37,
+            "deletions": 162,
+            "insertions": 5
           }
         ],
         "by_duration": [
@@ -265,8 +265,8 @@
             "speakers_found": 3,
             "speaker_recall_percent": 100.0,
             "reference_words": 787,
-            "word_recall_percent": 56.29,
-            "wer_percent": 45.24
+            "word_recall_percent": 48.79,
+            "wer_percent": 52.35
           },
           {
             "bucket": "over_5m",
@@ -274,8 +274,8 @@
             "speakers_found": 1,
             "speaker_recall_percent": 100.0,
             "reference_words": 1175,
-            "word_recall_percent": 84.26,
-            "wer_percent": 19.15
+            "word_recall_percent": 84.51,
+            "wer_percent": 19.06
           }
         ]
       },
@@ -327,18 +327,18 @@
           }
         }
       },
-      "real_time_factor": 0.1926,
-      "peak_rss_mb": 4899.7,
+      "real_time_factor": 0.1936,
+      "peak_rss_mb": 4901.4,
       "stage_seconds": {
-        "enhance": 14.354,
-        "voice_activity": 2.505,
-        "recognise": 77.006,
-        "language_drift": 1.829,
-        "identify_language": 0.003,
-        "diarise": 63.942,
-        "consolidate": 1.787,
-        "refine": 0.001,
-        "attribute": 0.105,
+        "enhance": 14.225,
+        "voice_activity": 2.999,
+        "recognise": 75.449,
+        "language_drift": 2.005,
+        "identify_language": 0.004,
+        "diarise": 65.431,
+        "consolidate": 2.169,
+        "refine": 0.002,
+        "attribute": 0.141,
         "resolve_names": 0.0
       },
       "condition": "Mix-Headset"
@@ -505,18 +505,18 @@
           }
         }
       },
-      "real_time_factor": 0.1592,
-      "peak_rss_mb": 4899.7,
+      "real_time_factor": 0.1595,
+      "peak_rss_mb": 4901.4,
       "stage_seconds": {
-        "enhance": 24.893,
-        "voice_activity": 5.338,
-        "recognise": 92.484,
-        "language_drift": 1.453,
+        "enhance": 25.781,
+        "voice_activity": 5.439,
+        "recognise": 93.023,
+        "language_drift": 1.462,
         "identify_language": 0.005,
-        "diarise": 111.242,
-        "consolidate": 4.077,
-        "refine": 0.004,
-        "attribute": 0.171,
+        "diarise": 110.093,
+        "consolidate": 4.185,
+        "refine": 0.003,
+        "attribute": 0.205,
         "resolve_names": 0.0
       },
       "condition": "Mix-Headset"
@@ -527,14 +527,14 @@
     "total_minutes": 56.6,
     "macro_average": {
       "wer_percent": 21.25,
-      "cpwer_percent": 30.61,
-      "tcpwer_percent": 32.1,
-      "wder_percent": 7.58,
-      "der_percent": 29.21,
-      "der_collar_percent": 18.93,
-      "jer_percent": 45.44,
+      "cpwer_percent": 32.85,
+      "tcpwer_percent": 33.92,
+      "wder_percent": 8.66,
+      "der_percent": 30.16,
+      "der_collar_percent": 19.79,
+      "jer_percent": 46.0,
       "reference_overlap_percent": 17.58
     },
-    "word_weighted_cpwer_percent": 30.29
+    "word_weighted_cpwer_percent": 32.17
   }
 }

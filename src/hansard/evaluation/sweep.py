@@ -87,6 +87,12 @@ def recognition_signature(settings: Settings) -> dict[str, object]:
     return signature
 
 
+def diarization_clip(meeting: SweepMeeting, settings: Settings) -> AudioClip:
+    clip = load_clip(meeting.audio)
+    enhancer = Composition(settings).diarization_enhancer()
+    return enhancer.enhance(clip) if enhancer is not None else clip
+
+
 def cached_transcript(
     meeting: SweepMeeting, settings: Settings, cache: Path
 ) -> tuple[Transcript, AudioClip, tuple[TimeSpan, ...]]:
@@ -207,8 +213,8 @@ def run_sweep(
     models_dir = settings.runtime.models_dir
     prepared: list[tuple[SweepMeeting, Transcript, AudioClip, tuple[TimeSpan, ...]]] = []
     for meeting in meetings:
-        transcript, clip, speech = cached_transcript(meeting, settings, cache)
-        prepared.append((meeting, transcript, clip, speech))
+        transcript, _, speech = cached_transcript(meeting, settings, cache)
+        prepared.append((meeting, transcript, diarization_clip(meeting, settings), speech))
     rows: list[dict[str, object]] = []
     clusters: dict[tuple[object, ...], dict[str, Diarization]] = {}
     for point in points:
