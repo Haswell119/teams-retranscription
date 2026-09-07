@@ -141,6 +141,8 @@ difference in speaker handling and nothing else.
 | 12 | Score eight meetings end to end | 8 SUMM-RE meetings | macro **71.92 %** cpWER, **57.49 %** WER | The honest French figure |
 | 13 | Segment ceiling 120 s → 15 s | dense + sparse meeting | dense **83.05 % → 54.02 %** WER; AMI loses 2.4 | Flat ceiling rejected |
 | 14 | Ceiling chosen from the speech ratio | AMI + 12 SUMM-RE meetings | tuning **−12.3** WER, held-out **−2.1**, AMI bit-identical | **KEEP** |
+| 15 | Speaker centroids from uncontested turns | AMI + 12 SUMM-RE meetings | SUMM-RE **63.83 % → 57.04 %** cpWER, held-out **−2.2**, AMI roster unchanged, AMI told nothing **+1.24** | **KEEP** |
+| 15b | The same idea as a 0.2 contest ceiling | same runs | worse than plain ranking on both corpora; the sweep that proposed it was measuring the wrong audio | **REVERT** |
 
 ## Iterations
 
@@ -761,6 +763,114 @@ like `006b_EADH` and a polite one looks like `020c_EBPZ`.
 
 ---
 
+### Iteration 15 — clean embedding samples, and a harness that measured the wrong audio
+
+**Hypothesis.** The consolidator builds each cluster's speaker centroid from that
+cluster's *longest* turns. On a densely overlapped meeting the longest turns are
+the most contaminated ones, so the vectors being compared are averages of two
+voices — and the two worst cpWER rows in the corpus, `033c_EBPH` at three
+clusters for four people and `035b_EADH` at two, are exactly the meetings where
+speakers get merged away. Ranking samples by how much of them somebody else is
+talking through should give cleaner centroids and stop the merge.
+
+The fraction needs no reference. The segmentation model already emits
+overlapping turns carrying different labels — 257 cross-label pairs across 309
+turns on `033c_EBPH` alone — so `contested_fractions` computes it at inference
+time from the diarization the pipeline has already produced.
+
+**Experiment.** Two formulations, each measured end to end on AMI and on all
+twelve SUMM-RE meetings against the committed default:
+
+- **ranking** — sort by contested fraction rounded to a hundredth, duration
+  breaking ties among equally clean candidates;
+- **ceiling** — take the *longest* sample among those under a 0.2 contest
+  ceiling, keeping the rest behind them so no cluster is left without a centroid.
+
+The second exists only because the diarization sweep preferred it, and preferred
+it emphatically: the sweep said the ceiling took AMI from 28.54 % to 27.95 %
+cpWER and handed `IS1009a` back its exact four speakers.
+
+**Result 1 — the sweep was wrong, and wrong about its own headline.**
+
+| AMI, told nothing | cpWER | `IS1009a` clusters |
+| --- | ---: | :---: |
+| sweep, ceiling formulation | 27.95 % | 4 for 4 |
+| **end to end, ceiling formulation** | **32.85 %** | **6 for 4** |
+
+Not a smaller gain than promised — the opposite sign, by five points. The cause
+is a fidelity bug in the sweep. Hansard deliberately runs two audio chains:
+recognition gets fully normalised audio, diarization gets a high-pass-filtered,
+dynamics-preserving clip, because loudness normalisation was measured to wreck
+attribution. The sweep clustered and consolidated on the raw clip, so every
+diarization number it had ever produced described a pipeline that does not exist.
+This is the *second* fidelity bug in this harness — the first fed coverage
+refinement the utterance spans instead of the voice-activity spans — and this one
+came within one commit of shipping a three-and-a-half-point English regression.
+Both were found by an end-to-end run disagreeing with the sweep, which is the
+only reason to keep running them.
+
+**Result 2 — ranking wins, the ceiling loses to it on both corpora at once.**
+
+| Variant | AMI told nothing | AMI roster | SUMM-RE 12 | tuning | held-out |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| longest sample (previous default) | 29.37 % | 27.89 % | 63.83 % | 68.65 % | 54.18 % |
+| **ranked by contest** | 30.61 % | **27.89 %** | **57.04 %** | **59.59 %** | **51.95 %** |
+| longest under a 0.2 ceiling | 32.85 % | 28.27 % | 58.04 % | 61.29 % | 51.55 % |
+
+The ceiling is beaten by plain ranking on French *and* on English, so it does not
+get to be a knob: `MAXIMUM_SAMPLE_CONTEST` was deleted rather than shipped as a
+setting nobody should touch.
+
+**Result 3 — the whole English cost is one meeting losing its speaker count.**
+
+| AMI meeting | cpWER before → after | clusters before → after |
+| --- | --- | :---: |
+| `ES2004a` | 29.34 % → 29.34 % | 5 → 5 |
+| `IS1009a` | 30.94 % → **34.66 %** | **4 → 5** |
+| `TS3003a` | 27.83 % → 27.83 % | 5 → 5 |
+
+Two of the three meetings are unchanged to two decimal places. `IS1009a` was the
+one AMI recording that found its exact four speakers, and cleaner centroids split
+it into five. And **with a roster the change costs exactly nothing**: 26.63 %,
+30.94 %, 26.09 % — the same three numbers as before, to two decimals, for a macro
+of 27.89 % either way. When the participant count is known the ceiling drives
+agglomeration to four clusters regardless of which turns the centroids came from,
+so the only configuration that pays is the one where Hansard is told nothing.
+
+**Result 4 — on French it is the largest single win of the campaign, and it is
+concentrated.**
+
+Six of the twelve meetings are unchanged to two decimal places. Six move:
+
+| SUMM-RE meeting | Split | Overlap | cpWER before → after | clusters before → after |
+| --- | --- | ---: | --- | :---: |
+| `035b_EADH` | tuning | 12.57 % | 98.57 % → **53.72 %** | 2 → **4** |
+| `033c_EBPH` | tuning | 21.83 % | 111.68 % → **85.94 %** | 3 → 5 |
+| `011c_ECPL` | held-out | 15.17 % | 59.80 % → **49.27 %** | 3 → **4** |
+| `017a_EBRZ` | tuning | 8.06 % | 59.07 % → **55.76 %** | 4 → **3** |
+| `006b_EADH` | tuning | 18.89 % | 75.02 % → 76.41 % | 4 → 6 |
+| `018a_EARZ` | held-out | 9.33 % | 36.13 % → 37.72 % | 6 → 7 |
+
+The hypothesis is confirmed exactly where it was made. Both meetings that had
+collapsed speakers recover them — `035b_EADH` finds all four and gives back 44.85
+points, `033c_EBPH` goes from three clusters to five — and `017a_EBRZ` stops
+inventing a fourth speaker for three people. Two meetings pay: `006b_EADH` and
+`018a_EARZ` each gain a cluster and about 1.5 points. Word diarization error
+across the corpus falls from 23.44 % to 18.35 %.
+
+**Conclusion. KEEP.** Word error does not move at all — 42.86 % on SUMM-RE and
+21.25 % on AMI, unchanged to two decimals in every configuration — so this is
+purely attribution, which is what it was aimed at. The trade is 6.79 points of
+French cpWER for 1.24 points of English cpWER in the told-nothing configuration
+and nothing at all with a roster; the Teams bot always has a roster.
+
+State the caveat plainly: **half of the French gain comes from two meetings**,
+and both are in the tuning split. The held-out half moves 54.18 % → 51.95 %,
+which is 2.23 points, not 6.79. That is the number to quote when asking whether
+this generalises.
+
+---
+
 ## What to do next, in the order the evidence supports
 
 Written down because the ordering changed twice during this campaign and the
@@ -796,15 +906,27 @@ Two cheaper things are worth trying first, and neither needs a GPU:
   people are talking here" instead of silently dropping one, and would let
   attribution stop charging an overlapped word to a single speaker.
 
-**2. Speaker over-detection, not quiet speakers, is the diarization problem.**
-Four, five and six clusters where there are three or four people
-([iteration 7](#iteration-7--one-meeting-was-an-anecdote-and-it-was-the-flattering-one)),
-and cpWER charges for every fragment. Quiet-speaker recall is already 100 % on
-these four meetings. The merge threshold is the lever and it is corpus-sensitive:
-0.70 collapsed speakers on `020c_EBPZ`, 0.77 over-splits three other meetings.
-A per-meeting decision — eigengap on the similarity matrix, or the constrained
-reassignment pyannote's community-1 back-end uses — is the principled version of
-what is currently one global constant.
+**2. Speaker over-detection is what is left of the diarization problem, and it
+is no longer the merge threshold's fault.** Under-detection is fixed: after
+[iteration 15](#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio)
+no SUMM-RE meeting collapses speakers any more. What remains is the other
+direction — seven clusters for four people on `004c_PAPH` and `018a_EARZ`, six on
+three more — and cpWER charges for every fragment. Quiet-speaker recall is
+already 100 %.
+
+The merge threshold is not the lever: five values were measured
+([iterations 9 and 11](#iteration-11--the-merge-threshold-measured-again-on-code-that-works))
+and none beat 0.77, because the right value differs per meeting. Iteration 15 is
+the evidence for where to look instead — *which audio the centroid is built from*
+moved four meetings that the threshold could not move at all. The principled next
+step is a per-meeting decision rather than a global constant: eigengap on the
+similarity matrix, or the constrained reassignment pyannote's community-1
+back-end uses.
+
+Note what iteration 15 also says about the ceiling: with a roster, the speaker
+count is known and none of this matters — AMI scores the same to two decimal
+places whichever turns the centroids came from. Over-detection is a
+*told-nothing* problem, and the Teams bot is never told nothing.
 
 **3. Language identification should come from the audio.** 105 French words
 labelled English against 41 the other way, and the same defect shows up in word

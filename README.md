@@ -88,10 +88,10 @@ spontaneous speech — and these are the numbers to judge us on:
 
 | Corpus | Meetings | cpWER | WER |
 | --- | :---: | ---: | ---: |
-| AMI English meetings, told nothing | 3 | 29.37 % | 21.25 % |
+| AMI English meetings, told nothing | 3 | 30.61 % | 21.25 % |
 | AMI English meetings, with a participant list | 3 | **27.89 %** | 21.25 % |
-| SUMM-RE French meetings, held-out half | 4 | 54.18 % | 38.18 % |
-| SUMM-RE French meetings, all | 12 | 63.83 % | 42.86 % |
+| SUMM-RE French meetings, held-out half | 4 | 51.95 % | 38.18 % |
+| SUMM-RE French meetings, all | 12 | 57.04 % | 42.86 % |
 
 Azure Speech, the engine behind Teams transcription, is independently measured at
 **27.39 %** cpWER on AMI. With a participant list we score 27.89 % — half a point
@@ -103,7 +103,7 @@ meeting number to be behind, which cuts both ways.
 The French figure is twelve meetings, not one. An earlier edition of this page
 reported 53.16 % from a single meeting that turned out to have the second-lowest
 speaker overlap of the twelve. Half the corpus is held back from tuning and
-scores 54.18 %. Where we lose, and why, is in
+scores 51.95 %. Where we lose, and why, is in
 [benchmarks §8](docs/benchmarks.md#8-where-we-lose); every experiment behind
 these numbers, including the ones that failed, is in
 [quality-research](docs/quality-research.md).

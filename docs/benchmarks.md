@@ -194,17 +194,23 @@ nothing about how many people are in the room.
 
 | Meeting | Duration | Speakers (reference → detected) | Words (reference → produced) | WER | **cpWER** | tcpWER@5s | WDER | DER (collar 0) | Reference overlap | RTF | Peak RAM |
 | --- | ---: | :---: | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ES2004a | 17.5 min | 4 → 5 | 2614 → 2210 | 20.07 % | **29.34 %** | 30.45 % | 7.67 % | 31.10 % | 21.3 % | 0.37 | 4911 MB |
-| IS1009a | 14.0 min | 4 → **4** | 1986 → 1720 | 21.58 % | **30.94 %** | 32.31 % | 8.21 % | 25.74 % | 18.6 % | 0.37 | 4911 MB |
-| TS3003a | 25.1 min | 4 → 5 | 2518 → 2154 | 22.09 % | **27.83 %** | 29.52 % | 4.66 % | 29.12 % | 12.9 % | 0.26 | 4911 MB |
-| **Macro average** | — | — | — | **21.25 %** | **29.37 %** | **30.76 %** | **6.85 %** | **28.65 %** | 17.6 % | — | — |
+| ES2004a | 17.5 min | 4 → 5 | 2614 → 2210 | 20.07 % | **29.34 %** | 30.45 % | 7.67 % | 31.10 % | 21.3 % | 0.18 | 4900 MB |
+| IS1009a | 14.0 min | 4 → 5 | 1986 → 1720 | 21.58 % | **34.66 %** | 36.34 % | 10.42 % | 27.42 % | 18.6 % | 0.19 | 4900 MB |
+| TS3003a | 25.1 min | 4 → 5 | 2518 → 2154 | 22.09 % | **27.83 %** | 29.52 % | 4.66 % | 29.12 % | 12.9 % | 0.16 | 4900 MB |
+| **Macro average** | — | — | — | **21.25 %** | **30.61 %** | **32.10 %** | **7.58 %** | **29.21 %** | 17.6 % | — | — |
 
 ```bash
 make bench-data-ami
 make bench-ami
 ```
 
-Word-weighted cpWER is 28.52 %; DER at the 0.25-second collar is 18.34 %.
+Word-weighted cpWER is 30.29 %; DER at the 0.25-second collar is 18.93 %.
+
+> `IS1009a` used to find its exact four speakers and now finds five, which is the
+> whole of a 1.24-point macro regression introduced deliberately: taking speaker
+> embeddings from uncontested turns rather than the longest ones is worth 6.79
+> points of cpWER on French meetings and costs this. The roster table below is
+> unaffected — see [quality-research iteration 15](quality-research.md#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio).
 
 **With a participant list, which is what the bot has.** When Hansard joins a
 meeting it knows who is present, and the roster becomes a ceiling on the speaker
@@ -213,15 +219,21 @@ count. Source:
 
 | Meeting | Speakers (reference → detected) | **cpWER** | WDER | DER (collar 0) | RTF |
 | --- | :---: | ---: | ---: | ---: | ---: |
-| ES2004a | 4 → **4** | **26.63 %** | 6.44 % | 29.91 % | 0.45 |
-| IS1009a | 4 → **4** | **30.94 %** | 8.21 % | 25.74 % | 0.26 |
-| TS3003a | 4 → **4** | **26.09 %** | 3.57 % | 27.93 % | 0.21 |
+| ES2004a | 4 → **4** | **26.63 %** | 6.44 % | 29.91 % | 0.17 |
+| IS1009a | 4 → **4** | **30.94 %** | 8.21 % | 25.74 % | 0.19 |
+| TS3003a | 4 → **4** | **26.09 %** | 3.57 % | 27.93 % | 0.16 |
 | **Macro average** | — | **27.89 %** | **6.07 %** | **27.86 %** | — |
 
 Every meeting finds the right number of speakers, and macro cpWER lands at
-**27.89 %** against **29.37 %** told nothing. Recognition is untouched — word
+**27.89 %** against **30.61 %** told nothing. Recognition is untouched — word
 error is 21.25 % in both configurations, to two decimal places — so the whole
 gain is attribution, which is what a roster can and cannot do.
+
+These three numbers have not moved through any of the diarization work in
+[quality-research](quality-research.md): when the participant count is known, the
+ceiling drives agglomeration to four clusters whatever the centroids were built
+from. Every regression and every gain that page reports on AMI lives entirely in
+the told-nothing column.
 
 **How this run differs from the one it replaces.** The previously published
 figure on this page was 49.39 % macro cpWER. That run used **INT8 weights**,
@@ -232,11 +244,11 @@ diarization retune and a batch-padding fix account for the rest:
 | | Superseded (INT8) | Current (float32) | With a roster |
 | --- | ---: | ---: | ---: |
 | Macro WER | 41.38 % | **21.25 %** | 21.25 % |
-| Macro cpWER | 49.39 % | **29.37 %** | **27.89 %** |
-| Macro WDER | 9.38 % | 6.85 % | 6.07 % |
-| Macro DER | 32.19 % | 28.65 % | 27.86 % |
-| Speakers detected | 6, 6, 6 | 5, 4, 5 | **4, 4, 4** |
-| RTF | 0.61 – 0.74 | 0.26 – 0.37 | **0.21 – 0.45** |
+| Macro cpWER | 49.39 % | **30.61 %** | **27.89 %** |
+| Macro WDER | 9.38 % | 7.58 % | 6.07 % |
+| Macro DER | 32.19 % | 29.21 % | 27.86 % |
+| Speakers detected | 6, 6, 6 | 5, 5, 5 | **4, 4, 4** |
+| RTF | 0.61 – 0.74 | 0.16 – 0.19 | **0.16 – 0.19** |
 
 The INT8 column is from an older edition of this page and was produced under
 normalizer 1.1.0 on other hardware; the two float32 columns are current. The
@@ -271,9 +283,9 @@ can be reported on the other. Everything in
 
 | Split | Meetings | Minutes | WER | **cpWER** | tcpWER@5s | WDER | DER (collar 0) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| tuning | 8 | 151.9 | 45.20 % | **68.65 %** | 71.20 % | 25.76 % | 46.84 % |
-| **held-out** | 4 | 78.9 | **38.18 %** | **54.18 %** | 56.53 % | 18.81 % | 41.96 % |
-| all | 12 | 230.8 | 42.86 % | 63.83 % | 66.31 % | 23.44 % | 45.21 % |
+| tuning | 8 | 151.9 | 45.20 % | **59.59 %** | 62.86 % | 19.25 % | 41.66 % |
+| **held-out** | 4 | 78.9 | **38.18 %** | **51.95 %** | 54.01 % | 16.54 % | 38.28 % |
+| all | 12 | 230.8 | 42.86 % | 57.04 % | 59.91 % | 18.35 % | 40.54 % |
 
 Per meeting, ordered by how much of the reference is two people talking at once:
 
@@ -281,15 +293,15 @@ Per meeting, ordered by how much of the reference is two people talking at once:
 | --- | --- | ---: | ---: | :---: | :---: | ---: | ---: | ---: |
 | `020b_EBDZ` | held-out | 4.13 % | 18.4 min | 4 → **4** | 3602 → 2923 | **24.53 %** | 39.02 % | 11.94 % |
 | `020c_EBPZ` | tuning | 5.04 % | 18.2 min | 4 → **4** | 3376 → 2369 | 36.36 % | 51.99 % | 17.03 % |
-| `017a_EBRZ` | tuning | 8.06 % | 12.5 min | 3 → 4 | 1131 → 718 | 52.19 % | 59.07 % | 5.32 % |
-| `018a_EARZ` | held-out | 9.33 % | 22.0 min | 4 → 6 | 5028 → 3567 | 30.78 % | **36.13 %** | 5.80 % |
+| `017a_EBRZ` | tuning | 8.06 % | 12.5 min | 3 → **3** | 1131 → 718 | 52.19 % | 55.76 % | 4.22 % |
+| `018a_EARZ` | held-out | 9.33 % | 22.0 min | 4 → 7 | 5028 → 3567 | 30.78 % | **37.72 %** | 6.77 % |
 | `021a_EARD` | tuning | 9.55 % | 18.8 min | 4 → 6 | 3751 → 2543 | 33.86 % | 37.15 % | 5.13 % |
 | `004c_PAPH` | tuning | 10.97 % | 21.1 min | 4 → 7 | 4110 → 2561 | 40.74 % | 51.64 % | 12.06 % |
 | `018b_EADZ` | tuning | 12.57 % | 19.4 min | 4 → **4** | 4377 → 2116 | 59.00 % | 64.11 % | 12.30 % |
-| `035b_EADH` | tuning | 12.57 % | 19.8 min | 4 → 2 | 4402 → 2894 | 37.54 % | 98.57 % | 52.33 % |
-| `011c_ECPL` | held-out | 15.17 % | 16.9 min | 4 → 3 | 3078 → 1911 | 44.70 % | 59.80 % | 18.53 % |
-| `006b_EADH` | tuning | 18.89 % | 21.4 min | 4 → **4** | 6462 → 3472 | 51.88 % | 75.02 % | 35.60 % |
-| `033c_EBPH` | tuning | 21.83 % | 20.7 min | 4 → 3 | 5472 → 3083 | 50.00 % | 111.68 % | 66.32 % |
+| `035b_EADH` | tuning | 12.57 % | 19.8 min | 4 → **4** | 4402 → 2894 | 37.54 % | 53.72 % | 20.15 % |
+| `011c_ECPL` | held-out | 15.17 % | 16.9 min | 4 → **4** | 3078 → 1911 | 44.70 % | 49.27 % | 8.49 % |
+| `006b_EADH` | tuning | 18.89 % | 21.4 min | 4 → 6 | 6462 → 3472 | 51.88 % | 76.41 % | 37.13 % |
+| `033c_EBPH` | tuning | 21.83 % | 20.7 min | 4 → 5 | 5472 → 3083 | 50.00 % | 85.94 % | 45.99 % |
 | `015b_EBDD` | held-out | 26.83 % | 21.6 min | 4 → 6 | 5383 → 2890 | 52.70 % | 81.77 % | 38.98 % |
 
 ```bash
@@ -298,27 +310,40 @@ make bench-summre
 ```
 
 **Overlap predicts the score and speaker-count error does not.** Across the
-twelve meetings, reference overlap correlates with cpWER at Spearman **ρ = +0.77**
-(p = 0.004), with WDER at ρ = +0.74 (p = 0.006) and with word error at ρ = +0.64
+twelve meetings, reference overlap correlates with cpWER at Spearman **ρ = +0.67**
+(p = 0.018), with WDER at ρ = +0.67 (p = 0.018) and with word error at ρ = +0.64
 (p = 0.025). The number of speakers we get wrong correlates with cpWER at
-**ρ = −0.14** — no relationship at all. Twelve meetings is a small sample and
-these are rank correlations on it, but the ordering is the same one
+**ρ = −0.11** (p = 0.73) — no relationship at all. Twelve meetings is a small
+sample and these are rank correlations on it, but the ordering is the same one
 [§8](#8-where-we-lose) finds inside a single meeting by splitting its utterances
 by overlap, which is a different measurement reaching the same place.
 
-**A cpWER over 100 % is not a typo.** `033c_EBPH` detects three speakers where
-there are four, so the optimal assignment leaves one reference speaker matched to
-nothing and charges all of their words as deletions, on top of the insertions the
-merged cluster contributes. Anything above 100 % means the speaker structure
-collapsed, not that every word is wrong: that meeting's plain word error rate is
-50.00 %.
+The overlap correlation was +0.77 in the previous edition of this page. It fell
+because the two most overlapped meetings improved the most — cleaner speaker
+embeddings ([quality-research iteration 15](quality-research.md#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio))
+took `033c_EBPH` from 111.68 % to 85.94 % and `035b_EADH` from 98.57 % to
+53.72 % — which is the correlation weakening for the right reason. Overlap is
+still the strongest predictor on this corpus.
+
+**No meeting collapses its speakers any more.** The previous edition of this page
+reported `035b_EADH` at two clusters for four people and `033c_EBPH` at three,
+scoring 98.57 % and 111.68 % cpWER — over 100 % because the optimal assignment
+leaves a reference speaker matched to nothing and charges all of their words as
+deletions on top of the merged cluster's insertions. Both now find at least four,
+and the worst row in the corpus is 85.94 %. The remaining error is in the other
+direction: five meetings detect six or seven clusters where there are four.
 
 **This replaces a single-meeting figure of 53.16 %, and the replacement is
 worse.** `020c_EBPZ` was the only meeting this project had ever scored and it has
-the second-lowest overlap of the twelve. The corpus figure is **63.83 %**, and the
-held-out half — four meetings, no default developed against them — is **54.18 %**.
+the second-lowest overlap of the twelve. The corpus figure is **57.04 %**, and the
+held-out half — four meetings, no default developed against them — is **51.95 %**.
 The earlier number was not wrong; it was unrepresentative. That is the argument
 for scoring twelve meetings instead of one, and for keeping a half of them back.
+
+Read the two halves separately when judging the diarization work in
+[quality-research](quality-research.md): the corpus moved 63.83 % → 57.04 % and
+the held-out half moved 54.18 % → 51.95 %, because the meetings that gained most
+are in the tuning half. The held-out figure is the one that generalises.
 
 ### 2.6 How this compares to Microsoft
 
@@ -328,9 +353,9 @@ for scoring twelve meetings instead of one, and for keeping a half of them back.
 | Azure Speech | NOTSOFAR-1 test (Microsoft's own office-meeting corpus) | 35.68 % |
 | Azure Speech | NOTSOFAR-1 dev | 45.38 % |
 | **Hansard, with a participant list** | **AMI Mix-Headset, 3 meetings** | **27.89 %** |
-| **Hansard, told nothing** | **AMI Mix-Headset, 3 meetings** | **29.37 %** |
-| Hansard | SUMM-RE, 12 real French meetings | 63.83 % |
-| Hansard | SUMM-RE, 4 held-out French meetings | 54.18 % |
+| **Hansard, told nothing** | **AMI Mix-Headset, 3 meetings** | **30.61 %** |
+| Hansard | SUMM-RE, 12 real French meetings | 57.04 % |
+| Hansard | SUMM-RE, 4 held-out French meetings | 51.95 % |
 | Hansard | our synthetic meetings, 3–9 speakers, French and English | 2.52 – 13.36 % |
 
 *Azure figures: AssemblyAI's January 2026 competitive benchmark, which is the
@@ -346,15 +371,17 @@ three meetings, measured by two different toolchains.
   nothing but the raw audio, which is harder. That difference alone can be worth
   several points in either direction.
 - Three meetings is a small sample. Per-meeting cpWER ranges from 27.83 % to
-  30.94 % told nothing, and from 26.09 % to 30.94 % with a roster.
-- **The AMI figure moved when nothing about AMI changed.** This page previously
-  published 20.44 % / 28.75 %, produced on other hardware under normalizer
-  1.1.0. The current code on the current machine measures **21.25 % / 29.37 %**,
-  and a control run with the new adaptive segmentation switched off produces the
-  same number to two decimal places — so the difference is the normalizer version
-  and the hardware, not a regression. It is recorded here rather than quietly
-  replaced because *the earlier figure was never reproduced on this machine
-  before the work began*, which is a methodology gap and not a rounding one. See
+  34.66 % told nothing, and from 26.09 % to 30.94 % with a roster.
+- **The AMI figure moved twice, once for a reason that is not a regression and
+  once for one that is.** This page previously published 20.44 % / 28.75 %,
+  produced on other hardware under normalizer 1.1.0; the current code on the
+  current machine measures 21.25 % / 29.37 % *with the segmentation and
+  consolidation work switched off*, and a control run confirms the difference is
+  the normalizer version and the hardware. It is recorded here rather than
+  quietly replaced because *the earlier figure was never reproduced on this
+  machine before the work began*, which is a methodology gap and not a rounding
+  one. The remaining move, 29.37 % → **30.61 %**, is real and deliberate: one
+  meeting loses its speaker count so that French meetings gain 6.79 points. See
   [quality-research](quality-research.md).
 - The only rigorous comparison is running Teams on the same recordings and
   scoring both outputs with one toolchain. The protocol is in
@@ -364,7 +391,7 @@ three meetings, measured by two different toolchains.
 So: treat parity on AMI as *measured but not established*.
 
 **On French meetings we are well behind, and now we know by how much.** Twelve
-SUMM-RE meetings score **63.83 %** cpWER, and the four held-out ones **54.18 %**
+SUMM-RE meetings score **57.04 %** cpWER, and the four held-out ones **51.95 %**
 ([§2.5](#25-summ-re-real-french-meetings)). The single meeting this page used to
 report at 53.16 % turned out to be the second-easiest of the twelve. Neither
 Microsoft nor anyone else publishes a French meeting figure, so there is nothing
@@ -375,7 +402,7 @@ Note also the gap in Microsoft's own numbers: Azure markets **2.4 % WER** on
 curated short clips and scores **27.4 % cpWER** on AMI. That is not dishonesty —
 it is the difference between read speech and a real meeting, and it is exactly
 why this page separates the two. We are subject to the same gap: 4.63 % on
-French read speech, 63.83 % on twelve French meetings.
+French read speech, 57.04 % on twelve French meetings.
 
 ## 3. What the metrics mean
 
@@ -620,7 +647,7 @@ Publishing this matters more than publishing the wins.
 test meetings (ES2004a, IS1009a, TS3003a — 56.6 minutes of real, spontaneous,
 four-person meeting audio in the Mix-Headset condition) end to end through the
 full pipeline, and scored them with our own harness. The macro average is
-**29.37 % cpWER** told nothing, **27.89 %** with a participant list, against
+**30.61 % cpWER** told nothing, **27.89 %** with a participant list, against
 Azure's published **27.39 %**.
 
 An earlier edition of this page reported 27.34 % here and called it level. The
@@ -633,22 +660,26 @@ supported. The per-meeting numbers are in
 [§2.4](#24-ami-real-meeting-audio) and the raw file is
 [`bench/results/ami_mix_headset.json`](../bench/results/ami_mix_headset.json).
 
-The most legible symptom left is speaker counting: five, four and five clusters
-detected where there are four speakers. It was ten in all three meetings before
-the segmentation and clustering fixes, and 49.39 % macro cpWER; the direction of
-travel is right and the distance left is real. Spontaneous overlapping speech
+The most legible symptom left is speaker counting: five clusters detected in each
+of the three meetings where there are four speakers. It was ten in all three
+before the segmentation and clustering fixes, and 49.39 % macro cpWER; the
+direction of travel is right and the distance left is real. One of those fives
+was a four until the consolidator started building centroids from uncontested
+turns — a change that costs AMI 1.24 points told nothing, costs it nothing at all
+with a roster, and is worth 6.79 points on French meetings
+([quality-research iteration 15](quality-research.md#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio)). Spontaneous overlapping speech
 fragments a speaker across clusters in a way clean fixtures never do, and cpWER
 charges for every fragment. A Teams roster removes this particular error, which
 is why the roster row exists. Work on it is tracked by re-running
 `make bench-ami`, not by rewording this paragraph.
 
 **On real French meetings we are clearly behind, and nobody publishes a number
-to be behind.** **63.83 %** cpWER over twelve SUMM-RE meetings against 29.37 % on
-AMI, with the held-out four at 54.18 %. Roughly two-thirds of that gap is
+to be behind.** **57.04 %** cpWER over twelve SUMM-RE meetings against 30.61 % on
+AMI, with the held-out four at 51.95 %. Roughly two-thirds of that gap is
 recognition — 42.86 % word error on casual French against 21.25 % on AMI — and
 the rest is attribution. This is the largest open quality problem in the project,
 and [§2.5](#25-summ-re-real-french-meetings) shows what predicts it: overlap,
-at Spearman ρ = +0.77 against cpWER.
+at Spearman ρ = +0.67 against cpWER.
 
 Two things about that comparison need saying plainly:
 
@@ -710,7 +741,8 @@ SUMM-RE `020c_EBPZ`, the shipped `merge_similarity` of 0.70 fused genuinely
 different speakers and collapsed four people into two, taking cpWER to 89.82 %.
 The synthetic French fixtures gave no hint of it: their speakers all talk for
 minutes, while two of SUMM-RE's talk for 59 and 12 seconds. The default is now
-0.77, the speaker count is exact and cpWER is 53.16 %. The durable lesson is not
+0.77, the speaker count is exact, and cpWER on that meeting was 53.16 % when this
+was written and is 51.99 % today. The durable lesson is not
 the number — **a default
 tuned on one corpus is a hypothesis, not a result**, and the fixtures that pass
 are the ones least likely to catch its failure.
@@ -850,15 +882,21 @@ Current status on the hardware described at the top of this page, over every
 shipped-profile result in `bench/results/`:
 
 ```
-189/360 gates met  (89 must-pass failures, 82 stretch misses)
+190/360 gates met  (89 must-pass failures, 81 stretch misses)
 Must-pass gates are not met. The work is not finished.
 ```
 
 **Eighty-seven of the eighty-nine must-pass failures are real meetings** —
-fourteen on the three AMI meetings, seventy-three across the twelve SUMM-RE
+fifteen on the three AMI meetings, seventy-two across the twelve SUMM-RE
 meetings. The remaining two are the code-switched fixtures: character error on
 `meeting_mixed_4spk` and language accuracy on `meeting_mixed_8spk`. That is the
 open problem of [§8](#8-where-we-lose), stated by the tooling rather than by us.
+
+The split between the two corpora moved by one in each direction with the
+consolidation change in [quality-research iteration 15](quality-research.md#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio):
+`IS1009a` picked up a speaker-count failure, `011c_ECPL` shed one. The total is
+unchanged because these gates are thresholds, and a French corpus that improves
+by 6.79 points of cpWER is still nowhere near a 30 % blocker.
 
 The count jumped when the corpus did. This section previously reported eighteen
 failures, because SUMM-RE contributed one meeting; it now contributes twelve, and
