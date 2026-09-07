@@ -143,6 +143,7 @@ difference in speaker handling and nothing else.
 | 14 | Ceiling chosen from the speech ratio | AMI + 12 SUMM-RE meetings | tuning **−12.3** WER, held-out **−2.1**, AMI bit-identical | **KEEP** |
 | 15 | Speaker centroids from uncontested turns | AMI + 12 SUMM-RE meetings | SUMM-RE **63.83 % → 57.04 %** cpWER, held-out **−2.2**, AMI roster unchanged, AMI told nothing **+1.24** | **KEEP** |
 | 15b | The same idea as a 0.2 contest ceiling | same runs | worse than plain ranking on both corpora; the sweep that proposed it was measuring the wrong audio | **REVERT** |
+| 16 | Decode the segmentation model's powerset overlap mask | 8 SUMM-RE meetings | **61 %** of overlapped frames found at **59 %** precision, free; recall vs overlap ρ = +0.90 | Diagnostic — no change yet |
 
 ## Iterations
 
@@ -871,6 +872,70 @@ this generalises.
 
 ---
 
+### Iteration 16 — the overlap mask the pipeline throws away
+
+**Hypothesis.** Overlap is the French meeting problem
+([iteration 3](#iteration-3--the-recogniser-is-not-the-bottleneck-the-second-voice-is)),
+and the honest conclusion has been that fixing it needs a separation front-end we
+cannot afford on 4 vCPU. But the pipeline may already know where the overlap is
+and be discarding the knowledge: pyannote segmentation-3.0 is a *powerset*
+model, and sherpa-onnx collapses its output to one label per frame. If the mask
+survives contact with real meeting audio, there is an overlap lever that costs no
+extra compute at all.
+
+**Experiment.** Read the model's own metadata rather than assuming, then decode
+it directly. `models/sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx`
+declares `num_speakers: 3`, `powerset_max_classes: 2`, `num_classes: 7` — the
+seven classes are the empty set, three singletons and the three pairs — with a
+160 000-sample window and a 270-sample frame shift. Decoding the argmax class to
+a speaker *count* per frame and scoring that against the reference gives a
+frame-level overlap detector for free. Eight SUMM-RE meetings, no tuning, no
+threshold: `hansard.evaluation.overlap`.
+
+**Result. The mask is real, and it is best exactly where it matters.**
+
+| Meeting | Reference overlap | Predicted | Recall | Precision |
+| --- | ---: | ---: | ---: | ---: |
+| `015b_EBDD` | 27.02 % | 31.38 % | **72.17 %** | 62.16 % |
+| `033c_EBPH` | 21.74 % | 36.49 % | **86.07 %** | 51.29 % |
+| `006b_EADH` | 18.13 % | 29.32 % | **79.20 %** | 48.98 % |
+| `011c_ECPL` | 12.57 % | 10.19 % | 53.92 % | 66.51 % |
+| `035b_EADH` | 10.78 % | 13.22 % | **68.27 %** | 55.68 % |
+| `018a_EARZ` | 8.27 % | 6.18 % | 52.61 % | 70.34 % |
+| `020c_EBPZ` | 3.48 % | 2.71 % | 43.90 % | 56.38 % |
+| `020b_EBDZ` | 2.93 % | 1.56 % | 33.99 % | 63.82 % |
+| **macro** | | | **61.27 %** | **59.39 %** |
+
+Recall correlates with how overlapped the meeting is at Spearman **ρ = +0.90**
+(p = 0.002); precision does not correlate with it at all (ρ = −0.40, p = 0.32).
+So the detector is weakest on the meetings where overlap barely happens and
+strongest on the four where it dominates the error — which is the opposite of the
+usual way a cheap signal disappoints.
+
+**Decision. No production change yet, and this is not a result to bank.** What is
+established is only that the information exists and is recoverable at zero extra
+compute: 61 % of overlapped frames found at 59 % precision, without a GPU and
+without a separation model. What is *not* established is that using it improves
+anything — a mask is not a second transcript, and none of these numbers is a
+cpWER. Three things it could plausibly buy, in the order they should be tried:
+
+1. **Stop attribution charging an overlapped word to one speaker.** The cheapest
+   use and the one that needs no new model output.
+2. **Say so in the transcript.** "Two people are speaking here" is more honest
+   than silently emitting one of them, and it costs nothing.
+3. **Feed it to the consolidator.** `contested_fractions`
+   ([iteration 15](#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio))
+   currently infers contest from the *collapsed* turns; the powerset mask is the
+   direct measurement of the same thing, and iteration 15 showed that measurement
+   is worth 6.79 points.
+
+Recorded now because the previous edition of this log said the overlap lever
+needs a GPU, and that is now only true of *recovering the buried words*. Knowing
+where they are is free, and this is the measurement tool for whatever is built on
+top: `bench/results/experiments/overlap_mask_summre.json`.
+
+---
+
 ## What to do next, in the order the evidence supports
 
 Written down because the ordering changed twice during this campaign and the
@@ -882,7 +947,12 @@ a recognizer that returns silence for utterances buried under another voice
 84.3 % of the time. Every other lever measured here is worth one to seven points;
 this one is worth the difference between 20.60 % and 70.54 %.
 
-The honest position is that we cannot afford the fix on this hardware. Every
+The honest position is that we cannot afford *recovering the buried words* on
+this hardware — but [iteration 16](#iteration-16--the-overlap-mask-the-pipeline-throws-away)
+establishes that knowing **where** they are is already free: the segmentation
+model emits a powerset overlap mask that sherpa-onnx discards, and it finds 61 %
+of overlapped frames at 59 % precision with recall rising to 86 % on the most
+overlapped meeting. Use that before buying a GPU. Every
 credible single-channel separator for meetings — the NOTSOFAR-1 baseline's
 Conformer CSS, TF-GridNet, MossFormer2, SepFormer — costs one to two orders of
 magnitude more compute than this entire pipeline, and NOTSOFAR's own baseline
@@ -902,9 +972,14 @@ Two cheaper things are worth trying first, and neither needs a GPU:
   that AMI and SUMM-RE therefore under-state.
 - **Overlap-aware output.** The pyannote segmentation model already emits
   powerset labels with up to two concurrent speakers; sherpa-onnx collapses them
-  to one. Surfacing the overlap mask would at minimum let the transcript say "two
-  people are talking here" instead of silently dropping one, and would let
-  attribution stop charging an overlapped word to a single speaker.
+  to one. [Iteration 16](#iteration-16--the-overlap-mask-the-pipeline-throws-away)
+  measured what that mask is worth and it is usable, so this is no longer a
+  hypothesis about a model but a decoding change with a measurement tool waiting
+  for it. Surfacing the mask would at minimum let the transcript say "two people
+  are talking here" instead of silently dropping one, would let attribution stop
+  charging an overlapped word to a single speaker, and would give the
+  consolidator a direct measurement of contest instead of the one it infers from
+  collapsed turns.
 
 **2. Speaker over-detection is what is left of the diarization problem, and it
 is no longer the merge threshold's fault.** Under-detection is fixed: after

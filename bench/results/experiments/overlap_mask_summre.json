@@ -1,0 +1,70 @@
+{
+ "benchmark": "overlap-mask",
+ "profile": "diagnostic",
+ "rows": [
+  {
+   "meeting": "033c_EBPH",
+   "frames": 73625,
+   "reference_overlap_percent": 21.74,
+   "predicted_overlap_percent": 36.49,
+   "recall_percent": 86.07,
+   "precision_percent": 51.29
+  },
+  {
+   "meeting": "006b_EADH",
+   "frames": 75981,
+   "reference_overlap_percent": 18.13,
+   "predicted_overlap_percent": 29.32,
+   "recall_percent": 79.2,
+   "precision_percent": 48.98
+  },
+  {
+   "meeting": "035b_EADH",
+   "frames": 70091,
+   "reference_overlap_percent": 10.78,
+   "predicted_overlap_percent": 13.22,
+   "recall_percent": 68.27,
+   "precision_percent": 55.68
+  },
+  {
+   "meeting": "011c_ECPL",
+   "frames": 60078,
+   "reference_overlap_percent": 12.57,
+   "predicted_overlap_percent": 10.19,
+   "recall_percent": 53.92,
+   "precision_percent": 66.51
+  },
+  {
+   "meeting": "020b_EBDZ",
+   "frames": 65379,
+   "reference_overlap_percent": 2.93,
+   "predicted_overlap_percent": 1.56,
+   "recall_percent": 33.99,
+   "precision_percent": 63.82
+  },
+  {
+   "meeting": "015b_EBDD",
+   "frames": 76570,
+   "reference_overlap_percent": 27.02,
+   "predicted_overlap_percent": 31.38,
+   "recall_percent": 72.17,
+   "precision_percent": 62.16
+  },
+  {
+   "meeting": "020c_EBPZ",
+   "frames": 64790,
+   "reference_overlap_percent": 3.48,
+   "predicted_overlap_percent": 2.71,
+   "recall_percent": 43.9,
+   "precision_percent": 56.38
+  },
+  {
+   "meeting": "018a_EARZ",
+   "frames": 77748,
+   "reference_overlap_percent": 8.27,
+   "predicted_overlap_percent": 6.18,
+   "recall_percent": 52.61,
+   "precision_percent": 70.34
+  }
+ ]
+}
