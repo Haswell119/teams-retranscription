@@ -23,7 +23,6 @@ class EmbeddingClusterConsolidator:
     samples_per_cluster: int = 8
     minimum_segment_seconds: float = 1.2
     clean_embedding_samples: bool = True
-    maximum_sample_contest: float = 0.2
     _extractor: Any | None = field(default=None, init=False, repr=False)
 
     @property
@@ -77,10 +76,9 @@ class EmbeddingClusterConsolidator:
         extractor = self._load()
         centroids: dict[str, np.ndarray] = {}
         for label, samples in by_label.items():
-            chosen = [
-                span
-                for span, _ in _ranked(samples, self.clean_embedding_samples, self.maximum_sample_contest)
-            ][: self.samples_per_cluster]
+            chosen = [span for span, _ in _ranked(samples, self.clean_embedding_samples)][
+                : self.samples_per_cluster
+            ]
             centroid = self._centroid(extractor, clip, chosen)
             if centroid is not None:
                 centroids[label] = centroid
@@ -119,14 +117,10 @@ def contested_fractions(diarization: Diarization) -> dict[TimeSpan, float]:
     return contested
 
 
-def _ranked(
-    samples: list[tuple[TimeSpan, float]], prefer_clean: bool, ceiling: float = 0.2
-) -> list[tuple[TimeSpan, float]]:
-    longest = sorted(samples, key=lambda item: -item[0].duration)
+def _ranked(samples: list[tuple[TimeSpan, float]], prefer_clean: bool) -> list[tuple[TimeSpan, float]]:
     if not prefer_clean:
-        return longest
-    uncontested = [item for item in longest if item[1] <= ceiling]
-    return uncontested + [item for item in longest if item[1] > ceiling]
+        return sorted(samples, key=lambda item: -item[0].duration)
+    return sorted(samples, key=lambda item: (round(item[1], 2), -item[0].duration))
 
 
 def _agglomerate(

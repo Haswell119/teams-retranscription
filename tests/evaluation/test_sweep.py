@@ -203,3 +203,47 @@ def test_the_signature_covers_the_settings_that_change_the_words():
     assert "max_segment_seconds" in signature
     assert "dense_speech_ratio" in signature
     assert signature["model_id"]
+
+
+def clip_with_a_low_rumble(path):
+    import numpy as np
+    import soundfile as sf
+
+    seconds = np.arange(16_000 * 2) / 16_000
+    rumble = 0.6 * np.sin(2 * np.pi * 15.0 * seconds)
+    voice = 0.2 * np.sin(2 * np.pi * 400.0 * seconds)
+    sf.write(str(path), (rumble + voice).astype("float32"), 16_000)
+    return path
+
+
+def rumble_energy(clip):
+    import numpy as np
+
+    spectrum = np.abs(np.fft.rfft(clip.samples))
+    frequencies = np.fft.rfftfreq(len(clip.samples), 1.0 / clip.sample_rate)
+    return float(spectrum[frequencies < 25.0].sum())
+
+
+def test_the_sweep_diarizes_the_clip_production_diarizes(tmp_path):
+    from hansard.adapters.audio.io import load_clip
+    from hansard.evaluation.sweep import diarization_clip
+
+    audio = clip_with_a_low_rumble(tmp_path / "rumble.wav")
+    settings = Settings()
+    assert settings.audio.high_pass_hz > 0
+
+    raw = load_clip(audio)
+    prepared = diarization_clip(SweepMeeting("m", audio, "fr", Transcript(), Diarization()), settings)
+    assert rumble_energy(prepared) < 0.5 * rumble_energy(raw)
+
+
+def test_without_a_high_pass_the_sweep_uses_the_clip_as_loaded(tmp_path):
+    from hansard.adapters.audio.io import load_clip
+    from hansard.evaluation.sweep import diarization_clip
+
+    audio = clip_with_a_low_rumble(tmp_path / "rumble.wav")
+    settings = Settings()
+    settings.audio.high_pass_hz = 0.0
+
+    prepared = diarization_clip(SweepMeeting("m", audio, "fr", Transcript(), Diarization()), settings)
+    assert rumble_energy(prepared) == rumble_energy(load_clip(audio))
