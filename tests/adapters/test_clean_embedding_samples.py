@@ -39,19 +39,29 @@ def test_a_zero_length_turn_is_uncontested_rather_than_undefined():
     assert contested[TimeSpan(4.0, 4.0)] == 0.0
 
 
-def test_the_cleanest_sample_wins_over_the_longest():
-    samples = [(TimeSpan(0.0, 30.0), 0.9), (TimeSpan(40.0, 44.0), 0.0)]
-    assert [span.start for span, _ in _ranked(samples, True)] == [40.0, 0.0]
-
-
 def test_length_still_breaks_a_tie_between_equally_clean_samples():
     samples = [(TimeSpan(0.0, 4.0), 0.0), (TimeSpan(10.0, 30.0), 0.0)]
     assert [span.start for span, _ in _ranked(samples, True)] == [10.0, 0.0]
 
 
-def test_near_equal_contest_is_rounded_so_length_decides():
-    samples = [(TimeSpan(0.0, 30.0), 0.101), (TimeSpan(40.0, 44.0), 0.104)]
-    assert [span.start for span, _ in _ranked(samples, True)] == [0.0, 40.0]
+def test_length_decides_among_everything_clean_enough():
+    samples = [(TimeSpan(0.0, 30.0), 0.10), (TimeSpan(40.0, 44.0), 0.02)]
+    assert [span.start for span, _ in _ranked(samples, True, 0.2)] == [0.0, 40.0]
+
+
+def test_a_contaminated_sample_falls_behind_however_long_it_is():
+    samples = [(TimeSpan(0.0, 300.0), 0.9), (TimeSpan(400.0, 404.0), 0.0)]
+    assert [span.start for span, _ in _ranked(samples, True, 0.2)] == [400.0, 0.0]
+
+
+def test_a_contaminated_sample_is_kept_as_a_last_resort_rather_than_dropped():
+    samples = [(TimeSpan(0.0, 30.0), 0.9), (TimeSpan(40.0, 44.0), 0.8)]
+    assert len(_ranked(samples, True, 0.2)) == 2
+
+
+def test_raising_the_ceiling_lets_length_win_again():
+    samples = [(TimeSpan(0.0, 30.0), 0.5), (TimeSpan(40.0, 44.0), 0.0)]
+    assert [span.start for span, _ in _ranked(samples, True, 0.6)] == [0.0, 40.0]
 
 
 def test_the_old_behaviour_is_still_reachable():

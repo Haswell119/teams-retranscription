@@ -69,6 +69,7 @@ class DiarizationSettings(BaseModel):
     cluster_consolidation: bool = True
     merge_similarity: float = 0.77
     clean_embedding_samples: bool = True
+    maximum_sample_contest: float = 0.2
     maximum_turn_extension: float = 2.5
 
 
