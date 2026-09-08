@@ -1,0 +1,172 @@
+# Your first meeting
+
+A runbook for the person testing Hansard for the first time. Thirty minutes,
+one real Teams meeting, and an honest read of what came out.
+
+If you are the Teams administrator setting the tenant up, read
+[teams-setup.md](teams-setup.md) first — none of this works until an admin has
+allowed external participants. This page assumes that is done.
+
+---
+
+## Before the day
+
+### 1. Get the tenant to allow the notetaker
+
+The single most common reason a notetaker never appears is that the tenant
+forbids it. An administrator must run the PowerShell in
+[teams-setup.md §2](teams-setup.md#2-administrator-authorisation-powershell) and
+wait for propagation — **up to 24 hours**, so do not leave this to the morning
+of the test.
+
+### 2. Bring the models down once
+
+```bash
+git clone https://github.com/Haswell119/teams-retranscription
+cd teams-retranscription
+make install
+make models          # ~3.2 GB, checksum-verified, needs the network THIS ONCE
+export HANSARD_RUNTIME__MODELS_DIR=$PWD/models
+```
+
+After this the transcription path never touches the network again. There is a
+CI job that fails the build if it does.
+
+### 3. Check the machine can actually do it
+
+```bash
+.venv/bin/hansard doctor
+```
+
+It verifies ffmpeg, the model bundle, the ONNX providers and the workspace. Fix
+anything it reports before booking a meeting.
+
+### 4. Prove the pipeline on a recording first
+
+Do **not** let a live meeting be your first test. Take any WAV or MP4 of people
+talking and run it through the file path:
+
+```bash
+.venv/bin/hansard transcribe ~/some-recording.wav --output ./artifacts
+```
+
+You get a transcript, speaker labels and minutes in `./artifacts`. If this works,
+the transcription half is fine and anything that fails later is capture.
+
+---
+
+## The meeting itself
+
+### 5. Name the notetaker something your colleagues will recognise
+
+It appears in the participant list. `Hansard Notetaker` is the default and it
+looks like a stranger.
+
+```bash
+export HANSARD_CAPTURE__DISPLAY_NAME="Notetaker - test IT"
+```
+
+### 6. Tell the room, out loud
+
+Hansard posts a notice in the meeting chat on join and sits visibly in the
+roster, but **Teams does not show its own recording banner** for an external
+notetaker — Teams is not doing the recording. A chat message is easy to miss.
+The organiser should say it at the start and put it in the invitation.
+[teams-setup.md §5 and §6](teams-setup.md#5-telling-participants-consent-and-notification)
+cover consent and the GDPR position properly. For a test with colleagues who
+know what is happening, saying it out loud is enough.
+
+### 7. Join
+
+Copy the *Join Microsoft Teams Meeting* link and:
+
+```bash
+.venv/bin/hansard join "<paste the join URL>" \
+  --title "Test Hansard" \
+  --output ./artifacts
+```
+
+Both link shapes work — the classic `meetup-join` one and the newer
+`teams.microsoft.com/meet/<id>?p=<passcode>`.
+
+The notetaker takes up to a minute to appear. **Somebody already in the meeting
+has to admit it from the lobby** unless the organiser has set the lobby to let
+it in. If nobody admits it, it gives up after ten minutes.
+
+### 8. Run a meeting worth measuring
+
+Twenty minutes is plenty. What makes the test informative:
+
+- **Let people interrupt each other.** Overlapping speech is where Hansard is
+  weakest and where you most need to know what it does. A polite meeting where
+  everyone waits their turn will flatter it.
+- **Mix French and English if that is how you actually work.** One model handles
+  both in a single pass; there is nothing to configure.
+- **Have four or so people.** Everything here was measured on four-person
+  meetings.
+
+Hansard leaves on its own when the meeting ends, when it is removed, when it is
+the last participant left (two minutes), or after ten minutes of silence.
+
+---
+
+## Reading what came out
+
+Everything lands in `./artifacts`: transcript in Markdown, HTML, JSON and
+subtitles, plus minutes and an RTTM speaker timeline.
+
+**Judge it on the right things.** Two separate questions:
+
+| Question | Where to look | What to expect |
+| --- | --- | --- |
+| Are the words right? | the transcript text | Good. 21 % word error on English meetings, 43 % on casual French, and French meeting speech is genuinely hard |
+| Is the right person credited? | the speaker labels | Weaker, and worse the more people talk over each other |
+
+The honest numbers are in [benchmarks.md](benchmarks.md) and the reasoning
+behind every one of them, including what failed, is in
+[quality-research.md](quality-research.md). Nothing there is hidden and nothing
+is rounded in our favour.
+
+**What will annoy you, in advance:**
+
+- **Speaker over-detection.** Four people can come back as five or six clusters,
+  especially in a lively meeting. The participant list Hansard reads from the
+  meeting limits this, which is why it does better in a real Teams meeting than
+  the "told nothing" numbers in the benchmarks suggest.
+- **Words disappearing under crosstalk.** When two people talk at once, one of
+  them is lost. This is not a bug that a setting fixes: a single-stream
+  recogniser cannot emit two voices. It is the largest open problem in the
+  project and it is documented as such.
+- **Filler words and false starts** appear in the transcript because they were
+  said. That is a transcription, not a summary — the minutes are the summary.
+
+---
+
+## When it goes wrong
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Notetaker never appears | tenant forbids external participants | [teams-setup.md §2.1](teams-setup.md#21-allow-external-bots-the-setting-that-most-often-blocks-a-notetaker); allow up to 24 h |
+| Stuck in the lobby | nobody admitted it | admit it, or change the lobby policy |
+| Joins, transcript is empty | browser audio not routed into the capture sink | check the logs for `capture.audio_silent`; [troubleshooting.md](troubleshooting.md) |
+| Leaves after ten minutes | genuine silence, or dead audio | same as above — a silent capture and a silent meeting look identical from outside |
+| Wrong speaker names | roster panel not readable | check the logs for `capture.roster_panel_unavailable` |
+
+[troubleshooting.md](troubleshooting.md) has the full list. The logs are
+structured JSON by default; `HANSARD_RUNTIME__LOG_FORMAT=console` makes them
+readable while you are watching.
+
+---
+
+## Tell us what you found
+
+The one test nobody has run is **Hansard and Teams on the same meeting**. If you
+have the Teams transcript for the meeting you just recorded, that comparison is
+worth more than every benchmark in this repository, because it is the only one
+measured on your audio, your accents and your vocabulary:
+
+```bash
+.venv/bin/hansard compare --help
+```
+
+The protocol is in [metrics.md](metrics.md#741-running-the-head-to-head-against-teams).
