@@ -231,6 +231,7 @@ time. Air-gapped clusters are a supported configuration.
 
 | | |
 | --- | --- |
+| **[Your first meeting](docs/first-meeting.md)** | **Start here if somebody handed you this to try** |
 | [Installation](docs/installation.md) · [Configuration](docs/configuration.md) | Getting it running, and every setting |
 | [Teams setup](docs/teams-setup.md) | What your Teams administrator has to approve |
 | [Deployment](docs/deployment.md) · [NKP](docs/deployment-nkp.md) | Docker Compose, Kubernetes, air-gapped |
