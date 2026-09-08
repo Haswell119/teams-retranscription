@@ -144,6 +144,8 @@ difference in speaker handling and nothing else.
 | 15 | Speaker centroids from uncontested turns | AMI + 12 SUMM-RE meetings | SUMM-RE **63.83 % → 57.04 %** cpWER, held-out **−2.2**, AMI roster unchanged, AMI told nothing **+1.24** | **KEEP** |
 | 15b | The same idea as a 0.2 contest ceiling | same runs | worse than plain ranking on both corpora; the sweep that proposed it was measuring the wrong audio | **REVERT** |
 | 16 | Decode the segmentation model's powerset overlap mask | 8 SUMM-RE meetings | **61 %** of overlapped frames found at **59 %** precision, free; recall vs overlap ρ = +0.90 | Diagnostic — no change yet |
+| 17a | Control: is the mask better than the turns we already have? | same 8 meetings | recall **61.27 %** against **45.08 %** at identical precision | The mask is new information |
+| 17b | Let the overlap mask decide contested words in attribution | same 8 meetings | an **oracle** mask is worth **0.07** cpWER and costs WDER; the real mask 'beats' the oracle | **REVERT** |
 
 ## Iterations
 
@@ -936,6 +938,92 @@ top: `bench/results/experiments/overlap_mask_summre.json`.
 
 ---
 
+### Iteration 17 — the overlap mask is real, and attribution cannot spend it
+
+Two experiments, in the order they had to happen. The first asks whether the mask
+from [iteration 16](#iteration-16--the-overlap-mask-the-pipeline-throws-away) is
+new information. The second asks whether the first thing I wanted to spend it on
+is worth anything, and answers no.
+
+**Experiment A — the control iteration 16 was missing.**
+
+Iteration 16 scored the powerset mask against the reference and stopped there,
+which does not establish that the mask *adds* anything: sherpa-onnx already emits
+turns that overlap each other with different labels, and `contested_fractions`
+already reads them. The control is to score the diarization the pipeline actually
+hands attribution — post-consolidation, post-coverage-refinement — as an overlap
+detector on the identical frame grid.
+
+| Meeting | Reference overlap | Mask recall | Mask precision | Pipeline recall | Pipeline precision |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `015b_EBDD` | 27.02 % | **72.17 %** | 62.16 % | 39.08 % | 65.61 % |
+| `033c_EBPH` | 21.74 % | **86.07 %** | 51.29 % | 68.93 % | 49.21 % |
+| `006b_EADH` | 18.13 % | **79.20 %** | 48.98 % | 45.92 % | 51.07 % |
+| `011c_ECPL` | 12.57 % | 53.92 % | 66.51 % | 50.60 % | 71.23 % |
+| `035b_EADH` | 10.78 % | **68.27 %** | 55.68 % | 60.77 % | 57.93 % |
+| `018a_EARZ` | 8.27 % | 52.61 % | 70.34 % | 41.57 % | 74.35 % |
+| `020c_EBPZ` | 3.48 % | 43.90 % | 56.38 % | 31.40 % | 55.31 % |
+| `020b_EBDZ` | 2.93 % | 33.99 % | 63.82 % | 22.35 % | 48.75 % |
+| **macro** | | **61.27 %** | **59.39 %** | 45.08 % | 59.18 % |
+
+**The mask is new information.** Sixteen points more overlap recall at precision
+that is the same to two decimal places — 59.39 % against 59.18 % — so it is not
+buying recall by firing more often. It wins on every meeting, and by the most
+where overlap is densest: +33.1 on `015b_EBDD`, +33.3 on `006b_EADH`.
+
+**Experiment B — spend it on attribution, with an oracle first.**
+
+The defect it was supposed to fix is concrete. `WordLevelAttributor` takes a
+word's label from local turn evidence when one speaker dominates by a factor of
+1.5, and otherwise from a Viterbi path whose transition matrix is 95 % biased
+toward *staying* with the previous speaker. In an overlapped region no speaker
+dominates, so the word gets glued to whoever spoke last — which is precisely
+where that inertia is least justified. Telling the attributor "this word is
+contested, decide locally instead" is a two-line change.
+
+Measured on the same eight meetings, against the pipeline's own diarization, with
+the *reference* overlap regions as an oracle upper bound and the real mask beside
+it:
+
+| Attribution | macro cpWER | macro WDER |
+| --- | ---: | ---: |
+| baseline | 59.50 % | **23.39 %** |
+| **oracle overlap**, decide locally | **59.43 %** | 23.48 % |
+| powerset mask, decide locally | 59.24 % | 23.53 % |
+| oracle overlap, half-strength | 59.50 % | 23.40 % |
+| powerset mask, half-strength | 59.49 % | 23.41 % |
+
+**REVERT.** Perfect knowledge of where every overlap is, used this way, is worth
+**0.07 points of cpWER** and makes word diarization error slightly worse. The
+change was reverted and the two settings it added were deleted rather than
+shipped as knobs that measured nothing.
+
+The tell that this is a null result and not a small positive one: **the real mask
+"beats" the oracle**, 59.24 % against 59.43 %. A signal that works because it is
+correct cannot be improved by being wrong more often. What the mask is doing at
+0.26 points is perturbing a Viterbi path in ways unrelated to overlap, which is
+noise wearing the costume of a result. Reading the 0.26 and shipping it is
+exactly the mistake [iteration 15](#iteration-15--clean-embedding-samples-and-a-harness-that-measured-the-wrong-audio)
+nearly made.
+
+**Why it cannot work, stated so nobody tries it again.** When two people talk at
+once the recogniser emits *one* word. Whichever speaker attribution gives it to,
+the other speaker's word does not exist, and cpWER charges that deletion either
+way; moving the surviving word between two speakers trades one substitution for
+another. This is [iteration 3](#iteration-3--the-recogniser-is-not-the-bottleneck-the-second-voice-is)
+restated from the other end: the buried words are lost at recognition, not
+misfiled at attribution. **Attribution cannot recover information the recogniser
+never produced, and no mask changes that.**
+
+What survives is narrower and still worth doing. The mask is a better overlap
+detector than anything else in the pipeline, and its remaining uses are the ones
+that do not require the missing words to exist: telling the reader two people are
+speaking, and giving the consolidator a direct measurement of contest in place of
+the one it infers from collapsed turns — which is the mechanism iteration 15
+showed to be worth 6.79 points.
+
+---
+
 ## What to do next, in the order the evidence supports
 
 Written down because the ordering changed twice during this campaign and the
@@ -970,16 +1058,20 @@ Two cheaper things are worth trying first, and neither needs a GPU:
   pre-mixed. That cannot recover a lost word, but it is a strong prior for
   attribution and speaker counting that no open corpus benchmark can measure and
   that AMI and SUMM-RE therefore under-state.
-- **Overlap-aware output.** The pyannote segmentation model already emits
-  powerset labels with up to two concurrent speakers; sherpa-onnx collapses them
-  to one. [Iteration 16](#iteration-16--the-overlap-mask-the-pipeline-throws-away)
-  measured what that mask is worth and it is usable, so this is no longer a
-  hypothesis about a model but a decoding change with a measurement tool waiting
-  for it. Surfacing the mask would at minimum let the transcript say "two people
-  are talking here" instead of silently dropping one, would let attribution stop
-  charging an overlapped word to a single speaker, and would give the
-  consolidator a direct measurement of contest instead of the one it infers from
-  collapsed turns.
+- **The overlap mask, spent on the consolidator rather than on attribution.**
+  The segmentation model emits powerset labels with up to two concurrent
+  speakers and sherpa-onnx collapses them to one.
+  [Iteration 16](#iteration-16--the-overlap-mask-the-pipeline-throws-away)
+  measured the mask and
+  [iteration 17](#iteration-17--the-overlap-mask-is-real-and-attribution-cannot-spend-it)
+  established both that it beats the pipeline's own turns as an overlap detector
+  — 61.27 % recall against 45.08 % at equal precision — and that **attribution
+  cannot use it**: an oracle mask moves cpWER by 0.07. Do not retry that.
+  What is left is the consolidator, which infers contest from collapsed turns and
+  could measure it directly, and an honest transcript that says two people are
+  speaking rather than silently dropping one. The first is a metric hypothesis
+  worth testing; the second is a product decision that no benchmark here can
+  score.
 
 **2. Speaker over-detection is what is left of the diarization problem, and it
 is no longer the merge threshold's fault.** Under-detection is fixed: after
@@ -1030,6 +1122,7 @@ without new evidence. Detail in
 
 | Hypothesis | How it died |
 | --- | --- |
+| Attribution loses overlapped words by charging them to one speaker | An oracle overlap mask moves cpWER by 0.07; the words are lost at recognition, not misfiled ([iteration 17](#iteration-17--the-overlap-mask-is-real-and-attribution-cannot-spend-it)) |
 | SUMM-RE segments mix speakers | Single-speaker spans scored *worse* than mixed-speaker spans |
 | SUMM-RE segments are too long | 120 s → 20 s → 8 s moved word error under two points; the oracle boundaries are worth eleven |
 | Too much silence reaches the recogniser | Not monotone: adding silence helped twice |
