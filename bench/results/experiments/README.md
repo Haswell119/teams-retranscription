@@ -16,6 +16,8 @@ about being misled by them; do not read a decision out of them.
 
 `overlap_mask_summre.json` is a frame-level diagnostic, not a transcription run: it scores the segmentation model's powerset overlap mask against the reference and carries no word error at all. Iteration 16 explains what it does and does not establish.
 
+`overlap_mask_control.json` scores the same mask against the diarization the pipeline actually produces, which is the control iteration 16 lacked. `overlap_attribution.json` is the experiment that killed the idea of spending the mask on attribution: it carries an oracle column, and the oracle is worth 0.07 points. Iteration 17 explains why the real mask appearing to beat the oracle is the reason to disbelieve both.
+
 The other sweep files (`diarization_sweep_summre.json`, `_merge`, `_absorption`,
 `_thresholds`) predate the clean-sample work and compare consolidation settings
 against each other under the same bug, which is why every conclusion drawn from
