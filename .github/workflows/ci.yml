@@ -112,8 +112,16 @@ jobs:
           uv pip install --python .venv/bin/python -e ".[api,asr-onnx,asr-whisper,diarization,capture,delivery,delivery-msal,metrics,observability,storage-s3,dev]"
           uv pip install --python .venv/bin/python pip-audit
 
+      # Audit the dependencies, not ourselves. Auditing the environment makes
+      # pip-audit look up `hansard` on PyPI too, where an unrelated project of
+      # the same name exists at 0.1.0 - so the job was asking about a stranger's
+      # package, and broke the moment our version stopped colliding with theirs.
+      # --exclude-editable drops the local project; --strict still fails on any
+      # real dependency that cannot be audited.
       - name: Audit every shipped dependency
-        run: .venv/bin/pip-audit --strict --progress-spinner off
+        run: |
+          uv pip freeze --python .venv/bin/python --exclude-editable > "${RUNNER_TEMP}/deps.txt"
+          .venv/bin/pip-audit --strict --no-deps --progress-spinner off -r "${RUNNER_TEMP}/deps.txt"
 
   chart:
     name: Helm chart
