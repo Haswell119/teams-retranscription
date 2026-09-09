@@ -93,10 +93,46 @@ Then join the meeting from inside the container:
 docker run --rm -v "$PWD/models:/models:ro" -v "$PWD/artifacts:/artifacts" -e HANSARD_RUNTIME__MODELS_DIR=/models -e HANSARD_CAPTURE__DISPLAY_NAME="Notetaker - test IT" --shm-size=2g hansard-bot:local hansard join "<paste the join URL>" --title "Test Hansard" --output /artifacts
 ```
 
-Two things that are not optional:
+`--shm-size=2g` is not optional: Chromium crashes on Docker's default 64 MB.
 
-- **`--shm-size=2g`.** Chromium crashes on Docker's default 64 MB.
-- **PowerShell writes `${PWD}`**, not `$PWD`. Absolute paths avoid the question.
+#### The same thing in PowerShell
+
+Docker Desktop with the WSL2 backend, and `${PWD}` rather than `$PWD` — the
+brace matters, because the `:` that follows it would otherwise be read as part
+of the variable name. Backtick is PowerShell's line continuation, so these are
+written on one line each to avoid the question entirely.
+
+```powershell
+docker build -f src/hansard/adapters/capture/docker/Dockerfile --build-arg EXTRAS=capture,asr-onnx,diarization,delivery -t hansard-bot:local .
+
+docker build -f deploy/docker/Dockerfile.models --target export --output type=local,dest=./models .
+
+docker run --rm -v "${PWD}/models:/models:ro" -v "${PWD}/artifacts:/artifacts" -e HANSARD_RUNTIME__MODELS_DIR=/models -e HANSARD_CAPTURE__DISPLAY_NAME="Notetaker - test IT" --shm-size=2g hansard-bot:local hansard join "<paste the join URL>" --title "Test Hansard" --output /artifacts
+```
+
+Create `artifacts` before the first run — Docker would otherwise create it as a
+directory owned by root:
+
+```powershell
+New-Item -ItemType Directory -Force -Path .\artifacts | Out-Null
+```
+
+To try a recording first, mount it and swap the command:
+
+```powershell
+docker run --rm -v "${PWD}/models:/models:ro" -v "${PWD}:/data" -e HANSARD_RUNTIME__MODELS_DIR=/models hansard-bot:local hansard transcribe /data/some-recording.wav --output /data/artifacts
+```
+
+Two PowerShell habits worth knowing here:
+
+- **Setting an environment variable** is `$env:HANSARD_CAPTURE__DISPLAY_NAME = "Notetaker - test IT"`,
+  not `export`. Inside `docker run` use `-e` as above and the question does not
+  arise.
+- **A native Windows install can transcribe but cannot join.** If you want
+  `hansard transcribe` on the host, install Python 3.11 and ffmpeg, then use
+  `.venv\Scripts\hansard.exe` where this guide writes `.venv/bin/hansard`.
+  Joining a meeting still needs the container, because PulseAudio does not exist
+  on Windows.
 
 ### 4. Check the machine can actually do it
 
