@@ -19,29 +19,95 @@ forbids it. An administrator must run the PowerShell in
 wait for propagation — **up to 24 hours**, so do not leave this to the morning
 of the test.
 
-### 2. Bring the models down once
+### 2. Pick the right machine, because the bot needs Linux
+
+The notetaker drives a headless Chromium and captures its audio through a
+**PulseAudio** null sink with `pactl` and `ffmpeg -f pulse`. That is Linux, with
+no fallback. Three honest options:
+
+| You have | Do this |
+| --- | --- |
+| A Linux machine or VM | Install natively — [§3](#3-install-no-make-required) |
+| Windows or macOS | Run the bot in Docker — [§3b](#3b-windows-or-macos-run-it-in-a-container) |
+| Windows with WSL2 | Native install inside WSL2 works, but you must start PulseAudio yourself; Docker is less fiddly |
+
+Transcribing an existing recording (`hansard transcribe`) works anywhere Python
+and ffmpeg do. It is only *joining a meeting* that needs Linux.
+
+### 3. Install, no `make` required
+
+The Makefile is a convenience; every target is one or two commands. This is all
+it does:
 
 ```bash
 git clone https://github.com/Haswell119/teams-retranscription
 cd teams-retranscription
-make install
-make models          # ~3.2 GB, checksum-verified, needs the network THIS ONCE
-export HANSARD_RUNTIME__MODELS_DIR=$PWD/models
+
+# Virtualenv and dependencies. uv is the fast path; plain pip works too.
+uv venv --python 3.11 .venv
+uv pip install --python .venv/bin/python -e ".[api,asr-onnx,diarization,delivery,metrics,observability]"
+uv pip install --python .venv/bin/python -e ".[capture]"
+.venv/bin/python -m playwright install --with-deps chromium
 ```
 
-After this the transcription path never touches the network again. There is a
-CI job that fails the build if it does.
+Without `uv`: `python3.11 -m venv .venv` then `.venv/bin/pip install -e ".[...]"`
+with the same extras. Slower, identical result.
 
-### 3. Check the machine can actually do it
+Model weights, ~3.2 GB, checksum-verified, network needed **this once only**:
 
 ```bash
-.venv/bin/hansard doctor
+sh deploy/docker/fetch-models.sh deploy/docker/models.manifest deploy/docker/models.NOTICE "$PWD/models"
+export HANSARD_RUNTIME__MODELS_DIR="$PWD/models"
+```
+
+If you would rather not run a shell script, Docker does the same job — see the
+`--target export` build in [§3b](#3b-windows-or-macos-run-it-in-a-container).
+
+You also need **ffmpeg**, **pulseaudio** and **pulseaudio-utils** from your
+distribution: `apt install ffmpeg pulseaudio pulseaudio-utils` on Debian and
+Ubuntu.
+
+After the model fetch the transcription path never touches the network again. A
+CI job runs a transcription and fails the build if a socket opens.
+
+### 3b. Windows or macOS: run it in a container
+
+The bot image packages Xvfb, Chromium, PulseAudio and ffmpeg, so nothing goes on
+the host. Build it with diarization included — the default build leaves it out
+because in Kubernetes a separate worker does the transcription:
+
+```bash
+docker build -f src/hansard/adapters/capture/docker/Dockerfile --build-arg EXTRAS=capture,asr-onnx,diarization,delivery -t hansard-bot:local .
+```
+
+Fetch the models once. A build target exists that only downloads, verifies and
+hands you the directory — no shell script, no `make`:
+
+```bash
+docker build -f deploy/docker/Dockerfile.models --target export --output type=local,dest=./models .
+```
+
+Then join the meeting from inside the container:
+
+```bash
+docker run --rm -v "$PWD/models:/models:ro" -v "$PWD/artifacts:/artifacts" -e HANSARD_RUNTIME__MODELS_DIR=/models -e HANSARD_CAPTURE__DISPLAY_NAME="Notetaker - test IT" --shm-size=2g hansard-bot:local hansard join "<paste the join URL>" --title "Test Hansard" --output /artifacts
+```
+
+Two things that are not optional:
+
+- **`--shm-size=2g`.** Chromium crashes on Docker's default 64 MB.
+- **PowerShell writes `${PWD}`**, not `$PWD`. Absolute paths avoid the question.
+
+### 4. Check the machine can actually do it
+
+```bash
+.venv/bin/hansard doctor          # or: docker run --rm ... hansard-bot:local hansard doctor
 ```
 
 It verifies ffmpeg, the model bundle, the ONNX providers and the workspace. Fix
 anything it reports before booking a meeting.
 
-### 4. Prove the pipeline on a recording first
+### 5. Prove the pipeline on a recording first
 
 Do **not** let a live meeting be your first test. Take any WAV or MP4 of people
 talking and run it through the file path:
@@ -50,6 +116,9 @@ talking and run it through the file path:
 .venv/bin/hansard transcribe ~/some-recording.wav --output ./artifacts
 ```
 
+In a container, mount the recording and swap `join` for `transcribe`:
+`docker run --rm -v "$PWD/models:/models:ro" -v "$PWD:/data" -e HANSARD_RUNTIME__MODELS_DIR=/models hansard-bot:local hansard transcribe /data/some-recording.wav --output /data/artifacts`
+
 You get a transcript, speaker labels and minutes in `./artifacts`. If this works,
 the transcription half is fine and anything that fails later is capture.
 
@@ -57,7 +126,7 @@ the transcription half is fine and anything that fails later is capture.
 
 ## The meeting itself
 
-### 5. Name the notetaker something your colleagues will recognise
+### 6. Name the notetaker something your colleagues will recognise
 
 It appears in the participant list. `Hansard Notetaker` is the default and it
 looks like a stranger.
@@ -66,7 +135,7 @@ looks like a stranger.
 export HANSARD_CAPTURE__DISPLAY_NAME="Notetaker - test IT"
 ```
 
-### 6. Tell the room, out loud
+### 7. Tell the room, out loud
 
 Hansard posts a notice in the meeting chat on join and sits visibly in the
 roster, but **Teams does not show its own recording banner** for an external
@@ -76,15 +145,16 @@ The organiser should say it at the start and put it in the invitation.
 cover consent and the GDPR position properly. For a test with colleagues who
 know what is happening, saying it out loud is enough.
 
-### 7. Join
+### 8. Join
 
 Copy the *Join Microsoft Teams Meeting* link and:
 
 ```bash
-.venv/bin/hansard join "<paste the join URL>" \
-  --title "Test Hansard" \
-  --output ./artifacts
+.venv/bin/hansard join "<paste the join URL>" --title "Test Hansard" --output ./artifacts
 ```
+
+In a container it is the same command inside the `docker run` from
+[§3b](#3b-windows-or-macos-run-it-in-a-container).
 
 Both link shapes work — the classic `meetup-join` one and the newer
 `teams.microsoft.com/meet/<id>?p=<passcode>`.
@@ -93,7 +163,7 @@ The notetaker takes up to a minute to appear. **Somebody already in the meeting
 has to admit it from the lobby** unless the organiser has set the lobby to let
 it in. If nobody admits it, it gives up after ten minutes.
 
-### 8. Run a meeting worth measuring
+### 9. Run a meeting worth measuring
 
 Twenty minutes is plenty. What makes the test informative:
 

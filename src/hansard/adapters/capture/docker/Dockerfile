@@ -7,6 +7,11 @@ ARG PLAYWRIGHT_VERSION=1.62.0
 # The build fails when the argument is set and does not match, and records the observed value at
 # /opt/hansard/chromium.sha256 so the first build can produce the value to pin.
 ARG CHROMIUM_SHA256=""
+# In Kubernetes the bot only captures and uploads; the worker transcribes, so diarization is
+# deliberately absent. To run a whole meeting in this one container instead - which is what a
+# single machine without Kubernetes needs - build with
+#   --build-arg EXTRAS=capture,asr-onnx,diarization,delivery
+ARG EXTRAS=capture,asr-onnx,delivery
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
@@ -51,7 +56,7 @@ RUN set -eu; \
 WORKDIR /opt/hansard
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir ".[capture,asr-onnx,delivery]"
+RUN pip install --no-cache-dir ".[${EXTRAS}]"
 
 COPY src/hansard/adapters/capture/docker/entrypoint.sh /usr/local/bin/hansard-entrypoint
 RUN chmod +x /usr/local/bin/hansard-entrypoint \
@@ -64,4 +69,6 @@ ENV HOME=/home/hansard \
     XDG_RUNTIME_DIR=/run/user/1000
 
 ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/hansard-entrypoint"]
-CMD ["hansard", "worker"]
+# Overridden by the Kubernetes Job template, which runs the capture. Left as the version probe
+# because the default build has no diarization and therefore cannot serve as a worker.
+CMD ["hansard", "version"]
