@@ -177,6 +177,10 @@ Hansard posts a notice in the meeting chat on join and sits visibly in the
 roster, but **Teams does not show its own recording banner** for an external
 notetaker — Teams is not doing the recording. A chat message is easy to miss.
 The organiser should say it at the start and put it in the invitation.
+
+The notetaker has no camera and cannot acquire one — it is removed at the browser level, not
+just toggled off — so it shows up in the roster as a camera-off participant with the name you
+gave it.
 [teams-setup.md §5 and §6](teams-setup.md#5-telling-participants-consent-and-notification)
 cover consent and the GDPR position properly. For a test with colleagues who
 know what is happening, saying it out loud is enough.

@@ -46,6 +46,7 @@ def build_session(screens, events=None, **overrides):
         event_sink=events.append if events is not None else None,
         timing=fast_timing(),
         instrumentation="/* test */",
+        camera_guard="/* no camera */",
         clock=StepClock(step=0.25),
         epoch_ms=lambda: 1_700_000_000_000,
         sleep=nosleep,
@@ -115,7 +116,7 @@ async def test_join_walks_launcher_prejoin_and_meeting():
     assert outcome.attempts == 1
     assert not outcome.waited_in_lobby
     context = factory.latest.context
-    assert context.init_scripts == ["/* test */"]
+    assert context.init_scripts == ["/* no camera */", "/* test */"]
     assert "__hansardEmit" in context.bindings
     assert context.permissions == [(("microphone", "camera"), "https://teams.microsoft.com")]
     method, params = factory.latest.cdp_session.calls[0]
@@ -133,6 +134,46 @@ async def test_join_leaves_already_muted_devices_alone():
     session, _ = build_session([screen])
     await session.join(CLASSIC_LINK)
     assert MIC_TOGGLE not in screen.clicks
+    assert CAMERA_TOGGLE not in screen.clicks
+
+
+async def test_a_toggle_that_reports_its_state_as_pressed_is_still_turned_off():
+    screen = launcher_screen()
+    screen.attributes = {
+        MIC_TOGGLE: {"aria-pressed": "true"},
+        CAMERA_TOGGLE: {"aria-pressed": "true"},
+    }
+    session, _ = build_session([screen])
+    await session.join(CLASSIC_LINK)
+    assert MIC_TOGGLE in screen.clicks
+    assert CAMERA_TOGGLE in screen.clicks
+
+
+async def test_a_toggle_already_off_is_not_clicked_whichever_attribute_it_uses():
+    screen = launcher_screen()
+    screen.attributes = {
+        MIC_TOGGLE: {"aria-pressed": "false"},
+        CAMERA_TOGGLE: {"aria-pressed": "false"},
+    }
+    session, _ = build_session([screen])
+    await session.join(CLASSIC_LINK)
+    assert MIC_TOGGLE not in screen.clicks
+    assert CAMERA_TOGGLE not in screen.clicks
+
+
+async def test_the_camera_guard_is_installed_before_the_instrumentation():
+    screen = launcher_screen()
+    session, factory = build_session([screen])
+    await session.join(CLASSIC_LINK)
+    assert factory.latest.context.init_scripts[0] == "/* no camera */"
+
+
+async def test_a_toggle_that_says_nothing_about_its_state_is_left_to_the_camera_guard():
+    screen = launcher_screen()
+    screen.attributes = {}
+    session, _ = build_session([screen])
+    outcome = await session.join(CLASSIC_LINK)
+    assert outcome.state is MeetingState.IN_MEETING
     assert CAMERA_TOGGLE not in screen.clicks
 
 

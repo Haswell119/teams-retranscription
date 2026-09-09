@@ -25,6 +25,7 @@ SNAPSHOT_EXPRESSION: Final[str] = (
     "() => (typeof window.__hansardSnapshot === 'function' ? window.__hansardSnapshot() : null)"
 )
 INSTRUMENTATION_PATH: Final[Path] = Path(__file__).with_name("instrumentation.js")
+NO_CAMERA_PATH: Final[Path] = Path(__file__).with_name("no_camera.js")
 
 LAUNCHER_PARAMETERS: Final[tuple[tuple[str, str], ...]] = (
     ("msLaunch", "false"),
@@ -252,6 +253,11 @@ def load_instrumentation(path: Path | None = None) -> str:
     return source.read_text(encoding="utf-8")
 
 
+def load_camera_guard(path: Path | None = None) -> str:
+    source = path or NO_CAMERA_PATH
+    return source.read_text(encoding="utf-8")
+
+
 class TeamsBrowserSession:
     def __init__(
         self,
@@ -262,6 +268,7 @@ class TeamsBrowserSession:
         options: BrowserOptions | None = None,
         timing: SessionTiming | None = None,
         instrumentation: str | None = None,
+        camera_guard: str | None = None,
         clock: Callable[[], float] = time.monotonic,
         epoch_ms: Callable[[], int] = lambda: int(time.time() * 1000),
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -273,6 +280,7 @@ class TeamsBrowserSession:
         self._options = options or BrowserOptions(headless=settings.headless)
         self._timing = timing or SessionTiming()
         self._instrumentation = instrumentation if instrumentation is not None else load_instrumentation()
+        self._camera_guard = camera_guard if camera_guard is not None else load_camera_guard()
         self._clock = clock
         self._epoch_ms = epoch_ms
         self._sleep = sleep
@@ -351,6 +359,7 @@ class TeamsBrowserSession:
             raise _TransientJoinError(CaptureError(f"could not start Chromium: {error}")) from error
         self._runtime = runtime
         await runtime.context.expose_binding(EMIT_BINDING, self._handle_binding)
+        await runtime.context.add_init_script(self._camera_guard)
         await runtime.context.add_init_script(self._instrumentation)
         await self._grant_permissions(origin_of(join_url))
 
@@ -457,9 +466,10 @@ class TeamsBrowserSession:
         if locator is None:
             return
         try:
-            checked = await locator.get_attribute("aria-checked")
-            if checked == "true":
-                await locator.click(timeout=self._timing.element_timeout_ms)
+            for attribute in ("aria-checked", "aria-pressed"):
+                if await locator.get_attribute(attribute) == "true":
+                    await locator.click(timeout=self._timing.element_timeout_ms)
+                    return
         except Exception:
             return
 

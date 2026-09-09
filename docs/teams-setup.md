@@ -149,7 +149,13 @@ covered by the test suite.
 export HANSARD_CAPTURE__DISPLAY_NAME="Notetaker - Direction juridique"
 ```
 
-4. It leaves automatically when the meeting ends, when it is removed, when it is the only
+4. **It never has a camera.** Microphone and camera are switched off on the pre-join screen,
+   and the camera is additionally removed from the browser's world before Teams loads: the page
+   is told there is no camera device, and any request for a video track is stripped or refused.
+   The notetaker therefore appears camera-off because it *is*, not because a button happened to
+   be clicked. This matters more than it sounds — Chromium runs with a synthetic media device, so
+   a missed click would have published a fake camera feed to the whole meeting.
+5. It leaves automatically when the meeting ends, when it is removed, when it is the only
    participant left (`alone_timeout_seconds`, default 120 s), after `silence_timeout_seconds`
    (default 600 s) without any speech, or at `max_duration_seconds` (default 4 h).
 
