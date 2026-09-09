@@ -20,10 +20,10 @@
 #   minio/mc                  models.source=s3
 docker.io/library/redis:7.4-alpine
 docker.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
-ghcr.io/haswell119/hansard-api:0.1.0
-ghcr.io/haswell119/hansard-bot:0.1.0
-ghcr.io/haswell119/hansard-models-init:0.1.0
-ghcr.io/haswell119/hansard-models:0.1.0
-ghcr.io/haswell119/hansard-worker-gpu:0.1.0
-ghcr.io/haswell119/hansard-worker:0.1.0
+ghcr.io/haswell119/hansard-api:0.1.1
+ghcr.io/haswell119/hansard-bot:0.1.1
+ghcr.io/haswell119/hansard-models-init:0.1.1
+ghcr.io/haswell119/hansard-models:0.1.1
+ghcr.io/haswell119/hansard-worker-gpu:0.1.1
+ghcr.io/haswell119/hansard-worker:0.1.1
 ghcr.io/oras-project/oras:v1.2.0

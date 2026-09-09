@@ -7,6 +7,33 @@ Quality figures cite the run that produced them. Anything not measured is said
 to be not measured — see [docs/benchmarks.md](docs/benchmarks.md) and
 [docs/quality-research.md](docs/quality-research.md).
 
+## [0.1.1] - 2026-09-09
+
+Nothing about transcription changed. Everything here is about somebody being
+able to run 0.1.0 on a machine that is not the one it was developed on.
+
+### Fixed
+
+- **The getting-started guide assumed `make`.** Every target it named is one or
+  two commands and they are now written out, so a reader without `make` — the
+  ordinary case on Windows — is not stopped on the first instruction.
+- **The guide never said the notetaker needs Linux.** Capture routes audio
+  through a PulseAudio null sink using `pactl` and `ffmpeg -f pulse`, with no
+  fallback on Windows or macOS. `docs/first-meeting.md` now picks the path by
+  platform before anything is installed, and documents a container route.
+- **That container route did not work.** The bot image installs
+  `capture,asr-onnx,delivery`, which is right in Kubernetes where the bot only
+  captures and a worker transcribes, but makes `hansard join` inside the image
+  fail with `unknown diarization engine 'sherpa'`. The extras are now a build
+  argument, so a single machine builds with
+  `--build-arg EXTRAS=capture,asr-onnx,diarization,delivery` and runs a whole
+  meeting in one container.
+- **The bot image's `CMD` was `hansard worker`**, which that image has never had
+  the dependencies to do. It is now `hansard version`; Kubernetes overrides the
+  command anyway.
+
+[0.1.1]: https://github.com/Haswell119/teams-retranscription/releases/tag/v0.1.1
+
 ## [0.1.0] - 2026-09-08
 
 First tagged release. Hansard joins a Microsoft Teams meeting as a notetaker,

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hansard"
-version = "0.1.0"
+version = "0.1.1"
 description = "Sovereign, self-hosted meeting transcription and minutes for Microsoft Teams. 100% local, open source."
 readme = "README.md"
 requires-python = ">=3.11"
